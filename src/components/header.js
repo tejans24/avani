@@ -14,10 +14,10 @@ function Header() {
   `);
 
   return (
-    <header className="bg-green-700">
-      <div className="flex flex-wrap items-center justify-between max-w-4xl p-4 mx-auto md:p-8">
+    <header className="bg-white-600">
+      <div className="flex flex-wrap items-center justify-between p-4 mx-auto md:p-8">
         <Link to="/">
-          <h1 className="flex items-center text-white no-underline">
+          <h1 className="flex items-center text-black no-underline">
             <svg
               className="w-8 h-8 mr-2 fill-current"
               height="54"

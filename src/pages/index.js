@@ -20,7 +20,7 @@ function IndexPage() {
         />
 
         <h2 className="inline-block p-3 mb-4 text-2xl font-bold bg-yellow-400">
-          Hey there! Welcome to your first Gatsby site.
+          Technology for the benefit of the planet.
         </h2>
 
         <p className="leading-loose">
