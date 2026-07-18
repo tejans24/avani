@@ -86,3 +86,62 @@ export type LineItemInput = z.infer<typeof lineItemSchema>;
 export type InvoiceInput = z.infer<typeof invoiceSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type SendInvoiceInput = z.infer<typeof sendInvoiceSchema>;
+
+// ============================================================
+// Phase 2 — CFO layer
+// ============================================================
+
+export const accountSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  kind: z.enum(["BANK", "CREDIT_CARD"]),
+  institution: z.string().trim().min(1, "Institution is required").max(100),
+  mask: z.string().trim().max(8).optional(),
+  amountsAreCharges: z.boolean().default(false),
+});
+
+export const csvImportSchema = z.object({
+  accountId: z.string().min(1),
+  rows: z
+    .array(
+      z.object({
+        dateIso: z.string().regex(ISO_DATE_RE, "Use YYYY-MM-DD"),
+        amountCents: z.number().int(),
+        description: z.string().min(1).max(500),
+      })
+    )
+    .min(1, "Nothing to import")
+    .max(5000, "Too many rows in one import"),
+});
+
+export const ruleSchema = z.object({
+  field: z.enum(["DESCRIPTION", "MERCHANT"]).default("DESCRIPTION"),
+  matchType: z.enum(["SUBSTRING", "REGEX"]).default("SUBSTRING"),
+  pattern: z.string().trim().min(1, "Pattern is required").max(200),
+  categoryId: z.string().min(1, "Pick a category"),
+  priority: z.number().int().min(0).max(10000).default(100),
+});
+
+export const taxSettingsSchema = z.object({
+  state: z.string().trim().max(30),
+  federalRateBps: z.number().int().min(0).max(10000),
+  stateRateBps: z.number().int().min(0).max(10000),
+  ownerSalaryAnnualCents: z.number().int().min(0),
+  withholdingYtdCents: z.number().int().min(0),
+  cpaFiles1120S: z.boolean().nullable().optional(),
+  payrollProvider: z.string().trim().max(100).optional(),
+});
+
+export const estimatePaymentSchema = z.object({
+  year: z.number().int().min(2020).max(2100),
+  quarter: z.number().int().min(1).max(4),
+  jurisdiction: z.enum(["FEDERAL", "STATE"]),
+  paidDate: z.string().regex(ISO_DATE_RE, "Use YYYY-MM-DD"),
+  amountCents: z.number().int().min(1, "Amount is required"),
+  notes: z.string().max(500).optional(),
+});
+
+export type AccountInput = z.infer<typeof accountSchema>;
+export type CsvImportInput = z.infer<typeof csvImportSchema>;
+export type RuleInput = z.infer<typeof ruleSchema>;
+export type TaxSettingsInput = z.infer<typeof taxSettingsSchema>;
+export type EstimatePaymentInput = z.infer<typeof estimatePaymentSchema>;

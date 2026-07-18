@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import { TEST_DATABASE_URL } from "../../playwright.config";
+import { CATEGORY_SEEDS } from "../../prisma/seed-categories";
 
 async function withPg<T>(fn: (pg: Client) => Promise<T>): Promise<T> {
   const pg = new Client({ connectionString: TEST_DATABASE_URL });
@@ -11,11 +12,27 @@ async function withPg<T>(fn: (pg: Client) => Promise<T>): Promise<T> {
   }
 }
 
-/** Truncate all app tables and re-seed the CompanySettings singleton. */
+/** Truncate all app tables and re-seed singletons + the category chart. */
 export async function resetDb() {
   await withPg(async (pg) => {
     await pg.query(
-      `TRUNCATE "InvoiceLineItem", "Invoice", "Client", "CompanySettings" RESTART IDENTITY CASCADE`
+      `TRUNCATE "InvoiceLineItem", "Invoice", "Client", "CompanySettings",
+                "Transaction", "CategoryRule", "Category", "FinancialAccount",
+                "TaxSettings", "QuarterlyEstimatePayment", "ComplianceDeadline",
+                "HandlerRun", "DomainEvent", "Notification"
+       RESTART IDENTITY CASCADE`
+    );
+    for (const [i, c] of CATEGORY_SEEDS.entries()) {
+      await pg.query(
+        `INSERT INTO "Category" (id, name, kind, "taxLine", "deductiblePct", "sortOrder", system)
+         VALUES ($1, $2, $3::"CategoryKind", $4::"TaxLine", $5, $6, true)`,
+        [`testcat_${i}`, c.name, c.kind, c.taxLine, c.deductiblePct ?? 100, i]
+      );
+    }
+    await pg.query(
+      `INSERT INTO "TaxSettings" (id, state, "federalRateBps", "stateRateBps",
+        "ownerSalaryAnnualCents", "withholdingYtdCents", "updatedAt")
+       VALUES (1, 'CA', 2400, 930, 0, 0, NOW())`
     );
     await pg.query(
       `INSERT INTO "CompanySettings"
@@ -142,4 +159,72 @@ export async function insertLineItem(
 
 export async function queryRows(sql: string, params: unknown[] = []) {
   return withPg(async (pg) => (await pg.query(sql, params)).rows);
+}
+
+/** Insert a financial account directly. */
+export async function insertAccount(overrides: Partial<Record<string, unknown>> = {}) {
+  const id = `testacct_${Math.random().toString(36).slice(2, 10)}`;
+  const a = {
+    id,
+    name: "Mercury Checking",
+    kind: "BANK",
+    institution: "Mercury",
+    mask: "1234",
+    source: "CSV",
+    amountsAreCharges: false,
+    ...overrides,
+  } as Record<string, unknown>;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "FinancialAccount"
+        (id, name, kind, institution, mask, source, "amountsAreCharges", archived, "createdAt", "updatedAt")
+       VALUES ($1,$2,$3::"AccountKind",$4,$5,$6::"AccountSource",$7,false,NOW(),NOW())`,
+      [a.id, a.name, a.kind, a.institution, a.mask, a.source, a.amountsAreCharges]
+    )
+  );
+  return a as { id: string; name: string };
+}
+
+/** Insert a transaction directly (signed cents, business perspective). */
+export async function insertTransaction(
+  accountId: string,
+  t: {
+    postedAt: string | Date;
+    amountCents: number;
+    description: string;
+    merchant?: string | null;
+    categoryId?: string | null;
+    status?: "UNREVIEWED" | "REVIEWED" | "EXCLUDED";
+    matchedInvoiceId?: string | null;
+  }
+) {
+  const id = `testtxn_${Math.random().toString(36).slice(2, 10)}`;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "Transaction"
+        (id, "accountId", "postedAt", "amountCents", description, merchant, "dedupeKey",
+         "categoryId", "matchedInvoiceId", status, "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::"TransactionStatus",NOW(),NOW())`,
+      [
+        id,
+        accountId,
+        t.postedAt,
+        t.amountCents,
+        t.description,
+        t.merchant ?? null,
+        `test:${id}`,
+        t.categoryId ?? null,
+        t.matchedInvoiceId ?? null,
+        t.status ?? "UNREVIEWED",
+      ]
+    )
+  );
+  return id;
+}
+
+/** Look up a seeded category id by its unique name. */
+export async function getCategoryIdByName(name: string): Promise<string> {
+  const rows = await queryRows(`SELECT id FROM "Category" WHERE name = $1`, [name]);
+  if (!rows[0]) throw new Error(`Category not found: ${name}`);
+  return rows[0].id as string;
 }
