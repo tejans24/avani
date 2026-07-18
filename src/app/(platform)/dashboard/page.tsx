@@ -6,6 +6,7 @@ import { Button } from "@/components/platform/ds";
 import { StatTile } from "@/components/platform/StatTile";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
 import { HealthCard } from "@/components/platform/HealthCard";
+import { NeedsYouList } from "@/components/platform/NeedsYouList";
 
 export const metadata = { title: "Dashboard — Avani" };
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
+      <NeedsYouList />
       <HealthCard />
 
       <div className="stat-row">
