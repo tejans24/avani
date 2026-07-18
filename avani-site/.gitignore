@@ -10,3 +10,4 @@ out
 .fake-emails
 test-results
 playwright-report
+tsconfig.tsbuildinfo
