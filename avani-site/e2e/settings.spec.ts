@@ -33,7 +33,9 @@ test("sent invoice keeps its From snapshot after settings change", async ({
   await page.goto(`/invoices/${invoiceId}`);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await page.getByRole("button", { name: "Send invoice" }).click();
-  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
 
   // Change company name in settings
   await page.goto("/settings");

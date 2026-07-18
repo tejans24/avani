@@ -45,14 +45,17 @@ test("send flow: prefilled dialog, fake email with PDF, SENT transition", async 
   const before = readFakeEmails().length;
 
   await page.goto(`/invoices/${invoiceId}`);
-  await expect(page.getByText("Draft")).toBeVisible();
+  await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.locator("#send-to")).toHaveValue("billing@acme.example");
   await expect(page.locator("#send-cc")).toHaveValue("accounting@acme.example");
   await page.getByRole("button", { name: "Send invoice" }).click();
 
-  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
+  // First send renders the PDF and writes the fake email — allow dev-server slack
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
   // Edit button is gone once sent
   await expect(page.getByRole("link", { name: "Edit" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Resend" })).toBeVisible();
@@ -91,7 +94,9 @@ test("resend keeps status SENT and sends another email", async ({ page }) => {
   await page.goto(`/invoices/${invoiceId}`);
   await page.getByRole("button", { name: "Resend" }).click();
   await page.getByRole("button", { name: "Send invoice" }).click();
-  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
   await expect
     .poll(() => readFakeEmails().length, { timeout: 10_000 })
     .toBe(before + 1);

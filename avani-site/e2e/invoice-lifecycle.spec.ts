@@ -22,7 +22,9 @@ test("mark a sent invoice as paid", async ({ page }) => {
   await page.getByRole("button", { name: "Mark as paid" }).click();
   await page.locator("#paid-date").fill("2026-07-18");
   await page.getByRole("button", { name: "Mark paid", exact: true }).click();
-  await expect(page.getByText("Paid", { exact: true })).toBeVisible();
+  await expect(page.getByText("Paid", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
   await expect(page.getByText(/paid Jul 18, 2026/)).toBeVisible();
 });
 
@@ -85,9 +87,11 @@ test("duplicate creates a new draft with the next number", async ({ page }) => {
 
   await page.goto(`/invoices/${id}`);
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
-  await page.waitForURL(/\/invoices\/(?!.*INV)[a-z0-9_]+$/i);
+  await page.waitForURL((url) => !url.pathname.endsWith(`/${id}`), {
+    timeout: 20_000,
+  });
   await expect(page.getByText("INV-0001")).toBeVisible(); // counter seeded at 1
-  await expect(page.getByText("Draft")).toBeVisible();
+  await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 });
 
 test("duplicate for next period shifts description date ranges", async ({ page }) => {

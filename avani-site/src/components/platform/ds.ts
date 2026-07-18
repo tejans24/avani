@@ -11,8 +11,7 @@ import { Eyebrow as DsEyebrow } from "@/ds/components/core/Eyebrow";
 import { Callout as DsCallout } from "@/ds/components/core/Callout";
 import { Divider as DsDivider } from "@/ds/components/core/Divider";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Loose = ComponentType<any>;
+type Loose = ComponentType<Record<string, unknown>>;
 
 export const Button = DsButton as Loose;
 export const Badge = DsBadge as Loose;
