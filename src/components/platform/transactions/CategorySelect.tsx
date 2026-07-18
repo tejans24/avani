@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Select } from "@/ds/components/forms/Select";
 import { Input } from "@/ds/components/forms/Input";
 import { Button } from "@/components/platform/ds";
@@ -41,7 +40,6 @@ export function CategorySelect({
   merchant: string | null;
   onCategorized: (prompt: RulePrompt) => void;
 }) {
-  const router = useRouter();
   const [val, setVal] = useState(value ?? "");
   const [pending, startTransition] = useTransition();
 
@@ -66,7 +64,9 @@ export function CategorySelect({
           field: merchant ? "MERCHANT" : "DESCRIPTION",
         });
       }
-      router.refresh();
+      // No router.refresh() here: the action's revalidatePath("/transactions")
+      // already streams the refreshed page back with the POST response, and an
+      // extra in-transition refresh races it (hangs the transition on Next 14.2).
     });
   };
 
@@ -102,7 +102,6 @@ export function RuleStrip({
   uncategorizedCount: number;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [pattern, setPattern] = useState(prompt.pattern);
   const [applyToExisting, setApplyToExisting] = useState(true);
   const [pending, startTransition] = useTransition();
@@ -123,8 +122,8 @@ export function RuleStrip({
         setError(result.error);
         return;
       }
+      // revalidatePath in the action refreshes the page; see note above.
       onClose();
-      router.refresh();
     });
   };
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/platform/ds";
 import { Select } from "@/ds/components/forms/Select";
 import { bulkUpdateTransactions } from "@/actions/transactions";
@@ -22,7 +21,6 @@ export function BulkBar({
   categories: CategoryOption[];
   onClear: () => void;
 }) {
-  const router = useRouter();
   const [categoryId, setCategoryId] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +34,10 @@ export function BulkBar({
         setError(result.error);
         return;
       }
+      // revalidatePath in the action streams the refreshed page back with the
+      // POST response — no explicit router.refresh() needed (and an extra
+      // in-transition refresh races it on Next 14.2).
       onClear();
-      router.refresh();
     });
   };
 

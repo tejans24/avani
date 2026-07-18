@@ -10,8 +10,13 @@ import {
 const rowsLocator = (page) => page.locator(".data-table tbody tr");
 
 test.describe("transactions", () => {
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     await resetDb();
+    // The sandbox has no internet access, so the Google Fonts @import in
+    // ds/tokens/fonts.css hangs — and React blocks transition commits (e.g.
+    // applying a server action's revalidated tree) on pending stylesheet
+    // loads. Abort font requests instantly so commits stay deterministic.
+    await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
   });
 
   test("filters by account, month, status tab, and search", async ({ page }) => {
