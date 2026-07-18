@@ -21,7 +21,14 @@ export async function upsertClient(
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
-    const data = parsed.data;
+    const data = {
+      ...parsed.data,
+      // The form always submits the field; a missing value means "off", so
+      // normalize undefined -> null (undefined would leave a stale cadence
+      // in place on update instead of clearing it).
+      billingCadenceDays: parsed.data.billingCadenceDays ?? null,
+      overdueRemindersEnabled: parsed.data.overdueRemindersEnabled,
+    };
 
     const client = id
       ? await db.client.update({ where: { id }, data })

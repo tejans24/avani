@@ -25,6 +25,16 @@ export const clientSchema = z.object({
   postalCode: z.string().trim().max(20).optional(),
   country: z.string().trim().max(100).optional(),
   notes: z.string().max(5000).optional(),
+  /** Auto-draft cadence in days (e.g. 14 = biweekly); null/undefined = off. */
+  billingCadenceDays: z
+    .number()
+    .int("Whole days only")
+    .min(1, "At least 1 day")
+    .max(90, "At most 90 days")
+    .nullable()
+    .optional(),
+  /** Per-client gate for the (globally-toggled) overdue reminder emails. */
+  overdueRemindersEnabled: z.boolean().default(true),
 });
 
 export const lineItemSchema = z.object({

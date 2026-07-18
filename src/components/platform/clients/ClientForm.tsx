@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, type Resolver } from "react-hook-form";
+import { useController, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { clientSchema, type ClientInput } from "@/lib/validations";
 import { upsertClient } from "@/actions/clients";
 import { FormTextInput, FormTextarea, FormEmailListInput } from "@/components/form";
-import { Button, Eyebrow, Divider } from "@/components/platform/ds";
+import { Field, Select } from "@/components/form/shared";
+import { Button, Eyebrow, Divider, Switch } from "@/components/platform/ds";
 
 const sectionHeadStyle: React.CSSProperties = { marginBottom: 16 };
 const dividerStyle: React.CSSProperties = { margin: "28px 0" };
@@ -24,7 +25,16 @@ const EMPTY_CLIENT: ClientInput = {
   postalCode: "",
   country: "",
   notes: "",
+  billingCadenceDays: null,
+  overdueRemindersEnabled: true,
 };
+
+const CADENCE_OPTIONS = [
+  { value: "", label: "Off — invoice manually" },
+  { value: "7", label: "Every 7 days (weekly)" },
+  { value: "14", label: "Every 14 days (biweekly)" },
+  { value: "30", label: "Every 30 days (monthly)" },
+];
 
 export function ClientForm({
   client,
@@ -42,6 +52,12 @@ export function ClientForm({
     // `values` (not defaultValues) so server refreshes after save propagate in.
     ...(client ? { values: client } : { defaultValues: EMPTY_CLIENT }),
   });
+
+  // Custom-wired fields: the cadence select maps "" <-> null (FormSelect's
+  // placeholder option is disabled, so "Off" needs a real option), and the
+  // reminders switch holds a boolean the ds Switch toggles directly.
+  const { field: cadenceField } = useController({ control, name: "billingCadenceDays" });
+  const { field: remindersField } = useController({ control, name: "overdueRemindersEnabled" });
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +147,53 @@ export function ClientForm({
       <Divider style={dividerStyle} />
 
       <Eyebrow index="04" style={sectionHeadStyle}>
+        Billing automation
+      </Eyebrow>
+      <div className="form-grid">
+        <Field
+          label="Billing cadence"
+          htmlFor="billingCadenceDays"
+          hint="The tick prepares the next draft this many days after the latest invoice (starts from your first manual invoice)."
+          className="span-2"
+        >
+          <Select
+            id="billingCadenceDays"
+            name={cadenceField.name}
+            value={cadenceField.value == null ? "" : String(cadenceField.value)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              cadenceField.onChange(e.target.value === "" ? null : Number(e.target.value))
+            }
+          >
+            {CADENCE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="span-2" style={{ marginTop: 4 }}>
+          <Switch
+            checked={remindersField.value ?? true}
+            data-testid="toggle-overdue-reminders"
+            onChange={(next: boolean) => remindersField.onChange(next)}
+            label="Overdue payment reminder emails"
+          />
+          <p
+            style={{
+              margin: "6px 0 0 56px",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--ink-soft)",
+            }}
+          >
+            Applies only when the global overdue-reminder automation is on.
+          </p>
+        </div>
+      </div>
+
+      <Divider style={dividerStyle} />
+
+      <Eyebrow index="05" style={sectionHeadStyle}>
         Notes
       </Eyebrow>
       <div className="form-grid">

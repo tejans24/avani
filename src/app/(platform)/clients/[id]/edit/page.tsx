@@ -23,6 +23,8 @@ export default async function EditClientPage({ params }: { params: { id: string 
     postalCode: client.postalCode ?? "",
     country: client.country ?? "",
     notes: client.notes ?? "",
+    billingCadenceDays: client.billingCadenceDays,
+    overdueRemindersEnabled: client.overdueRemindersEnabled,
   };
 
   return (
