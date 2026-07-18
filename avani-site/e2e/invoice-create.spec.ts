@@ -71,7 +71,8 @@ test.describe("invoice create/edit", () => {
     // No client selected, single empty line item.
     await page.getByRole("button", { name: "Create invoice" }).click();
 
-    await expect(page.getByText("Select a client")).toBeVisible();
+    // exact: the select's placeholder option is "Select a client…".
+    await expect(page.getByText("Select a client", { exact: true })).toBeVisible();
     await expect(page.getByText("Description is required")).toBeVisible();
     await expect(page).toHaveURL(/\/invoices\/new/);
   });
