@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  VOID
+}
+
+/// Singleton (id = 1): the "From" block, payment instructions, and defaults.
+model CompanySettings {
+  id                     Int      @id @default(1)
+  companyName            String
+  addressLine1           String
+  addressLine2           String?
+  city                   String
+  state                  String
+  postalCode             String
+  country                String   @default("USA")
+  email                  String
+  phone                  String?
+  payViaLabel            String   @default("Manual transfer (ACH/Wire)")
+  paymentInstructions    String   @db.Text
+  defaultTerms           String?  @db.Text
+  /// Due date suggestion: issue date + this many business days
+  defaultNetBusinessDays Int      @default(15)
+  defaultTaxRateBps      Int      @default(0)
+  nextInvoiceNumber      Int      @default(1)
+  /// Per-reaction toggles keyed by settingKey, e.g. {"overdueEmails": false}
+  reactionSettings       Json     @default("{}")
+  /// Watchdog: set by every /api/events/tick run; stale > 2h → in-app warning
+  lastTickAt             DateTime?
+  updatedAt              DateTime @updatedAt
+}
+
+/// A client company ("Clients" in the UI).
+model Client {
+  id           String    @id @default(cuid())
+  name         String
+  /// Invoice number prefix, e.g. "ACME" → INV-ACME-0001. Derived from the
+  /// name on first allocation; stable across renames; editable.
+  invoicePrefix     String? @unique
+  /// Per-client invoice counter (atomic increment at allocation)
+  nextInvoiceNumber Int     @default(1)
+  contactName  String?
+  billingEmail String
+  ccEmails     String[]  @default([])
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+  notes        String?   @db.Text
+  archived     Boolean   @default(false)
+  /// Auto-draft cadence: e.g. 14 = biweekly draft prepared by the tick; null = off
+  billingCadenceDays      Int?
+  /// Per-client gate for the (globally-toggled) overdue reminder emails
+  overdueRemindersEnabled Boolean @default(true)
+  invoices     Invoice[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Invoice {
+  id            String            @id @default(cuid())
+  number        String            @unique
+  clientId      String
+  client        Client            @relation(fields: [clientId], references: [id])
+  status        InvoiceStatus     @default(DRAFT)
+  issueDate     DateTime          @db.Date
+  dueDate       DateTime          @db.Date
+  taxRateBps    Int               @default(0)
+  subtotalCents Int               @default(0)
+  taxCents      Int               @default(0)
+  totalCents    Int               @default(0)
+  memo          String?           @db.Text
+  /// CompanySettings frozen at first send so later edits don't rewrite history
+  fromSnapshot  Json?
+  sentAt        DateTime?
+  paidAt        DateTime?
+  lineItems     InvoiceLineItem[]
+  /// Set when a bank deposit was confirmed as this invoice's payment
+  matchedTransaction Transaction?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([clientId])
+  @@index([status, dueDate])
+}
+
+model InvoiceLineItem {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description    String
+  quantity       Decimal @db.Decimal(10, 2)
+  unitPriceCents Int
+  amountCents    Int
+  sortOrder      Int     @default(0)
+
+  @@index([invoiceId])
+}
+
+// ============================================================
+// Phase 2 — CFO layer
+// ============================================================
+
+enum AccountKind {
+  BANK
+  CREDIT_CARD
+}
+
+enum AccountSource {
+  MERCURY_API
+  CSV
+}
+
+enum TransactionStatus {
+  UNREVIEWED
+  REVIEWED
+  EXCLUDED
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+  TRANSFER
+  OWNER
+}
+
+enum RuleField {
+  DESCRIPTION
+  MERCHANT
+}
+
+enum RuleMatchType {
+  SUBSTRING
+  REGEX
+}
+
+enum TaxJurisdiction {
+  FEDERAL
+  STATE
+}
+
+/// Form 1120-S line mapping. OTHER_DEDUCTIONS = line 19 itemized attachment;
+/// NONE = non-deductible / balance-sheet (distributions, contributions,
+/// transfers, personal).
+enum TaxLine {
+  GROSS_RECEIPTS
+  OFFICER_COMPENSATION
+  SALARIES_WAGES
+  REPAIRS_MAINTENANCE
+  RENTS
+  TAXES_LICENSES
+  INTEREST
+  DEPRECIATION
+  ADVERTISING
+  EMPLOYEE_BENEFITS
+  OTHER_DEDUCTIONS
+  NONE
+}
+
+model FinancialAccount {
+  id                String        @id @default(cuid())
+  name              String
+  kind              AccountKind
+  institution       String
+  mask              String?
+  source            AccountSource
+  mercuryAccountId  String?       @unique
+  /// CSV wizard default: incoming amounts are charges (Amex-style) -> flip sign
+  amountsAreCharges Boolean       @default(false)
+  archived          Boolean       @default(false)
+  transactions      Transaction[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Transaction {
+  id               String            @id @default(cuid())
+  accountId        String
+  account          FinancialAccount  @relation(fields: [accountId], references: [id])
+  postedAt         DateTime          @db.Date
+  /// SIGNED cents, business perspective: + money in, - money out (src/lib/transactions.ts)
+  amountCents      Int
+  description      String
+  merchant         String?
+  /// "mercury:<id>" or "csv:<sha256(date|cents|normDesc|ordinal)>"
+  dedupeKey        String
+  categoryId       String?
+  category         Category?         @relation(fields: [categoryId], references: [id])
+  matchedInvoiceId String?           @unique
+  matchedInvoice   Invoice?          @relation(fields: [matchedInvoiceId], references: [id])
+  status           TransactionStatus @default(UNREVIEWED)
+  notes            String?           @db.Text
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([accountId, dedupeKey])
+  @@index([postedAt])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model Category {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  kind          CategoryKind
+  taxLine       TaxLine
+  /// P&L shows 100%; tax views apply this (e.g. meals = 50)
+  deductiblePct Int            @default(100)
+  sortOrder     Int            @default(0)
+  /// Seeded rows; not deletable in the UI
+  system        Boolean        @default(false)
+  transactions  Transaction[]
+  rules         CategoryRule[]
+}
+
+model CategoryRule {
+  id         String        @id @default(cuid())
+  field      RuleField     @default(DESCRIPTION)
+  matchType  RuleMatchType @default(SUBSTRING)
+  /// Case-insensitive
+  pattern    String
+  categoryId String
+  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// Lower wins
+  priority   Int           @default(100)
+  createdAt  DateTime      @default(now())
+}
+
+/// Singleton (id = 1), mirrors CompanySettings.
+model TaxSettings {
+  id                     Int      @id @default(1)
+  state                  String   @default("")
+  /// Owner-supplied EFFECTIVE rates (estimator, not tax advice)
+  federalRateBps         Int      @default(2400)
+  stateRateBps           Int      @default(0)
+  ownerSalaryAnnualCents Int      @default(0)
+  withholdingYtdCents    Int      @default(0)
+  /// Onboarding facts
+  cpaFiles1120S          Boolean? 
+  payrollProvider        String?
+  updatedAt              DateTime @updatedAt
+}
+
+model QuarterlyEstimatePayment {
+  id           String          @id @default(cuid())
+  year         Int
+  quarter      Int
+  jurisdiction TaxJurisdiction
+  paidDate     DateTime        @db.Date
+  amountCents  Int
+  notes        String?
+  createdAt    DateTime        @default(now())
+
+  @@index([year])
+}
+
+/// Recurring/annual compliance deadlines (1120-S, 941s, W-2s, estimates, state).
+model ComplianceDeadline {
+  id       String   @id @default(cuid())
+  /// Stable key, e.g. "form-1120s-2026", "q3-estimate-2026"
+  key      String   @unique
+  title    String
+  dueDate  DateTime @db.Date
+  /// Window opens dueDate - leadDays; package/nag prepared then
+  leadDays Int      @default(30)
+  enabled  Boolean  @default(true)
+  notes    String?  @db.Text
+
+  @@index([dueDate])
+}
+
+// ============================================================
+// Event core (Postgres outbox)
+// ============================================================
+
+/// Append-only domain events, written in the SAME transaction as the state
+/// change (outbox pattern). Doubles as the audit log / activity feed.
+model DomainEvent {
+  id          String       @id @default(cuid())
+  type        String
+  payload     Json
+  entityType  String?
+  entityId    String?
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+  attempts    Int          @default(0)
+  handlerRuns HandlerRun[]
+
+  @@index([processedAt])
+  @@index([type, createdAt])
+  @@index([entityType, entityId])
+}
+
+model HandlerRun {
+  id      String      @id @default(cuid())
+  eventId String
+  event   DomainEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  handler String
+  status  String
+  error   String?     @db.Text
+  ranAt   DateTime    @default(now())
+
+  @@unique([eventId, handler])
+}
+
+/// In-app notification (one channel of the notify policy).
+model Notification {
+  id        String    @id @default(cuid())
+  tier      String    @default("info")
+  title     String
+  body      String?   @db.Text
+  href      String?
+  readAt    DateTime?
+  /// Per-channel delivery results, e.g. {"email":"SENT","sms":"FAILED: Twilio 401"}
+  delivery  Json?
+  createdAt DateTime  @default(now())
+
+  @@index([readAt, createdAt])
+}

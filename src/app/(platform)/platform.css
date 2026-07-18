@@ -1,0 +1,268 @@
+/* ============================================================
+   Platform layout helpers — mirrors site.css conventions.
+   Everything reads design-system tokens.
+   ============================================================ */
+
+.signin-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+
+.platform-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.platform-sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--color-surface-brand);
+  color: var(--text-on-brand);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.platform-sidebar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 22px;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--text-on-brand);
+  text-decoration: none;
+}
+
+.platform-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.platform-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: rgba(239, 237, 226, 0.78);
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.platform-nav a:hover {
+  background: rgba(239, 237, 226, 0.08);
+  color: var(--text-on-brand);
+}
+
+.platform-nav a[data-active="true"] {
+  background: rgba(239, 237, 226, 0.14);
+  color: var(--text-on-brand);
+}
+
+.platform-sidebar .sidebar-foot {
+  margin-top: auto;
+  padding: 12px 10px 0;
+  border-top: 1px solid var(--border-on-dark);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: rgba(239, 237, 226, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.platform-main {
+  flex: 1;
+  min-width: 0;
+  padding: 40px 48px 72px;
+  max-width: 1120px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.page-head h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.page-head .sub {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* --- data table --- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--color-surface-sunken);
+}
+
+.data-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: var(--cream);
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.data-table a:hover {
+  text-decoration: underline;
+}
+
+/* --- forms --- */
+.form-card {
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  max-width: 720px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* --- stat tiles row --- */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+/* --- misc --- */
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  background: var(--color-surface);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.filter-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--cream);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 20px;
+}
+
+.filter-tabs a {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.filter-tabs a[data-active="true"] {
+  background: var(--color-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 860px) {
+  .platform-shell {
+    flex-direction: column;
+  }
+  .platform-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .platform-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .platform-sidebar .brand {
+    padding-bottom: 4px;
+  }
+  .platform-sidebar .sidebar-foot {
+    display: none;
+  }
+  .platform-main {
+    padding: 24px 20px 56px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+}

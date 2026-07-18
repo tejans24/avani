@@ -1,0 +1,56 @@
+[
+  {
+    "id": "merc_txn_001",
+    "amount": 5940.0,
+    "postedAt": "2026-07-02T14:05:00Z",
+    "createdAt": "2026-07-01T18:22:05Z",
+    "counterpartyName": "ACME CORP",
+    "bankDescription": "ACME CORP ACH PAYMENT",
+    "status": "sent"
+  },
+  {
+    "id": "merc_txn_002",
+    "amount": -49.0,
+    "postedAt": "2026-07-05T08:00:00Z",
+    "createdAt": "2026-07-04T21:14:33Z",
+    "counterpartyName": "Cursor",
+    "bankDescription": "CURSOR AI SUBSCRIPTION",
+    "status": "sent"
+  },
+  {
+    "id": "merc_txn_003",
+    "amount": -120.55,
+    "postedAt": "2026-07-10T08:00:00Z",
+    "createdAt": "2026-07-09T16:41:12Z",
+    "counterpartyName": "Gusto",
+    "bankDescription": "GUSTO PAYROLL FEE",
+    "status": "sent"
+  },
+  {
+    "id": "merc_txn_004",
+    "amount": -36.99,
+    "postedAt": null,
+    "createdAt": "2026-07-12T09:00:00Z",
+    "counterpartyName": "Google",
+    "bankDescription": "GOOGLE WORKSPACE",
+    "status": "sent"
+  },
+  {
+    "id": "merc_txn_005",
+    "amount": -2500.0,
+    "postedAt": null,
+    "createdAt": "2026-07-15T11:30:00Z",
+    "counterpartyName": "WeWork",
+    "bankDescription": "PENDING WIRE OFFICE RENT",
+    "status": "pending"
+  },
+  {
+    "id": "merc_txn_006",
+    "amount": -75.0,
+    "postedAt": null,
+    "createdAt": "2026-07-13T10:05:00Z",
+    "counterpartyName": "Staples",
+    "bankDescription": "CANCELLED VENDOR PAYMENT",
+    "status": "cancelled"
+  }
+]
