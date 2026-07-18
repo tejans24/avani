@@ -55,6 +55,36 @@ const hintStyle: React.CSSProperties = {
   color: "var(--ink-soft)",
 };
 
+const STEPS: { key: Step; label: string }[] = [
+  { key: "upload", label: "Upload" },
+  { key: "map", label: "Map columns" },
+  { key: "preview", label: "Preview & import" },
+];
+
+/** 1 → 2 → 3 progress strip so it reads as a wizard, not three lone forms. */
+function WizardSteps({ current }: { current: Step }) {
+  const activeIndex = STEPS.findIndex((s) => s.key === current);
+  return (
+    <div className="wizard-steps" aria-label={`Step ${activeIndex + 1} of ${STEPS.length}`}>
+      {STEPS.map((s, i) => (
+        <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          {i > 0 && <span className="step-sep" aria-hidden="true" />}
+          <span
+            className="step"
+            data-active={i === activeIndex || undefined}
+            data-done={i < activeIndex || undefined}
+          >
+            <span className="step-dot" aria-hidden="true">
+              {i < activeIndex ? "✓" : i + 1}
+            </span>
+            {s.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function CsvImportWizard({
   account,
 }: {
@@ -178,6 +208,7 @@ export function CsvImportWizard({
   if (step === "upload") {
     return (
       <div className="form-card">
+        <WizardSteps current="upload" />
         <label
           htmlFor="csv-file"
           style={{
@@ -191,7 +222,13 @@ export function CsvImportWizard({
         >
           CSV file
         </label>
-        <input id="csv-file" type="file" accept=".csv,text/csv" onChange={onFileChange} />
+        <input
+          id="csv-file"
+          className="file-input"
+          type="file"
+          accept=".csv,text/csv"
+          onChange={onFileChange}
+        />
         <p style={hintStyle}>
           Export transactions from your bank or card as CSV, then upload the file here.
         </p>
@@ -207,6 +244,7 @@ export function CsvImportWizard({
   if (step === "map") {
     return (
       <div className="form-card">
+        <WizardSteps current="map" />
         <ColumnMapper
           headerRow={rawRows[0] ?? []}
           mapping={mapping}
@@ -238,6 +276,7 @@ export function CsvImportWizard({
 
   return (
     <div className="form-card">
+      <WizardSteps current="preview" />
       <PreviewTable rows={previewRows} />
       <p style={hintStyle} data-testid="import-summary">
         {validRows.length} of {previewRows.length} rows will import.

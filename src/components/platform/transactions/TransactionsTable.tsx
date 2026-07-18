@@ -63,7 +63,8 @@ export function TransactionsTable({
       {selectedIds.length > 0 && (
         <BulkBar ids={selectedIds} categories={categories} onClear={() => setSelected({})} />
       )}
-      <table className="data-table">
+      <div className="table-scroll">
+      <table className="data-table" style={{ minWidth: 880 }}>
         <thead>
           <tr>
             <th style={{ width: 36 }}>
@@ -99,7 +100,7 @@ export function TransactionsTable({
                     />
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>{formatDateShort(t.postedAt)}</td>
-                  <td>{t.accountName}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{t.accountName}</td>
                   <td>
                     {t.description}
                     {t.merchant && (
@@ -120,7 +121,7 @@ export function TransactionsTable({
                   >
                     {formatCents(t.amountCents)}
                   </td>
-                  <td style={{ minWidth: 190 }}>
+                  <td style={{ minWidth: 215 }}>
                     <CategorySelect
                       transactionId={t.id}
                       value={t.categoryId}
@@ -150,6 +151,7 @@ export function TransactionsTable({
           })}
         </tbody>
       </table>
+      </div>
     </>
   );
 }

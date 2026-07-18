@@ -8,7 +8,7 @@ import { estimatePaymentSchema, type EstimatePaymentInput } from "@/lib/validati
 import { deleteEstimatePayment, recordEstimatePayment } from "@/actions/tax";
 import type { EstimatePaymentView } from "@/lib/tax-data";
 import { formatCents } from "@/lib/money";
-import { formatDateLong } from "@/lib/dates";
+import { formatDateShort } from "@/lib/dates";
 import { FormDateInput, FormMoneyInput, FormSelect, FormTextInput } from "@/components/form";
 import { Field, Select } from "@/components/form/shared";
 import { Button } from "@/components/platform/ds";
@@ -117,7 +117,7 @@ export function EstimatePaymentsTable({
               <tr key={p.id}>
                 <td>Q{p.quarter}</td>
                 <td>{p.jurisdiction === "FEDERAL" ? "Federal" : "State"}</td>
-                <td>{formatDateLong(p.paidDateIso)}</td>
+                <td style={{ whiteSpace: "nowrap" }}>{formatDateShort(p.paidDateIso)}</td>
                 <td className="num">{formatCents(p.amountCents)}</td>
                 <td>{p.notes ?? "—"}</td>
                 <td style={{ textAlign: "right" }}>

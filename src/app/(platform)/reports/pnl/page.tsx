@@ -43,7 +43,7 @@ function Row({
 }) {
   return (
     <tr>
-      <td>
+      <td style={{ whiteSpace: "nowrap" }}>
         {row.name}
         {TAX_LINE_LABEL[row.taxLine] && (
           <span
@@ -191,7 +191,7 @@ export default async function PnlPage({
           your P&amp;L.
         </div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="table-scroll">
           <table className="data-table" data-testid="pnl-table">
             <thead>
               <tr>
@@ -213,14 +213,22 @@ export default async function PnlPage({
               {pnl.expenses.map((r) => (
                 <Row key={r.name} row={r} granularity={granularity} negate />
               ))}
-              <tr style={{ fontWeight: 700 }}>
-                <td>Net profit</td>
+              <tr style={{ fontWeight: 700, background: "var(--color-surface-sunken)" }}>
+                <td style={{ whiteSpace: "nowrap" }}>Net profit</td>
                 {pnl.netProfitCells.map((c) => (
-                  <td key={c.periodKey} className="num">
+                  <td
+                    key={c.periodKey}
+                    className="num"
+                    style={c.cents < 0 ? { color: "var(--critical)" } : undefined}
+                  >
                     {formatCents(c.cents)}
                   </td>
                 ))}
-                <td className="num" data-testid="net-profit">
+                <td
+                  className="num"
+                  data-testid="net-profit"
+                  style={pnl.netProfitCents < 0 ? { color: "var(--critical)" } : undefined}
+                >
                   {formatCents(pnl.netProfitCents)}
                 </td>
               </tr>

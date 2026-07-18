@@ -40,10 +40,21 @@ export default async function ClientsPage({
       </div>
 
       {clients.length === 0 ? (
-        <div className="empty-state">
-          {showArchived ? "No archived clients." : "No clients yet. Add your first client to get started."}
-        </div>
+        showArchived ? (
+          <div className="empty-state">No archived clients.</div>
+        ) : (
+          <div className="empty-state">
+            <p className="empty-title">No clients yet</p>
+            <p>Add your first client to get started — invoices pull their billing details automatically.</p>
+            <div className="empty-actions">
+              <Button href="/clients/new" variant="primary" size="sm">
+                New client
+              </Button>
+            </div>
+          </div>
+        )
       ) : (
+        <div className="table-scroll">
         <table className="data-table">
           <thead>
             <tr>
@@ -74,6 +85,7 @@ export default async function ClientsPage({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </>
   );

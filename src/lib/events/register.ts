@@ -139,7 +139,7 @@ on(
       to: invoice.client.billingEmail,
       cc: invoice.client.ccEmails,
       subject: `Reminder: invoice ${p.number} from ${settings.companyName} — ${formatCents(p.totalCents)}`,
-      html: `<p style="font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#211F1A;">
+      html: `<p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#211F1A;">
 Hi ${invoice.client.contactName || invoice.client.name},<br/><br/>
 A friendly reminder that invoice ${p.number} for ${formatCents(p.totalCents)} was due on
 ${formatDateLong(p.dueDateIso)}. If payment is already on its way, please disregard this note.<br/><br/>

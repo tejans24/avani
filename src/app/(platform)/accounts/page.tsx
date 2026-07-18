@@ -45,11 +45,19 @@ export default async function AccountsPage({
       </div>
 
       {accounts.length === 0 ? (
-        <div className="empty-state">
-          {showArchived
-            ? "No archived accounts."
-            : "No accounts yet. Add an account to start importing transactions."}
-        </div>
+        showArchived ? (
+          <div className="empty-state">No archived accounts.</div>
+        ) : (
+          <div className="empty-state">
+            <p className="empty-title">No accounts yet</p>
+            <p>Connect a bank or card account to start importing transactions.</p>
+            <div className="empty-actions">
+              <Button href="/accounts/new" variant="primary" size="sm">
+                Add account
+              </Button>
+            </div>
+          </div>
+        )
       ) : (
         <AccountsTable
           accounts={accounts.map((a) => ({
