@@ -142,11 +142,13 @@ export function InvoiceForm({ clients, defaults, invoice }: InvoiceFormProps) {
     setError(null);
     startTransition(async () => {
       const result = invoice ? await updateInvoice(invoice.id, data) : await createInvoice(data);
-      if (result.ok) {
-        router.push(result.id ? `/invoices/${result.id}` : "/invoices");
-      } else {
+      // Equality (not truthiness) check: with strict:false, only discriminant
+      // equality narrows the ActionResult union.
+      if (result.ok === false) {
         setError(result.error);
+        return;
       }
+      router.push(result.id ? `/invoices/${result.id}` : "/invoices");
     });
   };
 
