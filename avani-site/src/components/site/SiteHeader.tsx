@@ -94,6 +94,9 @@ export function SiteHeader() {
               {l}
             </a>
           ))}
+          <Button href="/sign-in" variant="ghost" size="sm">
+            Sign in
+          </Button>
           <Button href="#contact" variant="primary" size="sm">
             Start a conversation
           </Button>

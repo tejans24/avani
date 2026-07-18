@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@/ds/styles.css";
 import "./site.css";
+import { AuthProvider } from "@/components/platform/AuthProvider";
 
 export const metadata: Metadata = {
   title: "Avani — Thoughtful systems. Real efficiency. Responsible AI.",
@@ -17,8 +18,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
+    <AuthProvider>
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    </AuthProvider>
   );
 }
