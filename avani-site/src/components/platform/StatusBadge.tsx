@@ -1,4 +1,4 @@
-import { Badge } from "@/ds/components/core/Badge";
+import { Badge } from "@/components/platform/ds";
 import type { DisplayStatus } from "@/lib/invoice-status";
 
 const TONE: Record<DisplayStatus, string> = {

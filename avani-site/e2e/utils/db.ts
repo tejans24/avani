@@ -69,6 +69,46 @@ export async function insertClient(overrides: Partial<Record<string, unknown>> =
   return c as { id: string; name: string; billingEmail: string; ccEmails: string[] };
 }
 
+/**
+ * Insert an invoice directly (for specs that need data without driving the UI).
+ * subtotal = total, tax 0; no line items (reports don't need them).
+ * Dates accept "YYYY-MM-DD" strings or Date objects.
+ */
+export async function insertInvoice(
+  clientId: string,
+  inv: {
+    status: "DRAFT" | "SENT" | "PAID" | "VOID";
+    totalCents: number;
+    issueDate: string | Date;
+    dueDate: string | Date;
+    paidAt?: string | Date | null;
+    number: string;
+  }
+) {
+  const id = `testinv_${Math.random().toString(36).slice(2, 10)}`;
+  const sentAt = inv.status === "DRAFT" ? null : inv.issueDate;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "Invoice"
+        (id, number, "clientId", status, "issueDate", "dueDate", "taxRateBps",
+         "subtotalCents", "taxCents", "totalCents", "sentAt", "paidAt", "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,0,$7,0,$7,$8,$9,NOW(),NOW())`,
+      [
+        id,
+        inv.number,
+        clientId,
+        inv.status,
+        inv.issueDate,
+        inv.dueDate,
+        inv.totalCents,
+        sentAt,
+        inv.paidAt ?? null,
+      ]
+    )
+  );
+  return id;
+}
+
 export async function queryRows(sql: string, params: unknown[] = []) {
   return withPg(async (pg) => (await pg.query(sql, params)).rows);
 }

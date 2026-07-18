@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { todayUtc } from "@/lib/dates";
-import { Button } from "@/ds/components/core/Button";
+import { Button } from "@/components/platform/ds";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
 import type { Prisma } from "@/generated/prisma/client";
 

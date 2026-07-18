@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatCents } from "@/lib/money";
 import { todayUtc } from "@/lib/dates";
-import { Button } from "@/ds/components/core/Button";
+import { Button } from "@/components/platform/ds";
 import { StatTile } from "@/components/platform/StatTile";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
 
