@@ -43,12 +43,13 @@ export function TaxSettingsForm({ settings }: { settings: TaxSettingsInput }) {
     setStatus(null);
     startTransition(async () => {
       const result = await updateTaxSettings(data);
-      setStatus(
-        result.ok
-          ? { ok: true, message: "Tax settings saved." }
-          : { ok: false, message: result.error ?? "Something went wrong saving tax settings." }
-      );
-      if (result.ok) router.refresh();
+      // `=== false` (not ternary on ok) so the union narrows under strict:false.
+      if (result.ok === false) {
+        setStatus({ ok: false, message: result.error });
+        return;
+      }
+      setStatus({ ok: true, message: "Tax settings saved." });
+      router.refresh();
     });
   };
 
