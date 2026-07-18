@@ -25,7 +25,7 @@ test.describe("invoice create/edit", () => {
     await page.goto("/invoices/new");
     await expect(page.getByRole("heading", { name: "New invoice" })).toBeVisible();
 
-    await page.getByLabel("Client", { exact: true }).selectOption({ label: "Acme Corp" });
+    await page.getByLabel("Client").selectOption({ label: "Acme Corp" });
 
     const lines: [string, string][] = [
       ["Consulting Services: 06/14/26 – 06/20/26", "6"],
@@ -54,7 +54,7 @@ test.describe("invoice create/edit", () => {
 
   test("live totals react to tax rate", async ({ page }) => {
     await page.goto("/invoices/new");
-    await page.getByLabel("Client", { exact: true }).selectOption({ label: "Acme Corp" });
+    await page.getByLabel("Client").selectOption({ label: "Acme Corp" });
     await fillLine(page, 0, "Consulting", "10", "100");
 
     await page.getByLabel("Tax rate (basis points)").fill("875");
@@ -79,7 +79,7 @@ test.describe("invoice create/edit", () => {
   test("edits a draft invoice", async ({ page }) => {
     // Create a simple draft via the UI.
     await page.goto("/invoices/new");
-    await page.getByLabel("Client", { exact: true }).selectOption({ label: "Acme Corp" });
+    await page.getByLabel("Client").selectOption({ label: "Acme Corp" });
     await fillLine(page, 0, "Consulting", "5", "100");
     await expect(page.getByTestId("totals-total")).toHaveText("$500.00");
     await page.getByRole("button", { name: "Create invoice" }).click();
