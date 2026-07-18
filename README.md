@@ -20,7 +20,7 @@ Vitest (unit) · Playwright (e2e)
 docker compose up -d
 
 # 2. App
-cd avani-site
+# repo root is the app
 npm install
 cp .env.example .env       # then fill in values — see below
 npx prisma migrate dev
@@ -81,7 +81,7 @@ Suggested: **Vercel + Neon**.
 
 1. Create a Neon Postgres, set `DATABASE_URL` (pooled connection string).
 2. `npx prisma migrate deploy` against it, then seed.
-3. Import the repo into Vercel with root directory `avani-site`; set every env
+3. Import the repo into Vercel with the repo root as the project root; set every env
    var from the table above (`AUTH_MODE=clerk`, `EMAIL_MODE=resend`).
 4. Clerk: add your production domain; Resend: verify your sending domain.
 
