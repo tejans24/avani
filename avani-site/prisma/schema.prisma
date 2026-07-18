@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  VOID
+}
+
+/// Singleton (id = 1): the "From" block, payment instructions, and defaults.
+model CompanySettings {
+  id                     Int      @id @default(1)
+  companyName            String
+  addressLine1           String
+  addressLine2           String?
+  city                   String
+  state                  String
+  postalCode             String
+  country                String   @default("USA")
+  email                  String
+  phone                  String?
+  payViaLabel            String   @default("Manual transfer (ACH/Wire)")
+  paymentInstructions    String   @db.Text
+  defaultTerms           String?  @db.Text
+  /// Due date suggestion: issue date + this many business days
+  defaultNetBusinessDays Int      @default(15)
+  defaultTaxRateBps      Int      @default(0)
+  nextInvoiceNumber      Int      @default(1)
+  updatedAt              DateTime @updatedAt
+}
+
+/// A client company ("Clients" in the UI).
+model Client {
+  id           String    @id @default(cuid())
+  name         String
+  contactName  String?
+  billingEmail String
+  ccEmails     String[]  @default([])
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+  notes        String?   @db.Text
+  archived     Boolean   @default(false)
+  invoices     Invoice[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Invoice {
+  id            String            @id @default(cuid())
+  number        String            @unique
+  clientId      String
+  client        Client            @relation(fields: [clientId], references: [id])
+  status        InvoiceStatus     @default(DRAFT)
+  issueDate     DateTime          @db.Date
+  dueDate       DateTime          @db.Date
+  taxRateBps    Int               @default(0)
+  subtotalCents Int               @default(0)
+  taxCents      Int               @default(0)
+  totalCents    Int               @default(0)
+  memo          String?           @db.Text
+  /// CompanySettings frozen at first send so later edits don't rewrite history
+  fromSnapshot  Json?
+  sentAt        DateTime?
+  paidAt        DateTime?
+  lineItems     InvoiceLineItem[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([clientId])
+  @@index([status, dueDate])
+}
+
+model InvoiceLineItem {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description    String
+  quantity       Decimal @db.Decimal(10, 2)
+  unitPriceCents Int
+  amountCents    Int
+  sortOrder      Int     @default(0)
+
+  @@index([invoiceId])
+}
