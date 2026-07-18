@@ -5,6 +5,7 @@ import { todayUtc } from "@/lib/dates";
 import { Button } from "@/components/platform/ds";
 import { StatTile } from "@/components/platform/StatTile";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
+import { HealthCard } from "@/components/platform/HealthCard";
 
 export const metadata = { title: "Dashboard — Avani" };
 export const dynamic = "force-dynamic";
@@ -57,6 +58,8 @@ export default async function DashboardPage() {
           New invoice
         </Button>
       </div>
+
+      <HealthCard />
 
       <div className="stat-row">
         <StatTile

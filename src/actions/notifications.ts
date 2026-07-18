@@ -61,3 +61,24 @@ export async function markAllNotificationsRead(): Promise<ActionResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
   }
 }
+
+/** Reset a dead-lettered/failed event so the next dispatch retries its handlers. */
+export async function retryEvent(eventId: string): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    await db.$transaction([
+      db.handlerRun.deleteMany({ where: { eventId, status: "FAILED" } }),
+      db.domainEvent.update({
+        where: { id: eventId },
+        data: { attempts: 0, processedAt: null },
+      }),
+    ]);
+    const { dispatchPending } = await import("@/lib/events/dispatch");
+    await import("@/lib/events/register");
+    await dispatchPending();
+    revalidatePath("/activity");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+  }
+}

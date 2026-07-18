@@ -56,7 +56,7 @@ export async function notify(input: NotifyInput): Promise<void> {
       : DEFAULT_TIER[input.eventType] ?? "info";
 
   // In-app: every non-off notification lands in the bell.
-  await db.notification.create({
+  const notification = await db.notification.create({
     data: {
       tier,
       title: input.title,
@@ -67,20 +67,34 @@ export async function notify(input: NotifyInput): Promise<void> {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const link = input.href ? `${appUrl}${input.href}` : appUrl;
+  // Channel outcomes recorded on the row so "I never got the email" is
+  // diagnosable from the Health view. Delivery failure never throws — the
+  // in-app notification already exists and handlers must not retry-loop on
+  // a downed channel.
+  const delivery: Record<string, string> = {};
 
   if (tier === "action" || tier === "urgent") {
     const ownerEmail = process.env.ALLOWED_EMAILS?.split(",")[0]?.trim();
     if (ownerEmail) {
-      await sendEmail({
+      const sent = await sendEmail({
         to: ownerEmail,
         subject: `Avani: ${input.title}`,
         html: `<p style="font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#211F1A;">${input.body ?? input.title}</p>
 <p style="font-family:Helvetica,Arial,sans-serif;font-size:14px;"><a href="${link}" style="color:#B0532F;">Open in Avani →</a></p>`,
       });
+      delivery.email = sent.ok === false ? `FAILED: ${sent.error}` : "SENT";
     }
   }
 
   if (tier === "urgent") {
-    await sendSms(`Avani: ${input.title}${input.href ? ` ${link}` : ""}`);
+    const sms = await sendSms(`Avani: ${input.title}${input.href ? ` ${link}` : ""}`);
+    delivery.sms = sms.ok === false ? `FAILED: ${sms.error}` : "SENT";
+  }
+
+  if (Object.keys(delivery).length > 0) {
+    await db.notification.update({
+      where: { id: notification.id },
+      data: { delivery },
+    });
   }
 }

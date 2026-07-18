@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/platform/ds";
 import { formatCents } from "@/lib/money";
+import { RetryEventButton } from "@/components/platform/notifications/RetryEventButton";
 
 export const metadata = { title: "Activity — Avani" };
 export const dynamic = "force-dynamic";
@@ -70,7 +71,141 @@ const timeFmt = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-export default async function ActivityPage() {
+const MAX_ATTEMPTS = 5;
+
+async function FailuresView() {
+  const [failedRuns, deadLetters, deliveryFails] = await Promise.all([
+    db.handlerRun.findMany({
+      where: { status: "FAILED" },
+      orderBy: { ranAt: "desc" },
+      take: 50,
+      include: { event: true },
+    }),
+    db.domainEvent.findMany({
+      where: { processedAt: null, attempts: { gte: MAX_ATTEMPTS } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    db.notification.findMany({
+      where: {
+        OR: [
+          { delivery: { path: ["email"], string_starts_with: "FAILED" } },
+          { delivery: { path: ["sms"], string_starts_with: "FAILED" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
+
+  if (failedRuns.length + deadLetters.length + deliveryFails.length === 0) {
+    return (
+      <div className="empty-state" data-testid="no-failures">
+        No failures — every automation run and delivery succeeded. 🎉
+      </div>
+    );
+  }
+
+  const box = {
+    background: "var(--color-surface)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "var(--radius-lg)",
+    overflow: "hidden" as const,
+    marginBottom: 20,
+  };
+  const rowStyle = {
+    display: "flex",
+    alignItems: "center" as const,
+    gap: 12,
+    padding: "12px 16px",
+    borderBottom: "1px solid var(--border-subtle)",
+    fontFamily: "var(--font-sans)",
+    fontSize: "var(--text-sm)",
+  };
+
+  return (
+    <>
+      {deadLetters.length > 0 && (
+        <div style={box} data-testid="dead-letters">
+          <div style={{ ...rowStyle, background: "#F2DCD7", fontWeight: 600 }}>
+            Needs manual intervention — retries exhausted
+          </div>
+          {deadLetters.map((e) => (
+            <div key={e.id} style={rowStyle}>
+              <Badge tone="critical">{e.type}</Badge>
+              <span style={{ flex: 1, color: "var(--text-secondary)" }}>
+                {e.attempts} attempts · created {timeFmt.format(e.createdAt)}
+              </span>
+              <RetryEventButton eventId={e.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {failedRuns.length > 0 && (
+        <div style={box} data-testid="failed-runs">
+          <div style={{ ...rowStyle, fontWeight: 600 }}>Failed reaction runs</div>
+          {failedRuns.map((r) => (
+            <div key={r.id} style={rowStyle}>
+              <Badge tone="critical">{r.handler}</Badge>
+              <span style={{ flex: 2, color: "var(--text-primary)" }}>
+                on <code>{r.event.type}</code>
+                <span
+                  style={{
+                    display: "block",
+                    color: "var(--critical)",
+                    fontSize: "var(--text-xs)",
+                    marginTop: 2,
+                  }}
+                >
+                  {r.error?.slice(0, 200)}
+                </span>
+              </span>
+              <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
+                {timeFmt.format(r.ranAt)}
+              </span>
+              <RetryEventButton eventId={r.eventId} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {deliveryFails.length > 0 && (
+        <div style={box} data-testid="delivery-failures">
+          <div style={{ ...rowStyle, fontWeight: 600 }}>Delivery failures</div>
+          {deliveryFails.map((n) => (
+            <div key={n.id} style={rowStyle}>
+              <Badge tone="caution">{n.tier}</Badge>
+              <span style={{ flex: 2 }}>
+                {n.title}
+                <span
+                  style={{
+                    display: "block",
+                    color: "var(--critical)",
+                    fontSize: "var(--text-xs)",
+                    marginTop: 2,
+                  }}
+                >
+                  {JSON.stringify(n.delivery)}
+                </span>
+              </span>
+              <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
+                {timeFmt.format(n.createdAt)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+export default async function ActivityPage({
+  searchParams,
+}: {
+  searchParams: { view?: string };
+}) {
+  const view = searchParams.view === "failures" ? "failures" : "all";
   const events = await db.domainEvent.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -84,6 +219,24 @@ export default async function ActivityPage() {
           <p className="sub">Everything the system did or noticed, newest first.</p>
         </div>
       </div>
+
+      <div className="filter-tabs">
+        <Link href="/activity" data-active={view === "all" || undefined}>
+          All activity
+        </Link>
+        <Link
+          href="/activity?view=failures"
+          data-active={view === "failures" || undefined}
+        >
+          Failures
+        </Link>
+      </div>
+
+      {view === "failures" ? (
+        <FailuresView />
+      ) : null}
+      {view === "failures" ? null : (
+        <>
 
       {events.length === 0 ? (
         <div className="empty-state">Nothing yet — activity appears as invoices move and money flows.</div>
@@ -129,6 +282,8 @@ export default async function ActivityPage() {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </>
   );

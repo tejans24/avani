@@ -318,6 +318,8 @@ model Notification {
   body      String?   @db.Text
   href      String?
   readAt    DateTime?
+  /// Per-channel delivery results, e.g. {"email":"SENT","sms":"FAILED: Twilio 401"}
+  delivery  Json?
   createdAt DateTime  @default(now())
 
   @@index([readAt, createdAt])

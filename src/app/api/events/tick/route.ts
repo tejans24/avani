@@ -47,5 +47,12 @@ export async function GET(req: Request) {
     data: { lastTickAt: new Date() },
   });
 
+  // External dead-man's switch: if the app stops ticking entirely, something
+  // OUTSIDE this infrastructure (healthchecks.io) notices the missing ping.
+  const pingUrl = process.env.HEALTHCHECK_PING_URL;
+  if (pingUrl) {
+    fetch(pingUrl).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, detected, dispatched });
 }

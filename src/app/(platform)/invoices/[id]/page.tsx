@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatCents } from "@/lib/money";
-import { formatDateLong } from "@/lib/dates";
+import { formatDateLong, dateToIso } from "@/lib/dates";
 import { deriveDisplayStatus } from "@/lib/invoice-status";
+import { suggestionForInvoice } from "@/lib/match-data";
 import { StatusBadge } from "@/components/platform/StatusBadge";
 import { InvoiceActions } from "@/components/platform/InvoiceActions";
+import {
+  InvoiceMatchConfirm,
+  InvoiceUnlinkButton,
+} from "@/components/platform/transactions/MatchSuggestionBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +20,16 @@ export default async function InvoiceDetailPage({
 }) {
   const invoice = await db.invoice.findUnique({
     where: { id: params.id },
-    include: { client: true },
+    include: { client: true, matchedTransaction: { select: { id: true, postedAt: true } } },
   });
   if (!invoice) notFound();
 
   const display = deriveDisplayStatus(invoice);
+
+  // Reverse suggestion: a SENT invoice may already have its payment sitting in
+  // the bank feed — offer a one-click confirm right on the detail page.
+  const suggestion =
+    invoice.status === "SENT" ? await suggestionForInvoice(invoice.id) : null;
 
   return (
     <>
@@ -37,7 +47,18 @@ export default async function InvoiceDetailPage({
         </div>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      {suggestion && (
+        <div style={{ marginBottom: 16 }}>
+          <InvoiceMatchConfirm
+            transactionId={suggestion.transactionId}
+            invoiceId={invoice.id}
+            amountCents={suggestion.amountCents}
+            postedAtIso={suggestion.postedAtIso}
+          />
+        </div>
+      )}
+
+      <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <InvoiceActions
           invoiceId={invoice.id}
           status={invoice.status}
@@ -45,6 +66,21 @@ export default async function InvoiceDetailPage({
           billingEmail={invoice.client.billingEmail}
           ccEmails={invoice.client.ccEmails}
         />
+        {invoice.status === "PAID" && invoice.matchedTransaction && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--text-muted)",
+            }}
+          >
+            Paid by a {formatDateLong(dateToIso(invoice.matchedTransaction.postedAt))} deposit
+            <InvoiceUnlinkButton transactionId={invoice.matchedTransaction.id} />
+          </span>
+        )}
       </div>
 
       <iframe

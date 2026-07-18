@@ -10,6 +10,8 @@ import {
   TransactionsTable,
   type TxnRow,
 } from "@/components/platform/transactions/TransactionsTable";
+import { MatchSuggestionBanner } from "@/components/platform/transactions/MatchSuggestionBanner";
+import { suggestionsForTransactions } from "@/lib/match-data";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata = { title: "Transactions — Avani" };
@@ -103,6 +105,18 @@ export default async function TransactionsPage({
       }),
     ]);
 
+  // Deposit→invoice suggestions for the transactions on this page (top
+  // candidate per deposit, rendered as banners above the table).
+  const suggestions = await suggestionsForTransactions(txns.map((t) => t.id));
+  const suggestedRows = txns
+    .filter((t) => suggestions.has(t.id))
+    .map((t) => ({
+      transactionId: t.id,
+      amountCents: t.amountCents,
+      postedAtIso: dateToIso(t.postedAt),
+      candidate: suggestions.get(t.id)![0],
+    }));
+
   const rows: TxnRow[] = txns.map((t) => ({
     id: t.id,
     postedAt: dateToIso(t.postedAt),
@@ -141,6 +155,20 @@ export default async function TransactionsPage({
       </div>
 
       <TransactionFilters accounts={accounts} categories={categories} values={filterValues} />
+
+      {suggestedRows.length > 0 && (
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {suggestedRows.map((s) => (
+            <MatchSuggestionBanner
+              key={s.transactionId}
+              transactionId={s.transactionId}
+              candidate={s.candidate}
+              amountCents={s.amountCents}
+              postedAtIso={s.postedAtIso}
+            />
+          ))}
+        </div>
+      )}
 
       <TransactionsTable
         rows={rows}
