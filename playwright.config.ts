@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
-const PORT = 3100;
+// PW_PORT lets parallel local runs (e.g. multiple agents) use isolated servers.
+const PORT = Number(process.env.PW_PORT ?? 3100);
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   "postgresql://avani:avani@localhost:5432/avani_test";

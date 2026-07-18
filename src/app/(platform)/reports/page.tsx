@@ -5,6 +5,7 @@ import { formatCents } from "@/lib/money";
 import { getReportsData } from "@/lib/reports";
 import RevenueByMonthChart from "@/components/platform/reports/RevenueByMonthChart";
 import TopClientsChart from "@/components/platform/reports/TopClientsChart";
+import { ReportsTabs } from "@/components/platform/ReportsTabs";
 
 export const metadata = { title: "Reports — Avani" };
 export const dynamic = "force-dynamic";
@@ -50,6 +51,8 @@ export default async function ReportsPage() {
           <div className="sub">Revenue and collection performance</div>
         </div>
       </div>
+
+      <ReportsTabs active="/reports" />
 
       {!hasData ? (
         <div className="empty-state">No invoice data yet.</div>
