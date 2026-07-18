@@ -1,5 +1,12 @@
 node_modules
 # Keep environment variables out of version control
+.next
+out
 .env
 
 /src/generated/prisma
+
+# Test artifacts
+.fake-emails
+test-results
+playwright-report
