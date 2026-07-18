@@ -11,3 +11,6 @@ out
 test-results
 playwright-report
 tsconfig.tsbuildinfo
+
+# Test artifacts
+.fake-sms

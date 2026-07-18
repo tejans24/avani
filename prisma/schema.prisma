@@ -33,6 +33,10 @@ model CompanySettings {
   defaultNetBusinessDays Int      @default(15)
   defaultTaxRateBps      Int      @default(0)
   nextInvoiceNumber      Int      @default(1)
+  /// Per-reaction toggles keyed by settingKey, e.g. {"overdueEmails": false}
+  reactionSettings       Json     @default("{}")
+  /// Watchdog: set by every /api/events/tick run; stale > 2h → in-app warning
+  lastTickAt             DateTime?
   updatedAt              DateTime @updatedAt
 }
 

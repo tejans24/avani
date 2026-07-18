@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { NavLink } from "./NavLink";
+import { NotificationBell } from "./NotificationBell";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -33,6 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-foot">
           {testMode ? <span>Test mode</span> : <UserButton afterSignOutUrl="/" />}
           <span>Avani Platform</span>
+          <NotificationBell />
         </div>
       </aside>
       <main className="platform-main">{children}</main>

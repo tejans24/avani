@@ -14,6 +14,9 @@ import {
   buildInvoiceEmailHtml,
   buildInvoiceEmailSubject,
 } from "@/emails/invoice-email";
+import { emitEvent } from "@/lib/events/emit";
+import { dispatchSoon } from "@/lib/events/dispatch";
+import { dateToIso } from "@/lib/dates";
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
@@ -85,14 +88,26 @@ export async function sendInvoice(
     });
     if (!sent.ok) return sent;
 
-    await db.invoice.update({
-      where: { id },
-      data: {
-        status: "SENT",
-        sentAt: invoice.sentAt ?? new Date(),
-        fromSnapshot: snapshot,
-      },
+    await db.$transaction(async (tx) => {
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          status: "SENT",
+          sentAt: invoice.sentAt ?? new Date(),
+          fromSnapshot: snapshot,
+        },
+      });
+      await emitEvent(tx, "invoice.sent", {
+        invoiceId: id,
+        number: invoice.number,
+        clientId: invoice.client.id,
+        clientName: invoice.client.name,
+        totalCents: invoice.totalCents,
+        dueDateIso: dateToIso(invoice.dueDate),
+        resend: invoice.status === "SENT",
+      });
     });
+    dispatchSoon();
 
     for (const p of ["/dashboard", "/invoices", `/invoices/${id}`, "/reports"]) {
       revalidatePath(p);

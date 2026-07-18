@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { SettingsInput } from "@/lib/validations";
 import { SettingsForm } from "@/components/platform/SettingsForm";
+import { ReactionSettingsCard } from "@/components/platform/ReactionSettingsCard";
 
 export const metadata = { title: "Settings — Avani" };
 export const dynamic = "force-dynamic";
@@ -37,6 +38,9 @@ export default async function SettingsPage() {
         </div>
       </div>
       <SettingsForm settings={initial} />
+      <ReactionSettingsCard
+        initial={(settings.reactionSettings as Record<string, boolean>) ?? {}}
+      />
     </>
   );
 }

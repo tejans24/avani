@@ -8,6 +8,8 @@ import { computeInvoiceTotals } from "@/lib/money";
 import { isoToUtcDate, dateToIso, todayUtc, addBusinessDaysUtc } from "@/lib/dates";
 import { allocateInvoiceNumber } from "@/lib/invoice-numbering";
 import { shiftDescriptionDates } from "@/lib/shift-dates";
+import { emitEvent } from "@/lib/events/emit";
+import { dispatchSoon } from "@/lib/events/dispatch";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -138,7 +140,22 @@ export async function markInvoicePaid(
       return { ok: false, error: "Only sent invoices can be marked as paid." };
     }
     const paidAt = paidAtIso ? isoToUtcDate(paidAtIso) : new Date();
-    await db.invoice.update({ where: { id }, data: { status: "PAID", paidAt } });
+    const client = await db.client.findUniqueOrThrow({
+      where: { id: existing.clientId },
+      select: { name: true },
+    });
+    await db.$transaction(async (tx) => {
+      await tx.invoice.update({ where: { id }, data: { status: "PAID", paidAt } });
+      await emitEvent(tx, "invoice.paid", {
+        invoiceId: id,
+        number: existing.number,
+        clientName: client.name,
+        totalCents: existing.totalCents,
+        paidAtIso: dateToIso(paidAt),
+        via: "manual",
+      });
+    });
+    dispatchSoon();
     revalidateInvoices(id);
     return { ok: true, id };
   } catch (e) {
@@ -153,7 +170,11 @@ export async function voidInvoice(id: string): Promise<ActionResult> {
     if (existing.status === "PAID") {
       return { ok: false, error: "Paid invoices cannot be voided." };
     }
-    await db.invoice.update({ where: { id }, data: { status: "VOID" } });
+    await db.$transaction(async (tx) => {
+      await tx.invoice.update({ where: { id }, data: { status: "VOID" } });
+      await emitEvent(tx, "invoice.voided", { invoiceId: id, number: existing.number });
+    });
+    dispatchSoon();
     revalidateInvoices(id);
     return { ok: true, id };
   } catch (e) {

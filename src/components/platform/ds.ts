@@ -10,6 +10,7 @@ import { Card as DsCard } from "@/ds/components/core/Card";
 import { Eyebrow as DsEyebrow } from "@/ds/components/core/Eyebrow";
 import { Callout as DsCallout } from "@/ds/components/core/Callout";
 import { Divider as DsDivider } from "@/ds/components/core/Divider";
+import { Switch as DsSwitch } from "@/ds/components/forms/Switch";
 
 type Loose = ComponentType<Record<string, unknown>>;
 
@@ -19,3 +20,4 @@ export const Card = DsCard as Loose;
 export const Eyebrow = DsEyebrow as Loose;
 export const Callout = DsCallout as Loose;
 export const Divider = DsDivider as Loose;
+export const Switch = DsSwitch as Loose;
