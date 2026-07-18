@@ -109,6 +109,37 @@ export async function insertInvoice(
   return id;
 }
 
+/** Insert a line item for an invoice created via insertInvoice. */
+export async function insertLineItem(
+  invoiceId: string,
+  item: {
+    description: string;
+    quantity: number;
+    unitPriceCents: number;
+    amountCents: number;
+    sortOrder?: number;
+  }
+) {
+  const id = `testli_${Math.random().toString(36).slice(2, 10)}`;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "InvoiceLineItem"
+        (id, "invoiceId", description, quantity, "unitPriceCents", "amountCents", "sortOrder")
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        id,
+        invoiceId,
+        item.description,
+        item.quantity,
+        item.unitPriceCents,
+        item.amountCents,
+        item.sortOrder ?? 0,
+      ]
+    )
+  );
+  return id;
+}
+
 export async function queryRows(sql: string, params: unknown[] = []) {
   return withPg(async (pg) => (await pg.query(sql, params)).rows);
 }

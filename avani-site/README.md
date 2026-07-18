@@ -1,65 +1,100 @@
-# Avani — Next.js marketing site
+# Avani — marketing site + invoicing platform
 
-The Avani marketing site, built on the Avani design system as a **Next.js 14 App
-Router** project. Plain named-export React components + CSS custom properties — no
-CSS-in-JS, no UI libraries.
+One Next.js 14 App Router app:
+
+- **Marketing site** at `/` — built on the Avani design system (CSS custom
+  properties + plain named-export React components; no CSS-in-JS, no UI libraries).
+- **Invoicing platform** underneath, behind auth — add clients, create
+  Mercury-style invoices, email them as PDFs, track Draft → Sent → Paid.
+
+## Stack
+
+Next.js 14 · TypeScript · Prisma 7 + Postgres · Clerk (auth) · Resend (email) ·
+@react-pdf/renderer (invoice PDFs) · react-hook-form + zod · recharts (reports) ·
+Vitest (unit) · Playwright (e2e)
 
 ## Run it
 
 ```bash
+# 1. Postgres (from the repo root; creates avani + avani_test databases)
+docker compose up -d
+
+# 2. App
+cd avani-site
 npm install
-npm run dev      # http://localhost:3000
+cp .env.example .env       # then fill in values — see below
+npx prisma migrate dev
+npm run db:seed            # settings singleton + a sample client
+npm run dev                # http://localhost:3000
 ```
 
-`npm run build && npm run start` for a production build.
+### Environment variables (`.env`)
 
-## Structure
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | `postgresql://avani:avani@localhost:5432/avani` for local Docker |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | From your [Clerk dashboard](https://dashboard.clerk.com). Set the Clerk app to **restricted/invite-only sign-up**. |
+| `ALLOWED_EMAILS` | Comma-separated allowlist. Signing in with Clerk is not enough — the account email must be listed here (single-tenant guard). |
+| `RESEND_API_KEY` / `EMAIL_FROM` | From [Resend](https://resend.com). Without a verified domain, Resend only delivers to your own account email. |
+| `EMAIL_MODE` | `resend` for real delivery; `fake` writes emails to `.fake-emails/` (used by tests and key-less local dev) |
+| `AUTH_MODE` | `clerk` normally; `test` bypasses Clerk entirely — **never in production** (used by e2e/CI) |
 
+## The platform
+
+| Route | What it does |
+|---|---|
+| `/dashboard` | Outstanding / overdue / collected tiles + recent invoices |
+| `/invoices` | Full list with status filter tabs (computed Overdue included) |
+| `/invoices/new` | Invoice form: line items (Description · Hours · Rate · Amount), live totals, tax in basis points |
+| `/invoices/[id]` | PDF preview, Send (Resend w/ PDF attached), Mark paid, Void, Duplicate (+ next period), Delete draft |
+| `/clients` | Client companies: contact, billing email + CC list, address |
+| `/reports` | Revenue by month, outstanding vs collected, top clients |
+| `/settings` | Your company info (invoice From block), payment instructions, defaults, next invoice number |
+
+Domain rules worth knowing:
+
+- **Money is integer cents**; tax rates are basis points (875 = 8.75%). Totals are
+  always recomputed server-side.
+- **Invoice numbers** (`INV-0001`) are allocated atomically inside the creation
+  transaction; sent invoices are never edited — duplicate or void instead.
+- **First send freezes** the company snapshot (`fromSnapshot`) so later settings
+  edits never rewrite sent history.
+- **"Duplicate for next period"** shifts issue/due dates and any `MM/DD/YY`
+  ranges inside line-item descriptions forward 14 days — one-click biweekly billing.
+- **OVERDUE is computed at read time** (`SENT` past due), never stored.
+
+## Tests
+
+```bash
+npm run test        # Vitest unit tests (money, dates, status, validation)
+npm run test:e2e    # Playwright, boots the app on :3100 against avani_test
 ```
-avani-site/
-├─ package.json, tsconfig.json, next.config.mjs
-├─ public/brand/            rising-sun marks (favicon + logo lockups)
-└─ src/
-   ├─ app/
-   │  ├─ layout.tsx         imports the design system once + site.css; metadata/favicon
-   │  ├─ page.tsx           composes the eight sections
-   │  └─ site.css           page layout helpers (container, section rhythm, grids)
-   ├─ ds/                   the design system, dropped in verbatim
-   │  ├─ styles.css         @import manifest (tokens + Google-Fonts faces)
-   │  ├─ tokens/*.css        colors, typography, spacing, effects, base, fonts
-   │  └─ components/
-   │     ├─ core/           Button, IconButton, Badge, Card, Eyebrow, Divider,
-   │     │                  Avatar, Stat, Callout
-   │     └─ forms/          Field, Input (+ Textarea), Select, Checkbox (+ Radio), Switch
-   └─ components/site/      Header, Hero, Services, Process, About, Proof, Contact, Footer
-```
 
-## How it's wired
+The e2e suite runs with `AUTH_MODE=test` and `EMAIL_MODE=fake` — no Clerk or
+Resend keys needed. CI (`.github/workflows/ci.yml`) runs lint → unit → build → e2e
+on every push. If your sandbox has a system Chromium instead of downloaded
+Playwright browsers, run with `PW_CHROMIUM_PATH=/path/to/chromium`.
 
-- **Global CSS** loads once in `app/layout.tsx` via `import "@/ds/styles.css"`. That
-  file `@import`s the tokens and the webfonts (Newsreader, Hanken Grotesk, Spline Sans
-  Mono); webpack resolves the relative token paths. Everything else reads CSS custom
-  properties — you rarely hardcode a value.
-- **Components are named exports** imported with the `@/` alias, e.g.
-  `import { Button } from "@/ds/components/core/Button"`.
-- **`"use client"`** is set on the interactive components (Button, IconButton, Card,
-  Switch, Input/Textarea, Select, Checkbox/Radio) and the two stateful sections
-  (Header, Contact). Everything else renders on the server.
-- **Assets** live in `public/brand/` and are referenced as `/brand/mark-sun.svg`.
+## Deploying
 
-## What's a placeholder
+Suggested: **Vercel + Neon**.
 
-Per the brand brief: the **About** team photo is a gradient placeholder, and the
-**Proof** figures + testimonial are sample data — swap in real case studies, quotes,
-and (for public-sector work) government registrations. Contact form `onSubmit` shows a
-success state with no backend; wire your own handler / API route.
+1. Create a Neon Postgres, set `DATABASE_URL` (pooled connection string).
+2. `npx prisma migrate deploy` against it, then seed.
+3. Import the repo into Vercel with root directory `avani-site`; set every env
+   var from the table above (`AUTH_MODE=clerk`, `EMAIL_MODE=resend`).
+4. Clerk: add your production domain; Resend: verify your sending domain.
 
-## Notes
+## Design system
 
-- TypeScript with `allowJs` — design-system components are `.jsx` and import cleanly
-  into the `.tsx` pages. Rename them to `.tsx` and add prop types if you prefer.
-- Fonts load via a Google-Fonts `@import` in `ds/tokens/fonts.css`. Move to `next/font`
-  or self-hosted licensed files later if desired — only the `--font-display/-sans/-mono`
-  tokens reference them.
-- Targets WCAG 2.1 AA (contrast, visible focus, reduced-motion, real semantics). Re-run
-  a contrast check whenever you add a new text/background pairing.
+`src/ds/` is the Avani design system, used by both halves of the app —
+tokens (`ds/tokens/*.css`: bone/forest/clay palette, Newsreader + Hanken Grotesk +
+Spline Sans Mono) and components (`ds/components/core`, `ds/components/forms`).
+Global CSS loads once in `app/layout.tsx`. Platform-side conventions:
+
+- Forms: react-hook-form + zodResolver via the RHF-bound wrappers in
+  `src/components/form/` (never hand-roll `Controller`); schemas in
+  `src/lib/validations.ts` are shared by forms and server actions.
+- Mutations: server actions in `src/actions/` (all `requireAuth()`-guarded).
+- The invoice PDF (`src/pdf/`) and email template hardcode the brand hex values
+  since react-pdf/email HTML can't read CSS custom properties.
