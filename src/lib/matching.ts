@@ -26,7 +26,9 @@ export type MatchCandidate = {
   reason: string;
 };
 
-const INVOICE_NUMBER_RE = /INV-\d+/gi;
+// Matches both legacy global numbers (INV-0001) and client-prefixed ones
+// (INV-ACME-0007) when clients paste the number into an ACH/wire memo.
+const INVOICE_NUMBER_RE = /INV-(?:[A-Z0-9]{2,6}-)?\d+/gi;
 
 /** Absolute distance in whole UTC days between two date-only values. */
 function absDaysBetween(a: Date, b: Date): number {

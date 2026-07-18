@@ -48,7 +48,7 @@ test.describe("invoice create/edit", () => {
     await page.waitForURL(DETAIL_URL);
 
     // First invoice after resetDb (nextInvoiceNumber seeded to 1), still a draft.
-    await expect(page.getByRole("heading", { name: /INV-0001/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /INV-ACME-0001/ })).toBeVisible();
     await expect(page.getByText("Draft", { exact: true })).toBeVisible();
   });
 
@@ -89,13 +89,13 @@ test.describe("invoice create/edit", () => {
 
     // Edit: bump the hours from 5 to 10.
     await page.goto(`${detailUrl}/edit`);
-    await expect(page.getByRole("heading", { name: /Edit INV-0001/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Edit INV-ACME-0001/ })).toBeVisible();
     await page.getByLabel("Hours", { exact: true }).fill("10");
     await expect(page.getByTestId("totals-total")).toHaveText("$1,000.00");
     await page.getByRole("button", { name: "Save changes" }).click();
 
     await page.waitForURL(DETAIL_URL);
-    await expect(page.getByRole("heading", { name: /INV-0001/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /INV-ACME-0001/ })).toBeVisible();
     await expect(page.getByText("$1,000.00")).toBeVisible();
   });
 });

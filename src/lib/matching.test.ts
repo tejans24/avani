@@ -84,6 +84,26 @@ describe("findInvoiceMatches", () => {
     expect(result[1]).toMatchObject({ invoiceId: "near", confidence: "MEDIUM" });
   });
 
+  it("promotes client-prefixed numbers (INV-ACME-0007) in descriptions", () => {
+    const invoices = [
+      invoice({ id: "near", number: "INV-GLOB-0002", dueDate: isoToUtcDate("2026-06-16") }),
+      invoice({ id: "named", number: "INV-ACME-0007", dueDate: isoToUtcDate("2026-12-31") }),
+    ];
+    const result = findInvoiceMatches(
+      {
+        amountCents: 100_000,
+        postedAt: isoToUtcDate("2026-06-15"),
+        description: "ACH TRANSFER memo inv-acme-0007",
+      },
+      invoices
+    );
+    expect(result[0]).toMatchObject({
+      invoiceId: "named",
+      confidence: "HIGH",
+      reason: "invoice number in description",
+    });
+  });
+
   it("excludes invoices issued after the transaction posted (date compare)", () => {
     const invoices = [
       invoice({ id: "later", issueDate: isoToUtcDate("2026-06-16") }),

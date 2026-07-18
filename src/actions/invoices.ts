@@ -60,7 +60,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     const { invoice, lineItems } = buildInvoiceData(parsed.data);
 
     const created = await db.$transaction(async (tx) => {
-      const number = await allocateInvoiceNumber(tx);
+      const number = await allocateInvoiceNumber(tx, parsed.data.clientId);
       return tx.invoice.create({
         data: {
           ...invoice,
@@ -214,7 +214,7 @@ export async function duplicateInvoice(
     }
 
     const created = await db.$transaction(async (tx) => {
-      const number = await allocateInvoiceNumber(tx);
+      const number = await allocateInvoiceNumber(tx, source.clientId);
       return tx.invoice.create({
         data: {
           number,

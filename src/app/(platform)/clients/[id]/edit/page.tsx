@@ -25,6 +25,7 @@ export default async function EditClientPage({ params }: { params: { id: string 
     notes: client.notes ?? "",
     billingCadenceDays: client.billingCadenceDays,
     overdueRemindersEnabled: client.overdueRemindersEnabled,
+    invoicePrefix: client.invoicePrefix ?? "",
   };
 
   return (

@@ -28,7 +28,19 @@ export async function upsertClient(
       // in place on update instead of clearing it).
       billingCadenceDays: parsed.data.billingCadenceDays ?? null,
       overdueRemindersEnabled: parsed.data.overdueRemindersEnabled,
+      // Blank prefix = "derive from name at first allocation" (stored null).
+      invoicePrefix: parsed.data.invoicePrefix || null,
     };
+
+    if (data.invoicePrefix) {
+      const clash = await db.client.findFirst({
+        where: { invoicePrefix: data.invoicePrefix, NOT: id ? { id } : undefined },
+        select: { name: true },
+      });
+      if (clash) {
+        return { ok: false, error: `Prefix ${data.invoicePrefix} is already used by ${clash.name}.` };
+      }
+    }
 
     const client = id
       ? await db.client.update({ where: { id }, data })

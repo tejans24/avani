@@ -73,7 +73,7 @@ test.describe("automation", () => {
 
     // The draft exists with the next allocated number.
     await page.goto("/invoices");
-    const draftRow = page.locator(".data-table tbody tr", { hasText: "INV-0001" });
+    const draftRow = page.locator(".data-table tbody tr", { hasText: "INV-CADE-0001" });
     await expect(draftRow).toBeVisible();
     await expect(draftRow).toContainText("Draft");
     await expect(draftRow).toContainText("Cadence Co");
@@ -94,7 +94,7 @@ test.describe("automation", () => {
 
     // Action-tier owner email announced the draft.
     const email = fakeEmails().find(
-      (e) => e.subject.startsWith("Avani:") && e.subject.includes("Draft INV-0001")
+      (e) => e.subject.startsWith("Avani:") && e.subject.includes("Draft INV-CADE-0001")
     );
     expect(email).toBeTruthy();
     expect(email!.to).toBe("owner@example.com");

@@ -27,6 +27,7 @@ const EMPTY_CLIENT: ClientInput = {
   notes: "",
   billingCadenceDays: null,
   overdueRemindersEnabled: true,
+  invoicePrefix: "",
 };
 
 const CADENCE_OPTIONS = [
@@ -150,6 +151,13 @@ export function ClientForm({
         Billing automation
       </Eyebrow>
       <div className="form-grid">
+        <FormTextInput
+          control={control}
+          name="invoicePrefix"
+          label="Invoice prefix"
+          placeholder="ACME"
+          hint="Numbers become INV-PREFIX-0001. Leave blank to derive from the company name."
+        />
         <Field
           label="Billing cadence"
           htmlFor="billingCadenceDays"

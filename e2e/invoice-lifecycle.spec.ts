@@ -90,7 +90,7 @@ test("duplicate creates a new draft with the next number", async ({ page }) => {
   await page.waitForURL((url) => !url.pathname.endsWith(`/${id}`), {
     timeout: 20_000,
   });
-  await expect(page.getByText("INV-0001")).toBeVisible(); // counter seeded at 1
+  await expect(page.getByText("INV-ACME-0001")).toBeVisible(); // counter seeded at 1
   await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 });
 

@@ -113,15 +113,6 @@ export function SettingsForm({ settings }: { settings: SettingsInput }) {
           step={1}
           hint={`${typeof taxRateBps === "number" && Number.isFinite(taxRateBps) ? formatBps(taxRateBps) : "0%"} — 100 bps = 1%.`}
         />
-        <FormNumberInput
-          control={control}
-          name="nextInvoiceNumber"
-          label="Next invoice number"
-          required
-          min={1}
-          step={1}
-          hint="Caution: changing this affects future invoice numbers."
-        />
         <FormTextarea
           control={control}
           name="defaultTerms"

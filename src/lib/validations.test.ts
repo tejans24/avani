@@ -35,7 +35,6 @@ const validSettings = {
   paymentInstructions: "Routing 000000000, Account 111111111",
   defaultNetBusinessDays: 15,
   defaultTaxRateBps: 0,
-  nextInvoiceNumber: 42,
 };
 
 describe("clientSchema", () => {
@@ -226,16 +225,20 @@ describe("settingsSchema", () => {
     ).toBe(true);
   });
 
-  it("bounds tax rate and requires nextInvoiceNumber >= 1", () => {
+  it("bounds tax rate", () => {
     expect(
       settingsSchema.safeParse({ ...validSettings, defaultTaxRateBps: 10001 }).success
     ).toBe(false);
-    expect(settingsSchema.safeParse({ ...validSettings, nextInvoiceNumber: 0 }).success).toBe(
-      false
-    );
-    expect(settingsSchema.safeParse({ ...validSettings, nextInvoiceNumber: 1.5 }).success).toBe(
-      false
-    );
+  });
+
+  it("validates client invoice prefixes", () => {
+    const base = { name: "Acme Corp", billingEmail: "a@b.co" };
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "ACME" }).success).toBe(true);
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "" }).success).toBe(true);
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "acme" }).success).toBe(true); // uppercased
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "A" }).success).toBe(false);
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "TOOLONGG" }).success).toBe(false);
+    expect(clientSchema.safeParse({ ...base, invoicePrefix: "AC-ME" }).success).toBe(false);
   });
 });
 

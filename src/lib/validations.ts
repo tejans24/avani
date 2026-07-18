@@ -35,6 +35,14 @@ export const clientSchema = z.object({
     .optional(),
   /** Per-client gate for the (globally-toggled) overdue reminder emails. */
   overdueRemindersEnabled: z.boolean().default(true),
+  /** Invoice number prefix (INV-{PREFIX}-0001). Blank = derive from name. */
+  invoicePrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{2,6}$/, "2–6 letters or digits")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const lineItemSchema = z.object({
@@ -83,7 +91,6 @@ export const settingsSchema = z.object({
   defaultTerms: z.string().optional(),
   defaultNetBusinessDays: z.number().int().min(0).max(90),
   defaultTaxRateBps: z.number().int().min(0).max(10000),
-  nextInvoiceNumber: z.number().int().min(1),
 });
 
 export const sendInvoiceSchema = z.object({

@@ -26,7 +26,6 @@ export default async function SettingsPage() {
     defaultTerms: settings.defaultTerms ?? "",
     defaultNetBusinessDays: settings.defaultNetBusinessDays,
     defaultTaxRateBps: settings.defaultTaxRateBps,
-    nextInvoiceNumber: settings.nextInvoiceNumber,
   };
 
   return (

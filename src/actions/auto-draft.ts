@@ -62,7 +62,7 @@ export async function prepareNextDraft(
   const dueDate = addDaysUtc(source.dueDate, shift);
 
   const created = await db.$transaction(async (tx) => {
-    const number = await allocateInvoiceNumber(tx);
+    const number = await allocateInvoiceNumber(tx, clientId);
     const invoice = await tx.invoice.create({
       data: {
         number,

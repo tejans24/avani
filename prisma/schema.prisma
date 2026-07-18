@@ -44,6 +44,11 @@ model CompanySettings {
 model Client {
   id           String    @id @default(cuid())
   name         String
+  /// Invoice number prefix, e.g. "ACME" → INV-ACME-0001. Derived from the
+  /// name on first allocation; stable across renames; editable.
+  invoicePrefix     String? @unique
+  /// Per-client invoice counter (atomic increment at allocation)
+  nextInvoiceNumber Int     @default(1)
   contactName  String?
   billingEmail String
   ccEmails     String[]  @default([])
