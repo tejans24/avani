@@ -98,9 +98,9 @@ test("P&L shows exact numbers, sections, and reconciliation", async ({ page }) =
   await expect(table).toBeVisible();
 
   // Income row total: $7,940.00; expenses shown positive: $49.00 and $100.00
-  await expect(table.getByText("$7,940.00")).toBeVisible();
-  await expect(table.getByText("$49.00")).toBeVisible();
-  await expect(table.getByText("$100.00")).toBeVisible();
+  await expect(table.getByText("$7,940.00").first()).toBeVisible();
+  await expect(table.getByText("$49.00").first()).toBeVisible();
+  await expect(table.getByText("$100.00").first()).toBeVisible();
   // Net profit = 7940 − 149 = $7,791.00
   await expect(page.getByTestId("net-profit")).toHaveText("$7,791.00");
   // Excluded txn is invisible
@@ -109,7 +109,7 @@ test("P&L shows exact numbers, sections, and reconciliation", async ({ page }) =
   await expect(table.getByText("Below the line (owner & transfers)")).toBeVisible();
   // Uncategorized bucket surfaces
   await expect(table.getByText("Uncategorized")).toBeVisible();
-  await expect(table.getByText("$123.00")).toBeVisible();
+  await expect(table.getByText("$123.00").first()).toBeVisible();
 
   // Reconciliation: invoiced $5,940 vs gross receipts $7,940 → delta surfaced
   await expect(page.getByText(/invoiced & paid \$5,940\.00/)).toBeVisible();
@@ -120,7 +120,7 @@ test("P&L cell drills down into filtered transactions", async ({ page }) => {
   await seedYear();
   await page.goto("/reports/pnl?year=2026");
   // June income cell ($5,940.00) links to /transactions?category=<id>&month=2026-06
-  await page.getByTestId("pnl-table").getByText("$5,940.00").click();
+  await page.getByTestId("pnl-table").getByText("$5,940.00").first().click();
   await expect(page).toHaveURL(/\/transactions\?category=.+&month=2026-06/);
 });
 

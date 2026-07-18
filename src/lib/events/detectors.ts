@@ -47,7 +47,14 @@ export type DetectorReport = Record<string, number>;
 
 /** Run every registered detector. Extended as milestones land. */
 export async function runDetectors(now = todayUtc()): Promise<DetectorReport> {
+  const { detectMissingPayments } = await import("./detect-payments");
+  const { detectQuarterWindows, detectComplianceWindows, detectDueDrafts } =
+    await import("./detect-taxes");
   return {
     overdueInvoices: await detectOverdueInvoices(now),
+    missingPayments: await detectMissingPayments(now),
+    quarterWindows: await detectQuarterWindows(now),
+    complianceWindows: await detectComplianceWindows(now),
+    dueDrafts: await detectDueDrafts(now),
   };
 }
