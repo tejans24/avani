@@ -89,23 +89,7 @@ export function NotificationCenter({
       </button>
 
       {open && (
-        <div
-          data-testid="notification-panel"
-          style={{
-            position: "fixed",
-            left: 16,
-            bottom: 64,
-            width: 360,
-            maxWidth: "calc(100vw - 32px)",
-            maxHeight: "70vh",
-            overflowY: "auto",
-            background: "var(--color-surface)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-lg)",
-            boxShadow: "var(--shadow-lg, 0 12px 32px rgba(33,31,26,0.18))",
-            zIndex: 50,
-          }}
-        >
+        <div data-testid="notification-panel" className="notif-panel">
           <div
             style={{
               display: "flex",
