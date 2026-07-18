@@ -36,3 +36,28 @@ export async function updateReactionSetting(
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
   }
 }
+
+export async function markNotificationRead(id: string): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    await db.notification.update({ where: { id }, data: { readAt: new Date() } });
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    await db.notification.updateMany({
+      where: { readAt: null },
+      data: { readAt: new Date() },
+    });
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+  }
+}

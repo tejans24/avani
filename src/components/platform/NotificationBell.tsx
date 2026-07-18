@@ -1,45 +1,40 @@
-import Link from "next/link";
 import { db } from "@/lib/db";
+import {
+  NotificationCenter,
+  type NotificationItem,
+} from "./notifications/NotificationCenter";
 
-/** Unread-count pill linking to the activity feed. Server component. */
+function ageLabel(from: Date, now: Date): string {
+  const mins = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 60000));
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/** Server wrapper: loads the latest notifications for the client panel. */
 export async function NotificationBell() {
+  let items: NotificationItem[] = [];
   let unread = 0;
   try {
-    unread = await db.notification.count({ where: { readAt: null } });
+    const now = new Date();
+    const [rows, unreadCount] = await Promise.all([
+      db.notification.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
+      db.notification.count({ where: { readAt: null } }),
+    ]);
+    unread = unreadCount;
+    items = rows.map((n) => ({
+      id: n.id,
+      tier: n.tier,
+      title: n.title,
+      body: n.body,
+      href: n.href,
+      read: n.readAt !== null,
+      ageLabel: ageLabel(n.createdAt, now),
+    }));
   } catch {
-    // DB unavailable (e.g. build-time render) — show a plain bell.
+    // DB unavailable (e.g. build-time render) — render an empty bell.
   }
-  return (
-    <Link
-      href="/activity"
-      aria-label={`Activity${unread > 0 ? `, ${unread} unread` : ""}`}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        color: "rgba(239, 237, 226, 0.78)",
-        textDecoration: "none",
-        fontFamily: "var(--font-sans)",
-        fontSize: "var(--text-sm)",
-      }}
-    >
-      <span aria-hidden="true">🔔</span>
-      {unread > 0 && (
-        <span
-          data-testid="unread-count"
-          style={{
-            background: "var(--clay)",
-            color: "#FBF6EF",
-            borderRadius: "var(--radius-full)",
-            fontSize: "var(--text-xs)",
-            lineHeight: 1,
-            padding: "3px 7px",
-            fontWeight: 600,
-          }}
-        >
-          {unread}
-        </span>
-      )}
-    </Link>
-  );
+  return <NotificationCenter items={items} unread={unread} />;
 }

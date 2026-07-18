@@ -76,12 +76,6 @@ export default async function ActivityPage() {
     take: 100,
   });
 
-  // Visiting the feed clears the bell.
-  await db.notification.updateMany({
-    where: { readAt: null },
-    data: { readAt: new Date() },
-  });
-
   return (
     <>
       <div className="page-head">
