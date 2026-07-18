@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Button } from "@/components/platform/ds";
 import { AccountsTable } from "@/components/platform/accounts/AccountsTable";
+import { SyncNowButton } from "@/components/platform/accounts/SyncNowButton";
 
 export const metadata = { title: "Accounts — Avani" };
 export const dynamic = "force-dynamic";
@@ -26,9 +27,12 @@ export default async function AccountsPage({
           <h1>Accounts</h1>
           <p className="sub">Bank and card accounts feeding your transactions.</p>
         </div>
-        <Button href="/accounts/new" variant="primary" size="md">
-          Add account
-        </Button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <SyncNowButton />
+          <Button href="/accounts/new" variant="primary" size="md">
+            Add account
+          </Button>
+        </div>
       </div>
 
       <div className="filter-tabs">
