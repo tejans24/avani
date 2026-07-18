@@ -1,0 +1,78 @@
+/* ============================================================
+   Avani — Color tokens
+   "Grounded intelligence": warm neutral base, earth tones,
+   a single clay accent, deep warm ink text.
+   ============================================================ */
+
+:root {
+  /* --- Warm neutrals (base / paper) --- */
+  --bone:        #F4EFE5;  /* primary page background */
+  --warm-white:  #FBF8F1;  /* raised surfaces, cards */
+  --cream:       #EDE6D7;  /* sunken / alternating sections */
+  --sand:        #E2D9C6;  /* hairlines on cream, subtle fills */
+  --paper-shade: #D8CDB7;  /* deeper sand, borders on dark-ish */
+
+  /* --- Ink (warm charcoal text) --- */
+  --ink:        #211F1A;  /* primary text, near-black warm */
+  --ink-soft:   #494539;  /* secondary text */
+  --ink-muted:  #6E6657;  /* muted captions, meta */
+  --ink-faint:  #75695A;  /* placeholder, disabled — AA on bone */
+
+  /* --- Forest / sage (primary brand green) --- */
+  --forest:      #28352B;  /* deepest — brand surfaces, footer */
+  --forest-700:  #33473A;  /* dark green fills */
+  --forest-600:  #43583F;  /* hover on dark green */
+  --sage:        #6E8167;  /* mid sage — accents, icons */
+  --sage-soft:   #93A488;  /* lighter sage */
+  --sage-tint:   #E4E7DB;  /* pale sage wash (section bg) */
+  --sage-line:   #C9D0BD;  /* sage hairline */
+
+  /* --- Clay (single warm accent) --- */
+  --clay:        #B0532F;  /* terracotta accent — links, CTAs */
+  --clay-600:    #9A4527;  /* clay hover / pressed */
+  --clay-soft:   #C9785A;  /* lighter clay */
+  --clay-tint:   #F0E0D4;  /* pale clay wash */
+
+  /* --- Stone (neutral warm gray for UI chrome) --- */
+  --stone-100: #ECE7DC;
+  --stone-200: #DDD6C7;
+  --stone-300: #C7BEAB;
+  --stone-400: #A89E89;
+  --stone-500: #87806E;
+  --stone-600: #645E51;
+
+  /* --- Functional (kept muted, earthy — no neon) --- */
+  --positive: #4F6B4A;   /* grounded green */
+  --caution:  #B07B2E;   /* ochre */
+  --critical: #9A3B2E;   /* brick red */
+  --info:     #3F5A63;   /* slate teal */
+
+  /* ============================================================
+     Semantic aliases — reference these in components
+     ============================================================ */
+  --color-bg:            var(--bone);
+  --color-surface:       var(--warm-white);
+  --color-surface-sunken: var(--cream);
+  --color-surface-brand: var(--forest);
+  --color-surface-accent: var(--sage-tint);
+
+  --text-primary:   var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-muted:     var(--ink-muted);
+  --text-faint:     var(--ink-faint);
+  --text-on-brand:  #EFEDE2;     /* warm off-white on forest */
+  --text-on-accent: var(--clay);
+
+  --color-accent:        #A34A28;          /* link / interactive text — AA on light */
+  --color-accent-hover:  var(--clay-600);
+  --color-brand:         var(--forest);
+  --color-brand-soft:    var(--sage);
+  --eyebrow:             #536549;          /* deep sage for small eyebrow labels — AA */
+
+  --border-subtle:  #E2D9C6;     /* hairline on light */
+  --border-default: #D2C8B4;     /* default borders */
+  --border-strong:  #B7AC95;     /* emphasized borders */
+  --border-on-dark: rgba(239, 237, 226, 0.16);
+
+  --focus-ring: rgba(176, 83, 47, 0.40);  /* clay, low alpha */
+}

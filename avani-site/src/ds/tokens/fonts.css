@@ -1,0 +1,7 @@
+/* Avani webfonts — sourced from Google Fonts.
+   Newsreader  — editorial display serif (headlines, quotes)
+   Hanken Grotesk — humanist sans (body, UI)
+   Spline Sans Mono — technical labels / eyebrows
+   NOTE: these are designer-selected substitutes; swap for licensed files if desired. */
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap');

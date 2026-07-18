@@ -1,0 +1,104 @@
+/* Avani marketing site — page layout helpers.
+   Section rhythm, content frame, and the responsive grids used across
+   sections. All values come from the design-system tokens. */
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--color-bg);
+}
+
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  width: 100%;
+}
+.section {
+  padding: var(--section-y) 0;
+}
+.section--alt {
+  background: var(--color-surface-sunken);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+.process-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: start;
+}
+.process-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+}
+.portrait-ph {
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(155deg, var(--sage-tint), var(--cream));
+  border: 1px solid var(--sage-line);
+  display: grid;
+  place-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sage);
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-7);
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+.footer-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: clamp(2rem, 6vw, 4rem);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .nav-desktop {
+    display: none !important;
+  }
+  .nav-toggle {
+    display: inline-flex !important;
+  }
+  .grid-2,
+  .process-grid,
+  .about-grid,
+  .contact-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stat-row {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-6) !important;
+  }
+  .about-portrait {
+    max-width: 320px;
+  }
+}

@@ -1,0 +1,23 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avani rising-sun mark">
+  
+  <line x1="4.5" y1="30.5" x2="43.5" y2="30.5" stroke="#EFEDE2" stroke-width="2" stroke-linecap="round"></line>
+  
+  <path d="M 17 30.5 A 7 7 0 0 1 31 30.5" stroke="#C9785A" stroke-width="2" fill="none"></path>
+  
+  <line x1="33.53" y1="29.33" x2="37.34" y2="28.86" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="33.13" y1="27.52" x2="37.42" y2="26.12" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="32.39" y1="25.83" x2="36.89" y2="23.32" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="31.33" y1="24.30" x2="35.70" y2="20.61" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="30.01" y1="23.01" x2="33.89" y2="18.17" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="28.46" y1="22.00" x2="31.52" y2="16.16" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="26.74" y1="21.30" x2="28.70" y2="14.74" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="24.93" y1="20.94" x2="25.60" y2="13.99" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="23.07" y1="20.94" x2="22.40" y2="13.99" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="21.26" y1="21.30" x2="19.30" y2="14.74" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="19.54" y1="22.00" x2="16.48" y2="16.16" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="17.99" y1="23.01" x2="14.11" y2="18.17" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="16.67" y1="24.30" x2="12.30" y2="20.61" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="15.61" y1="25.83" x2="11.11" y2="23.32" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="14.87" y1="27.52" x2="10.58" y2="26.12" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+  <line x1="14.47" y1="29.33" x2="10.66" y2="28.86" stroke="#EFEDE2" stroke-width="1.5" stroke-linecap="round"></line>
+</svg>

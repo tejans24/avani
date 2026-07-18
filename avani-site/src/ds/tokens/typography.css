@@ -1,0 +1,48 @@
+/* ============================================================
+   Avani — Typography tokens
+   Type-led, editorial. Newsreader (display serif) carries the
+   voice; Hanken Grotesk (humanist sans) for body & UI; IBM
+   Plex Mono for small technical labels / eyebrows.
+   ============================================================ */
+
+:root {
+  /* --- Families --- */
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-sans:    'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* --- Weights --- */
+  --weight-light:   300;
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  /* --- Fluid display scale (serif) --- */
+  --text-display:  clamp(2.75rem, 1.6rem + 5.0vw, 5.25rem);  /* @kind other */
+  --text-h1:       clamp(2.25rem, 1.5rem + 3.2vw, 3.75rem);   /* @kind other */
+  --text-h2:       clamp(1.75rem, 1.3rem + 2.0vw, 2.625rem);  /* @kind other */
+  --text-h3:       clamp(1.375rem, 1.15rem + 1.0vw, 1.75rem); /* @kind other */
+
+  /* --- Body / UI scale (sans) --- */
+  --text-lead:  1.375rem;   /* 22px — intro paragraphs */
+  --text-lg:    1.125rem;   /* 18px */
+  --text-base:  1.0625rem;  /* 17px — default body */
+  --text-sm:    0.9375rem;  /* 15px */
+  --text-xs:    0.8125rem;  /* 13px */
+
+  /* --- Eyebrow / label (mono) --- */
+  --text-label: 0.78125rem; /* 12.5px */
+
+  /* --- Line heights --- */
+  --leading-tight:   1.08;  /* display */
+  --leading-snug:    1.22;  /* headings */
+  --leading-normal:  1.55;  /* body */
+  --leading-relaxed: 1.7;   /* long-form */
+
+  /* --- Letter spacing --- */
+  --tracking-tight:  -0.02em;  /* large serif */
+  --tracking-normal: 0;
+  --tracking-wide:   0.02em;
+  --tracking-label:  0.14em;   /* mono eyebrows, uppercased */
+}

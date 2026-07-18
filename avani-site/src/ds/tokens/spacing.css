@@ -1,0 +1,30 @@
+/* ============================================================
+   Avani — Spacing & layout tokens
+   8px base rhythm with a couple of half-steps. Generous.
+   ============================================================ */
+
+:root {
+  --space-0:   0;
+  --space-1:   0.25rem;   /*  4px */
+  --space-2:   0.5rem;    /*  8px */
+  --space-3:   0.75rem;   /* 12px */
+  --space-4:   1rem;      /* 16px */
+  --space-5:   1.5rem;    /* 24px */
+  --space-6:   2rem;      /* 32px */
+  --space-7:   2.5rem;    /* 40px */
+  --space-8:   3rem;      /* 48px */
+  --space-9:   4rem;      /* 64px */
+  --space-10:  5rem;      /* 80px */
+  --space-11:  7rem;      /* 112px */
+  --space-12:  9rem;      /* 144px */
+
+  /* Section vertical rhythm */
+  --section-y:        clamp(4rem, 2.5rem + 6vw, 9rem);       /* @kind spacing */
+  --section-y-tight:  clamp(3rem, 2rem + 4vw, 6rem);         /* @kind spacing */
+
+  /* Layout widths */
+  --content-max:   1180px;   /* full content frame */
+  --measure:       66ch;     /* comfortable reading measure */
+  --measure-tight: 46ch;     /* short intro paragraphs */
+  --gutter:        clamp(1.25rem, 0.5rem + 3vw, 3rem);       /* @kind spacing */
+}
