@@ -31,6 +31,7 @@ const DEFAULT_TIER: Record<EventType, NotifyTier> = {
   "taxes.quarter_approaching": "urgent",
   "compliance.window_open": "action",
   "invoice.reminder_sent": "info",
+  "invoice.viewed": "info",
   "sync.failed": "action",
 };
 

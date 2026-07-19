@@ -171,7 +171,11 @@ export async function voidInvoice(id: string): Promise<ActionResult> {
       return { ok: false, error: "Paid invoices cannot be voided." };
     }
     await db.$transaction(async (tx) => {
-      await tx.invoice.update({ where: { id }, data: { status: "VOID" } });
+      // Clearing shareToken revokes the client-facing link.
+      await tx.invoice.update({
+        where: { id },
+        data: { status: "VOID", shareToken: null },
+      });
       await emitEvent(tx, "invoice.voided", { invoiceId: id, number: existing.number });
     });
     dispatchSoon();

@@ -99,6 +99,14 @@ on("compliance.window_open", "notify-owner", async (p) => {
   });
 });
 
+on("invoice.viewed", "notify-owner", async (p) => {
+  await notify({
+    eventType: "invoice.viewed",
+    title: `${p.clientName} viewed invoice ${p.number}`,
+    href: `/invoices/${p.invoiceId}`,
+  });
+});
+
 on("sync.failed", "notify-owner", async (p) => {
   await notify({
     eventType: "sync.failed",
