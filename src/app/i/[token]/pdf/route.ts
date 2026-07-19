@@ -19,6 +19,8 @@ export async function GET(
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${invoice.number}.pdf"`,
       "X-Robots-Tag": "noindex",
+      // Tokenized financial document — never cache in shared proxies/CDNs.
+      "Cache-Control": "no-store",
     },
   });
 }

@@ -70,7 +70,7 @@ export async function sendInvoice(
     );
     const buffer = await renderInvoicePdfDataToBuffer(pdfData);
 
-    // Unguessable client-link token (128 bits), minted once at first send.
+    // Unguessable client-link token (192 bits, base64url), minted at first send.
     const shareToken =
       invoice.shareToken ?? randomBytes(24).toString("base64url");
 

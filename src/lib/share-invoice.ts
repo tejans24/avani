@@ -7,7 +7,7 @@ const VIEW_THROTTLE_MS = 24 * 3600_000;
 /**
  * Resolve a share token to its invoice (with everything the public page
  * needs). Returns null for unknown/revoked tokens — the page 404s.
- * Security model: the 128-bit token IS the authorization; the page is
+ * Security model: the 192-bit token IS the authorization; the page is
  * read-only and shows nothing the emailed PDF didn't already contain.
  */
 export async function invoiceByShareToken(token: string) {

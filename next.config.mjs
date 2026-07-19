@@ -5,9 +5,13 @@
 // styles); Google Fonts css/fonts allowed; Clerk domains allowed for
 // real-auth deployments; frame-src 'self' keeps the invoice-PDF iframe
 // working while frame-ancestors 'none' stops embedding of the app itself.
+// 'unsafe-eval' is required only by Next.js dev-mode tooling (webpack eval
+// sourcemaps); production CSP omits it.
+const scriptEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com",
+  `script-src 'self' 'unsafe-inline'${scriptEval} https://*.clerk.accounts.dev https://*.clerk.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://img.clerk.com",

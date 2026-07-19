@@ -21,6 +21,9 @@ export function buildInvoiceEmailSubject(d: InvoiceEmailData): string {
 export function buildInvoiceEmailHtml(d: InvoiceEmailData): string {
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Attribute contexts additionally need quote escaping (defensive: callers
+  // currently pass only base64url tokens, but this helper is exported).
+  const escAttr = (s: string) => esc(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const instructions = esc(d.paymentInstructions).replace(/\n/g, "<br/>");
 
   return `<!doctype html>
@@ -46,7 +49,7 @@ export function buildInvoiceEmailHtml(d: InvoiceEmailData): string {
           ${
             d.shareUrl
               ? `<p style="margin:0 0 20px;">
-            <a href="${d.shareUrl}" style="display:inline-block;background:#28352B;color:#EFEDE2;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:8px;">
+            <a href="${escAttr(d.shareUrl)}" style="display:inline-block;background:#28352B;color:#EFEDE2;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:8px;">
               View invoice
             </a>
           </p>`

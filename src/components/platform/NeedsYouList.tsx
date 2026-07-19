@@ -134,7 +134,7 @@ export async function NeedsYouList() {
       </div>
       {items.map((item, i) => (
         <Link
-          key={i}
+          key={`${item.href}:${item.label}`}
           href={item.href}
           style={{
             display: "flex",
