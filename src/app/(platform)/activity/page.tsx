@@ -254,6 +254,7 @@ export default async function ActivityPage({
             const href = eventHref(e);
             const body = (
               <div
+                className={href ? "activity-row activity-row--link" : "activity-row"}
                 style={{
                   display: "flex",
                   alignItems: "center",

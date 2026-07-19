@@ -22,9 +22,11 @@ export default function TopClientsChart({
 }: {
   data: { name: string; cents: number }[];
 }) {
+  // Height tracks the row count so short lists don't float in empty space.
+  const height = Math.min(280, Math.max(120, data.length * 52 + 48));
   return (
-    <div style={{ width: "100%", height: 280 }}>
-      <ResponsiveContainer width="100%" height={280}>
+    <div style={{ width: "100%", height }}>
+      <ResponsiveContainer width="100%" height={height}>
         <BarChart
           data={data}
           layout="vertical"

@@ -11,6 +11,8 @@ import {
   type TxnRow,
 } from "@/components/platform/transactions/TransactionsTable";
 import { MatchSuggestionBanner } from "@/components/platform/transactions/MatchSuggestionBanner";
+import { SyncNowButton } from "@/components/platform/accounts/SyncNowButton";
+import { Button } from "@/components/platform/ds";
 import { suggestionsForTransactions } from "@/lib/match-data";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -138,6 +140,14 @@ export default async function TransactionsPage({
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
+  const hasActiveFilter = Boolean(
+    searchParams.account ||
+      searchParams.category ||
+      searchParams.status ||
+      searchParams.month ||
+      (searchParams.q ?? "").trim()
+  );
+
   return (
     <>
       <div className="page-head">
@@ -170,11 +180,31 @@ export default async function TransactionsPage({
         </div>
       )}
 
-      <TransactionsTable
-        rows={rows}
-        categories={categories}
-        uncategorizedCount={uncategorizedCount}
-      />
+      {total === 0 && !hasActiveFilter ? (
+        <div className="empty-state">
+          <p className="empty-title">No transactions yet</p>
+          <p>
+            Pull activity from Mercury or upload a CSV export from your bank or
+            card — categorized transactions feed the P&amp;L and tax estimates.
+          </p>
+          <div className="empty-actions">
+            <SyncNowButton />
+            <Button
+              href={accounts.length > 0 ? `/accounts/${accounts[0].id}/import` : "/accounts/new"}
+              variant="secondary"
+              size="sm"
+            >
+              Import CSV
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <TransactionsTable
+          rows={rows}
+          categories={categories}
+          uncategorizedCount={uncategorizedCount}
+        />
+      )}
 
       {(page > 1 || total > page * PER_PAGE) && (
         <div

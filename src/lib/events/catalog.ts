@@ -91,6 +91,11 @@ export const EVENT_SCHEMAS = {
     number: z.string(),
     to: z.string(),
   }),
+  "invoice.viewed": z.object({
+    invoiceId: z.string(),
+    number: z.string(),
+    clientName: z.string(),
+  }),
   "sync.failed": z.object({
     source: z.string(),
     error: z.string(),

@@ -122,8 +122,8 @@ export async function HealthCard() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-          gap: 10,
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "10px 18px",
         }}
       >
         {rows.map((r) => {
@@ -148,7 +148,13 @@ export async function HealthCard() {
                   alignSelf: "center",
                 }}
               />
-              <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+              <span
+                style={{
+                  color: "var(--text-primary)",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {r.label}
               </span>
               <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>

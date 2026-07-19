@@ -9,6 +9,8 @@ export type InvoiceEmailData = {
   dueDate: Date | string;
   payViaLabel: string;
   paymentInstructions: string;
+  /** Client-facing hosted invoice page (tokenized). */
+  shareUrl?: string;
 };
 
 export function buildInvoiceEmailSubject(d: InvoiceEmailData): string {
@@ -19,6 +21,9 @@ export function buildInvoiceEmailSubject(d: InvoiceEmailData): string {
 export function buildInvoiceEmailHtml(d: InvoiceEmailData): string {
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Attribute contexts additionally need quote escaping (defensive: callers
+  // currently pass only base64url tokens, but this helper is exported).
+  const escAttr = (s: string) => esc(s).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const instructions = esc(d.paymentInstructions).replace(/\n/g, "<br/>");
 
   return `<!doctype html>
@@ -41,6 +46,15 @@ export function buildInvoiceEmailHtml(d: InvoiceEmailData): string {
             Please find invoice ${esc(d.invoiceNumber)} attached as a PDF.
             Payment is due by <strong>${formatDateLong(d.dueDate)}</strong> via ${esc(d.payViaLabel)}.
           </p>
+          ${
+            d.shareUrl
+              ? `<p style="margin:0 0 20px;">
+            <a href="${escAttr(d.shareUrl)}" style="display:inline-block;background:#28352B;color:#EFEDE2;text-decoration:none;font-size:14px;padding:11px 22px;border-radius:8px;">
+              View invoice
+            </a>
+          </p>`
+              : ""
+          }
           <div style="background:#F4EFE5;border:1px solid #E2D9C6;border-radius:8px;padding:16px 20px;margin:0 0 16px;">
             <p style="margin:0 0 8px;font-size:12px;color:#6E6657;text-transform:uppercase;letter-spacing:0.06em;">
               Payment instructions

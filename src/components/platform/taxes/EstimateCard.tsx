@@ -1,5 +1,5 @@
 import { formatCents } from "@/lib/money";
-import { formatDateLong } from "@/lib/dates";
+import { formatDateShort } from "@/lib/dates";
 import type { EstimateResult } from "@/lib/tax-estimates";
 
 /**
@@ -133,7 +133,7 @@ export function EstimateCard({
                     </span>
                   )}
                 </td>
-                <td>{formatDateLong(s.quarter.dueDateIso)}</td>
+                <td style={{ whiteSpace: "nowrap" }}>{formatDateShort(s.quarter.dueDateIso)}</td>
                 <td className="num">{formatCents(s.targetCents)}</td>
                 <td className="num">{formatCents(s.paidCents)}</td>
                 <td className="num" data-testid={`q${s.quarter.quarter}-remaining`}>

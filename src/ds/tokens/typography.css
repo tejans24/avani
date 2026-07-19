@@ -26,6 +26,9 @@
 
   /* --- Body / UI scale (sans) --- */
   --text-lead:  1.375rem;   /* 22px — intro paragraphs */
+  --text-3xl:   2.125rem;   /* 34px — platform page titles */
+  --text-2xl:   1.75rem;    /* 28px — stat tile numerals */
+  --text-xl:    1.375rem;   /* 22px — card / section headings */
   --text-lg:    1.125rem;   /* 18px */
   --text-base:  1.0625rem;  /* 17px — default body */
   --text-sm:    0.9375rem;  /* 15px */

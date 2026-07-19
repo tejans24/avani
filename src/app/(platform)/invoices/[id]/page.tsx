@@ -84,7 +84,7 @@ export default async function InvoiceDetailPage({
       </div>
 
       <iframe
-        src={`/api/invoices/${invoice.id}/pdf`}
+        src={`/api/invoices/${invoice.id}/pdf#toolbar=0&navpanes=0&view=FitH`}
         title={`${invoice.number} preview`}
         style={{
           width: "100%",

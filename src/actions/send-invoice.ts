@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
@@ -69,6 +70,10 @@ export async function sendInvoice(
     );
     const buffer = await renderInvoicePdfDataToBuffer(pdfData);
 
+    // Unguessable client-link token (192 bits, base64url), minted at first send.
+    const shareToken =
+      invoice.shareToken ?? randomBytes(24).toString("base64url");
+
     const emailData = {
       invoiceNumber: invoice.number,
       companyName: snapshot.companyName,
@@ -77,6 +82,7 @@ export async function sendInvoice(
       dueDate: invoice.dueDate,
       payViaLabel: settings.payViaLabel,
       paymentInstructions: snapshot.paymentInstructions,
+      shareUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/i/${shareToken}`,
     };
 
     const sent = await sendEmail({
@@ -95,6 +101,7 @@ export async function sendInvoice(
           status: "SENT",
           sentAt: invoice.sentAt ?? new Date(),
           fromSnapshot: snapshot,
+          shareToken,
         },
       });
       await emitEvent(tx, "invoice.sent", {

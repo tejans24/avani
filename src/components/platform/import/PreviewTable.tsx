@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCents } from "@/lib/money";
+import { formatDateShort } from "@/lib/dates";
 import { Badge } from "@/components/platform/ds";
 
 export type PreviewRow = {
@@ -35,17 +36,17 @@ export function PreviewTable({ rows }: { rows: PreviewRow[] }) {
           const excluded = row.invalidReason !== null;
           return (
             <tr key={row.index} style={excluded ? { opacity: 0.55 } : undefined}>
-              <td>{row.dateIso ?? "—"}</td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                {row.dateIso ? formatDateShort(row.dateIso) : "—"}
+              </td>
               <td>{row.description || "—"}</td>
               <td
                 className="num"
                 style={
-                  row.signedCents === null
-                    ? undefined
-                    : {
-                        color:
-                          row.signedCents < 0 ? "var(--critical)" : "var(--positive)",
-                      }
+                  // Match the transactions table: deposits green, money out ink.
+                  row.signedCents !== null && row.signedCents > 0
+                    ? { color: "var(--positive)" }
+                    : undefined
                 }
               >
                 {row.signedCents === null ? "—" : formatCents(row.signedCents)}

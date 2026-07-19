@@ -6,15 +6,6 @@ import { computeLineAmountCents, formatCents } from "@/lib/money";
 import { FormTextInput, FormNumberInput, FormMoneyInput } from "@/components/form";
 import { Button } from "@/components/platform/ds";
 
-const GRID_COLUMNS = "6fr 1.2fr 1.6fr 1.8fr 44px";
-
-const rowGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: GRID_COLUMNS,
-  gap: 10,
-  alignItems: "start",
-};
-
 const headerCellStyle: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
   fontSize: 12,
@@ -73,7 +64,7 @@ export function LineItemsEditor({ control }: { control: Control<InvoiceInput> })
 
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ ...rowGridStyle, marginBottom: 8 }}>
+      <div className="line-items-grid line-items-head" style={{ marginBottom: 8 }}>
         <span style={headerCellStyle}>Description</span>
         <span style={headerCellStyle}>Hours</span>
         <span style={headerCellStyle}>Rate</span>
@@ -82,8 +73,8 @@ export function LineItemsEditor({ control }: { control: Control<InvoiceInput> })
       </div>
 
       {fields.map((row, index) => (
-        <div key={row.id} style={{ ...rowGridStyle, marginBottom: 10 }}>
-          <div>
+        <div key={row.id} className="line-items-grid" style={{ marginBottom: 10 }}>
+          <div className="li-desc">
             <label htmlFor={`lineItems.${index}.description`} style={visuallyHidden}>
               Description
             </label>

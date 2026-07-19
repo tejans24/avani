@@ -89,23 +89,7 @@ export function NotificationCenter({
       </button>
 
       {open && (
-        <div
-          data-testid="notification-panel"
-          style={{
-            position: "fixed",
-            left: 16,
-            bottom: 64,
-            width: 360,
-            maxWidth: "calc(100vw - 32px)",
-            maxHeight: "70vh",
-            overflowY: "auto",
-            background: "var(--color-surface)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-lg)",
-            boxShadow: "var(--shadow-lg, 0 12px 32px rgba(33,31,26,0.18))",
-            zIndex: 50,
-          }}
-        >
+        <div data-testid="notification-panel" className="notif-panel">
           <div
             style={{
               display: "flex",
@@ -166,16 +150,7 @@ export function NotificationCenter({
                 <button
                   key={item.id}
                   onClick={() => openItem(item)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    background: item.read ? "transparent" : "var(--cream)",
-                    border: "none",
-                    borderBottom: "1px solid var(--border-subtle)",
-                    cursor: "pointer",
-                    padding: "12px 16px",
-                  }}
+                  className={item.read ? "notif-item" : "notif-item notif-item--unread"}
                 >
                   <span
                     style={{
@@ -223,30 +198,10 @@ export function NotificationCenter({
                       {item.ageLabel}
                     </span>
                   </span>
-                  <span
-                    style={{
-                      display: "block",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: "var(--text-sm)",
-                      color: "var(--text-primary)",
-                      lineHeight: 1.4,
-                    }}
-                  >
+                  <span className="notif-title" title={item.title}>
                     {item.title}
                   </span>
-                  {item.body && (
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 2,
-                        fontFamily: "var(--font-sans)",
-                        fontSize: "var(--text-xs)",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      {item.body}
-                    </span>
-                  )}
+                  {item.body && <span className="notif-body">{item.body}</span>}
                 </button>
               );
             })

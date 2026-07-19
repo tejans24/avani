@@ -84,6 +84,9 @@ model Invoice {
   memo          String?           @db.Text
   /// CompanySettings frozen at first send so later edits don't rewrite history
   fromSnapshot  Json?
+  /// Unguessable token for the client-facing invoice page (/i/{token}).
+  /// Created at first send; cleared on void (revokes the link).
+  shareToken    String?       @unique
   sentAt        DateTime?
   paidAt        DateTime?
   lineItems     InvoiceLineItem[]
