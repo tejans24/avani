@@ -76,6 +76,19 @@ model Client {
   /// count; netDaysMode is whether it skips weekends.
   netDays                 Int?
   netDaysMode             NetDaysMode?
+  // --- CRM / BD layer (Phase 3, all INTERNAL — never client-facing) ---
+  /// Relationship stage; existing clients default ACTIVE. Drives the coach.
+  stage             ClientStage @default(ACTIVE)
+  /// The next step to take with this client (the "system of action" prompt).
+  nextActionNote    String?     @db.Text
+  /// When that next step is due — drives follow-up nudges via the tick.
+  nextActionDueDate DateTime?   @db.Date
+  /// Simple deal size (integer cents); no separate Opportunity entity in v1.
+  dealValueCents    Int?
+  /// Simple expected-close forecast date.
+  expectedCloseDate DateTime?   @db.Date
+  contacts     Contact[]
+  interactions Interaction[]
   invoices     Invoice[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -343,4 +356,90 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([readAt, createdAt])
+}
+
+// ============================================================
+// Phase 3 — CRM / BD layer (STRICTLY INTERNAL)
+//
+// Contacts, org map, personality/politics notes, and the interaction
+// timeline. None of this data is ever serialized to the /i/{token} client
+// share page or any outbound email (see src/lib/share-invoice.ts).
+// ============================================================
+
+/// Relationship lifecycle. Leads are a stage, not a separate record.
+enum ClientStage {
+  LEAD
+  PROSPECT
+  ACTIVE
+  PAST
+}
+
+/// A contact's function in the buying decision (drives coaching).
+enum ContactRole {
+  DECISION_MAKER
+  CHAMPION
+  INFLUENCER
+  BLOCKER
+  USER
+  OTHER
+}
+
+enum InteractionType {
+  EMAIL
+  CALL
+  MEETING
+  NOTE
+}
+
+enum InteractionDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+/// A person mapped inside a client org. reportsTo forms a light org tree.
+model Contact {
+  id           String        @id @default(cuid())
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String
+  title        String?
+  email        String?
+  phone        String?
+  role         ContactRole?
+  /// Self-relation for the org chart (manager). SetNull so removing a manager
+  /// doesn't cascade-delete their reports.
+  reportsToId  String?
+  reportsTo    Contact?      @relation("OrgChart", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports      Contact[]     @relation("OrgChart")
+  /// Personality / politics / anything-I-know — INTERNAL, never client-facing.
+  notes        String?       @db.Text
+  isPrimary    Boolean       @default(false)
+  archived     Boolean       @default(false)
+  interactions Interaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([reportsToId])
+}
+
+/// One touch in the relationship timeline (manual or auto-logged app email).
+model Interaction {
+  id         String               @id @default(cuid())
+  clientId   String
+  client     Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  type       InteractionType
+  direction  InteractionDirection @default(OUTBOUND)
+  occurredAt DateTime
+  subject    String?
+  body       String?              @db.Text
+  /// null = manually logged; else the auto-source, e.g. "invoice.sent:INV-ACME-0001".
+  source     String?
+  createdAt  DateTime             @default(now())
+
+  @@index([clientId, occurredAt])
+  @@index([contactId])
 }
