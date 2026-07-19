@@ -15,7 +15,24 @@ export async function invoiceByShareToken(token: string) {
   return db.invoice.findUnique({
     where: { shareToken: token },
     include: {
-      client: true,
+      // PRIVACY: explicit select — the client-facing page only ever sees
+      // billing identity, never the internal CRM layer (stage, next-action,
+      // deal value, notes) and never contacts/interactions relations.
+      client: {
+        select: {
+          id: true,
+          name: true,
+          contactName: true,
+          billingEmail: true,
+          ccEmails: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          postalCode: true,
+          country: true,
+        },
+      },
       lineItems: { orderBy: { sortOrder: "asc" } },
     },
   });
