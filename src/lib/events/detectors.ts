@@ -93,12 +93,15 @@ export async function runDetectors(now = todayUtc()): Promise<DetectorReport> {
   const { detectMissingPayments } = await import("./detect-payments");
   const { detectQuarterWindows, detectComplianceWindows, detectDueDrafts } =
     await import("./detect-taxes");
+  const { detectFollowupsDue, detectGoingCold } = await import("./detect-bd");
   return {
     overdueInvoices: await detectOverdueInvoices(now),
     missingPayments: await detectMissingPayments(now),
     quarterWindows: await detectQuarterWindows(now),
     complianceWindows: await detectComplianceWindows(now),
     dueDrafts: await detectDueDrafts(now),
+    followupsDue: await detectFollowupsDue(now),
+    goingCold: await detectGoingCold(now),
     systemFailures: await detectSystemFailures(now),
   };
 }

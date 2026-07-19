@@ -117,6 +117,27 @@ on("sync.failed", "notify-owner", async (p) => {
   });
 });
 
+// --- BD coach: relationship nudges ---
+
+on("client.followup_due", "notify-owner", async (p) => {
+  await notify({
+    eventType: "client.followup_due",
+    title: `Follow-up due for ${p.clientName}: ${p.note}`,
+    body: `This was due ${formatDateLong(p.dueDateIso)}. Do it, then set the next step.`,
+    href: `/clients/${p.clientId}`,
+  });
+});
+
+on("client.going_cold", "notify-owner", async (p) => {
+  const stageLabel = p.stage === "LEAD" ? "Lead" : "Prospect";
+  await notify({
+    eventType: "client.going_cold",
+    title: `${p.clientName} is going cold (${stageLabel} · ${p.daysCold} days quiet)`,
+    body: "Reach out to keep the relationship warm, or set a next step.",
+    href: `/clients/${p.clientId}`,
+  });
+});
+
 // --- Client-facing: overdue reminder email (BUILT but default OFF) ---
 
 const REMINDER_GAP_DAYS = 7;

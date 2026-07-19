@@ -7,8 +7,10 @@ import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTabl
 import { ClientTabs, type ClientTabKey } from "@/components/platform/clients/ClientTabs";
 import { PeopleTab } from "@/components/platform/clients/PeopleTab";
 import { TimelineTab } from "@/components/platform/clients/TimelineTab";
+import { ClientBDCard } from "@/components/platform/clients/ClientBDCard";
 import { deriveDisplayStatus } from "@/lib/invoice-status";
 import { formatCents } from "@/lib/money";
+import { dateToIso } from "@/lib/dates";
 
 export const metadata = { title: "Client — Avani" };
 export const dynamic = "force-dynamic";
@@ -107,6 +109,19 @@ export default async function ClientDetailPage({
         <TimelineTab clientId={client.id} clientName={client.name} />
       ) : (
         <>
+          <ClientBDCard
+            clientId={client.id}
+            stage={client.stage}
+            nextActionNote={client.nextActionNote}
+            nextActionDueDateIso={
+              client.nextActionDueDate ? dateToIso(client.nextActionDueDate) : null
+            }
+            dealValueCents={client.dealValueCents}
+            expectedCloseDateIso={
+              client.expectedCloseDate ? dateToIso(client.expectedCloseDate) : null
+            }
+          />
+
           <div className="stat-row">
             <StatTile label="Billed" value={formatCents(billedCents)} sublabel="Sent + paid" />
             <StatTile

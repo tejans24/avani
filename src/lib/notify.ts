@@ -33,6 +33,8 @@ const DEFAULT_TIER: Record<EventType, NotifyTier> = {
   "invoice.reminder_sent": "info",
   "invoice.viewed": "info",
   "sync.failed": "action",
+  "client.followup_due": "action",
+  "client.going_cold": "action",
 };
 
 export type NotifyInput = {

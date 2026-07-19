@@ -5,6 +5,7 @@ import { formatCents } from "@/lib/money";
 import { suggestionsForTransactions } from "@/lib/match-data";
 import { computeYearEstimate } from "@/lib/tax-data";
 import { windowOpen } from "@/lib/compliance";
+import { isGoingCold, STAGE_LABEL } from "@/lib/bd-playbook";
 
 type NeedsYouItem = { label: string; detail?: string; href: string };
 
@@ -16,7 +17,7 @@ export async function NeedsYouList() {
   const now = new Date();
   const today = todayUtc();
 
-  const [suggestions, drafts, overdue, unreviewed, deadlines, estimate] =
+  const [suggestions, drafts, overdue, unreviewed, deadlines, estimate, dueClients, coldCandidates] =
     await Promise.all([
       suggestionsForTransactions(),
       db.invoice.findMany({
@@ -28,9 +29,54 @@ export async function NeedsYouList() {
       db.transaction.count({ where: { status: "UNREVIEWED" } }),
       db.complianceDeadline.findMany({ where: { enabled: true } }),
       computeYearEstimate(now).catch(() => null),
+      db.client.findMany({
+        where: { archived: false, stage: { not: "PAST" }, nextActionDueDate: { not: null, lte: today } },
+        select: { id: true, name: true, nextActionNote: true, nextActionDueDate: true },
+        orderBy: { nextActionDueDate: "asc" },
+      }),
+      db.client.findMany({
+        where: { archived: false, stage: { in: ["LEAD", "PROSPECT"] }, nextActionDueDate: null },
+        select: {
+          id: true,
+          name: true,
+          stage: true,
+          createdAt: true,
+          interactions: { orderBy: { occurredAt: "desc" }, take: 1, select: { occurredAt: true } },
+        },
+      }),
     ]);
 
   const items: NeedsYouItem[] = [];
+
+  // BD coach: who to reconnect with today, front and center.
+  for (const c of dueClients.slice(0, 3)) {
+    items.push({
+      label: `Follow up with ${c.name}${c.nextActionNote ? `: ${c.nextActionNote}` : ""}`,
+      detail: c.nextActionDueDate ? `Due ${formatDateLong(c.nextActionDueDate)}` : "Due",
+      href: `/clients/${c.id}`,
+    });
+  }
+  if (dueClients.length > 3) {
+    items.push({
+      label: `${dueClients.length - 3} more follow-up${dueClients.length - 3 === 1 ? "" : "s"} due`,
+      href: "/clients",
+    });
+  }
+  const cold = coldCandidates
+    .map((c) => ({
+      ...c,
+      lastContactAt: c.interactions[0]?.occurredAt ?? null,
+    }))
+    .filter((c) => isGoingCold(c.stage, c.lastContactAt, today, c.createdAt));
+  for (const c of cold.slice(0, 3)) {
+    const reference = c.lastContactAt ?? c.createdAt;
+    const days = Math.floor((today.getTime() - reference.getTime()) / 86_400_000);
+    items.push({
+      label: `${c.name} is going cold`,
+      detail: `${STAGE_LABEL[c.stage]} · ${days} days quiet`,
+      href: `/clients/${c.id}`,
+    });
+  }
 
   if (suggestions.size > 0) {
     items.push({
