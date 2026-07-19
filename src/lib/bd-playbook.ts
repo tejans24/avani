@@ -1,4 +1,9 @@
-import type { ClientStage, ContactRole } from "@/lib/validations";
+import type {
+  ClientStage,
+  ContactRole,
+  InteractionDirection,
+  InteractionType,
+} from "@/lib/validations";
 
 /**
  * The BD playbook — light, opinionated coaching for an owner who's new to
@@ -79,6 +84,20 @@ export const CONTACT_ROLE_BLURB: Record<ContactRole, string> = {
   BLOCKER: "Can stall or kill it. Understand their objection early.",
   USER: "Lives with the work day to day. Their happiness drives renewal.",
   OTHER: "Someone worth knowing in the org.",
+};
+
+/** Display labels for the interaction timeline. */
+export const INTERACTION_TYPE_LABEL: Record<InteractionType, string> = {
+  EMAIL: "Email",
+  CALL: "Call",
+  MEETING: "Meeting",
+  NOTE: "Note",
+};
+
+export const INTERACTION_DIRECTION_LABEL: Record<InteractionDirection, string> = {
+  INBOUND: "Inbound",
+  OUTBOUND: "Outbound",
+  INTERNAL: "Internal",
 };
 
 /** Stages that count toward the open pipeline (not yet won, not lost). */
