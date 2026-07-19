@@ -69,7 +69,7 @@ export default async function ClientsPage({
             {clients.map((client) => (
               <tr key={client.id}>
                 <td>
-                  <Link href={`/clients/${client.id}/edit`}>{client.name}</Link>
+                  <Link href={`/clients/${client.id}`}>{client.name}</Link>
                 </td>
                 <td>{client.contactName ?? "—"}</td>
                 <td>{client.billingEmail}</td>

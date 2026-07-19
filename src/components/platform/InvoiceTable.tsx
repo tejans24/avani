@@ -9,6 +9,8 @@ export type InvoiceRow = {
   id: string;
   number: string;
   clientName: string;
+  /** When set, the client name links to the client detail page. */
+  clientId?: string;
   status: string;
   issueDate: Date;
   dueDate: Date;
@@ -48,7 +50,13 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
             <td>
               <Link href={`/invoices/${inv.id}`}>{inv.number}</Link>
             </td>
-            <td>{inv.clientName}</td>
+            <td>
+              {inv.clientId ? (
+                <Link href={`/clients/${inv.clientId}`}>{inv.clientName}</Link>
+              ) : (
+                inv.clientName
+              )}
+            </td>
             <td>
               <StatusBadge status={deriveDisplayStatus(inv)} />
             </td>

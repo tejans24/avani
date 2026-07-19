@@ -65,6 +65,7 @@ export default async function InvoicesPage({
     id: inv.id,
     number: inv.number,
     clientName: inv.client.name,
+    clientId: inv.clientId,
     status: inv.status,
     issueDate: inv.issueDate,
     dueDate: inv.dueDate,

@@ -42,7 +42,10 @@ test.describe("clients", () => {
     await insertClient({ name: "Acme Corp" });
 
     await page.goto("/clients");
+    // Client name now opens the detail page; edit is one click from there.
     await page.getByRole("link", { name: "Acme Corp" }).click();
+    await page.waitForURL(/\/clients\/[^/]+$/);
+    await page.getByRole("link", { name: "Edit client" }).click();
 
     await page.waitForURL("**/clients/*/edit");
     await expect(page.locator("#name")).toHaveValue("Acme Corp");
