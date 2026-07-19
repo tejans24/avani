@@ -6,13 +6,14 @@ import { StatTile } from "@/components/platform/StatTile";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
 import { ClientTabs, type ClientTabKey } from "@/components/platform/clients/ClientTabs";
 import { PeopleTab } from "@/components/platform/clients/PeopleTab";
+import { TimelineTab } from "@/components/platform/clients/TimelineTab";
 import { deriveDisplayStatus } from "@/lib/invoice-status";
 import { formatCents } from "@/lib/money";
 
 export const metadata = { title: "Client — Avani" };
 export const dynamic = "force-dynamic";
 
-const TABS: ClientTabKey[] = ["overview", "people"];
+const TABS: ClientTabKey[] = ["overview", "people", "timeline"];
 
 export default async function ClientDetailPage({
   params,
@@ -22,13 +23,19 @@ export default async function ClientDetailPage({
   searchParams: { tab?: string };
 }) {
   const tab: ClientTabKey =
-    searchParams.tab === "people" ? "people" : "overview";
+    searchParams.tab === "people"
+      ? "people"
+      : searchParams.tab === "timeline"
+        ? "timeline"
+        : "overview";
 
   const client = await db.client.findUnique({
     where: { id: params.id },
     include: {
       invoices: { orderBy: { createdAt: "desc" } },
-      _count: { select: { contacts: { where: { archived: false } } } },
+      _count: {
+        select: { contacts: { where: { archived: false } }, interactions: true },
+      },
     },
   });
   if (!client) notFound();
@@ -91,11 +98,13 @@ export default async function ClientDetailPage({
         clientId={client.id}
         active={tab}
         tabs={TABS}
-        counts={{ people: client._count.contacts }}
+        counts={{ people: client._count.contacts, timeline: client._count.interactions }}
       />
 
       {tab === "people" ? (
         <PeopleTab clientId={client.id} clientName={client.name} />
+      ) : tab === "timeline" ? (
+        <TimelineTab clientId={client.id} clientName={client.name} />
       ) : (
         <>
           <div className="stat-row">

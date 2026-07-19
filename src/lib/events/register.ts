@@ -2,6 +2,7 @@ import { on } from "./dispatch";
 import { notify } from "@/lib/notify";
 import { db } from "@/lib/db";
 import { emitEvent } from "./emit";
+import { logInteraction } from "@/lib/interactions";
 import { sendEmail } from "@/lib/email";
 import { formatCents } from "@/lib/money";
 import { formatDateLong } from "@/lib/dates";
@@ -161,6 +162,15 @@ Thank you!<br/>${settings.companyName}</p>`,
         invoiceId: p.invoiceId,
         number: p.number,
         to: invoice.client.billingEmail,
+      });
+      // Auto-log the reminder to the client's relationship timeline (internal).
+      await logInteraction(tx, {
+        clientId: invoice.clientId,
+        type: "EMAIL",
+        direction: "OUTBOUND",
+        occurredAt: ctx.now,
+        subject: `Overdue reminder for ${p.number} sent to ${invoice.client.billingEmail}`,
+        source: `invoice.reminder_sent:${p.number}`,
       });
     });
   },
