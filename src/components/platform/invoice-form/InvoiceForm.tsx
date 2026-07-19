@@ -15,6 +15,8 @@ import { LineItemsEditor } from "./LineItemsEditor";
 export interface InvoiceFormProps {
   clients: { id: string; name: string }[];
   defaults: { taxRateBps: number; netBusinessDays: number; terms: string };
+  /** Pre-selected client (e.g. from a client page's "New invoice" button). */
+  initialClientId?: string;
   /** Present = edit mode. */
   invoice?: InvoiceInput & { id: string };
 }
@@ -97,7 +99,7 @@ function TotalsFooter({ control }: { control: Control<InvoiceInput> }) {
   );
 }
 
-export function InvoiceForm({ clients, defaults, invoice }: InvoiceFormProps) {
+export function InvoiceForm({ clients, defaults, initialClientId, invoice }: InvoiceFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export function InvoiceForm({ clients, defaults, invoice }: InvoiceFormProps) {
         lineItems: invoice.lineItems,
       }
     : {
-        clientId: "",
+        clientId: initialClientId ?? "",
         issueDate: dateToIso(todayUtc()),
         dueDate: dateToIso(addBusinessDaysUtc(todayUtc(), defaults.netBusinessDays)),
         taxRateBps: defaults.taxRateBps,

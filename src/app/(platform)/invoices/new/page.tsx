@@ -5,7 +5,11 @@ import { InvoiceForm } from "@/components/platform/invoice-form/InvoiceForm";
 export const metadata = { title: "New invoice — Avani" };
 export const dynamic = "force-dynamic";
 
-export default async function NewInvoicePage() {
+export default async function NewInvoicePage({
+  searchParams,
+}: {
+  searchParams: { client?: string };
+}) {
   const [clients, settings] = await Promise.all([
     db.client.findMany({
       where: { archived: false },
@@ -14,6 +18,11 @@ export default async function NewInvoicePage() {
     }),
     db.companySettings.findUniqueOrThrow({ where: { id: 1 } }),
   ]);
+
+  // Pre-select the client only if it's a real, selectable one.
+  const initialClientId = clients.some((c) => c.id === searchParams.client)
+    ? searchParams.client
+    : undefined;
 
   return (
     <>
@@ -32,6 +41,7 @@ export default async function NewInvoicePage() {
       ) : (
         <InvoiceForm
           clients={clients}
+          initialClientId={initialClientId}
           defaults={{
             taxRateBps: settings.defaultTaxRateBps,
             netBusinessDays: settings.defaultNetBusinessDays,
