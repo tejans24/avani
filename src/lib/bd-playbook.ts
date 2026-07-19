@@ -1,4 +1,4 @@
-import type { ClientStage } from "@/lib/validations";
+import type { ClientStage, ContactRole } from "@/lib/validations";
 
 /**
  * The BD playbook — light, opinionated coaching for an owner who's new to
@@ -60,6 +60,25 @@ export const STAGE_CHECKLIST: Record<ClientStage, string[]> = {
     "Note why the relationship went quiet",
     "Set a reason to re-engage later (news, a new offering)",
   ],
+};
+
+/** Display label + a one-liner for each contact role (People tab, coaching). */
+export const CONTACT_ROLE_LABEL: Record<ContactRole, string> = {
+  DECISION_MAKER: "Decision-maker",
+  CHAMPION: "Champion",
+  INFLUENCER: "Influencer",
+  BLOCKER: "Blocker",
+  USER: "User",
+  OTHER: "Other",
+};
+
+export const CONTACT_ROLE_BLURB: Record<ContactRole, string> = {
+  DECISION_MAKER: "Signs off / controls budget. Win them and you win the deal.",
+  CHAMPION: "Sells for you internally. Arm them with what they need.",
+  INFLUENCER: "Shapes the decision without owning it. Keep them on side.",
+  BLOCKER: "Can stall or kill it. Understand their objection early.",
+  USER: "Lives with the work day to day. Their happiness drives renewal.",
+  OTHER: "Someone worth knowing in the org.",
 };
 
 /** Stages that count toward the open pipeline (not yet won, not lost). */

@@ -4,16 +4,32 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/platform/ds";
 import { StatTile } from "@/components/platform/StatTile";
 import { InvoiceTable, type InvoiceRow } from "@/components/platform/InvoiceTable";
+import { ClientTabs, type ClientTabKey } from "@/components/platform/clients/ClientTabs";
+import { PeopleTab } from "@/components/platform/clients/PeopleTab";
 import { deriveDisplayStatus } from "@/lib/invoice-status";
 import { formatCents } from "@/lib/money";
 
 export const metadata = { title: "Client — Avani" };
 export const dynamic = "force-dynamic";
 
-export default async function ClientDetailPage({ params }: { params: { id: string } }) {
+const TABS: ClientTabKey[] = ["overview", "people"];
+
+export default async function ClientDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { tab?: string };
+}) {
+  const tab: ClientTabKey =
+    searchParams.tab === "people" ? "people" : "overview";
+
   const client = await db.client.findUnique({
     where: { id: params.id },
-    include: { invoices: { orderBy: { createdAt: "desc" } } },
+    include: {
+      invoices: { orderBy: { createdAt: "desc" } },
+      _count: { select: { contacts: { where: { archived: false } } } },
+    },
   });
   if (!client) notFound();
 
@@ -71,92 +87,98 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      <div className="stat-row">
-        <StatTile label="Billed" value={formatCents(billedCents)} sublabel="Sent + paid" />
-        <StatTile
-          label="Outstanding"
-          value={formatCents(outstandingCents)}
-          sublabel={`${overdueCount} overdue`}
-          tone={overdueCount > 0 ? "critical" : "default"}
-        />
-        <StatTile label="Collected" value={formatCents(collectedCents)} tone="positive" />
-        <StatTile
-          label="Invoices"
-          value={String(client.invoices.length)}
-          sublabel="All time"
-        />
-      </div>
+      <ClientTabs
+        clientId={client.id}
+        active={tab}
+        tabs={TABS}
+        counts={{ people: client._count.contacts }}
+      />
 
-      {addressLines.length > 0 || client.ccEmails.length > 0 || client.notes ? (
-        <div
-          className="form-card"
-          style={{ marginBottom: 28, display: "grid", gap: 6 }}
-        >
-          {addressLines.length > 0 && (
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-              {addressLines.map((l, i) => (
-                <div key={i}>{l}</div>
-              ))}
-            </div>
-          )}
-          {client.ccEmails.length > 0 && (
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-              CC: {client.ccEmails.join(", ")}
-            </div>
-          )}
-          {client.notes && (
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-secondary)", whiteSpace: "pre-line" }}>
-              {client.notes}
-            </div>
-          )}
-        </div>
-      ) : null}
+      {tab === "people" ? (
+        <PeopleTab clientId={client.id} clientName={client.name} />
+      ) : (
+        <>
+          <div className="stat-row">
+            <StatTile label="Billed" value={formatCents(billedCents)} sublabel="Sent + paid" />
+            <StatTile
+              label="Outstanding"
+              value={formatCents(outstandingCents)}
+              sublabel={`${overdueCount} overdue`}
+              tone={overdueCount > 0 ? "critical" : "default"}
+            />
+            <StatTile label="Collected" value={formatCents(collectedCents)} tone="positive" />
+            <StatTile label="Invoices" value={String(client.invoices.length)} sublabel="All time" />
+          </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--text-xl)",
-            color: "var(--text-primary)",
-            margin: 0,
-          }}
-        >
-          Invoices
-        </h2>
-        {client.invoices.length > 0 && (
-          <Link
-            href={`/invoices?client=${client.id}`}
+          {addressLines.length > 0 || client.ccEmails.length > 0 || client.notes ? (
+            <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 6 }}>
+              {addressLines.length > 0 && (
+                <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                  {addressLines.map((l, i) => (
+                    <div key={i}>{l}</div>
+                  ))}
+                </div>
+              )}
+              {client.ccEmails.length > 0 && (
+                <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                  CC: {client.ccEmails.join(", ")}
+                </div>
+              )}
+              {client.notes && (
+                <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--text-secondary)", whiteSpace: "pre-line" }}>
+                  {client.notes}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div
             style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "var(--text-sm)",
-              color: "var(--color-accent)",
-              textDecoration: "none",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: 12,
             }}
           >
-            View in invoices list
-          </Link>
-        )}
-      </div>
-
-      {client.invoices.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-title">No invoices for {client.name} yet</p>
-          <p>Create the first invoice for this client — their billing details fill in automatically.</p>
-          <div className="empty-actions">
-            <Button href={`/invoices/new?client=${client.id}`} variant="primary" size="sm">
-              New invoice
-            </Button>
+            <h2
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--text-xl)",
+                color: "var(--text-primary)",
+                margin: 0,
+              }}
+            >
+              Invoices
+            </h2>
+            {client.invoices.length > 0 && (
+              <Link
+                href={`/invoices?client=${client.id}`}
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--color-accent)",
+                  textDecoration: "none",
+                }}
+              >
+                View in invoices list
+              </Link>
+            )}
           </div>
-        </div>
-      ) : (
-        <InvoiceTable invoices={rows} />
+
+          {client.invoices.length === 0 ? (
+            <div className="empty-state">
+              <p className="empty-title">No invoices for {client.name} yet</p>
+              <p>Create the first invoice for this client — their billing details fill in automatically.</p>
+              <div className="empty-actions">
+                <Button href={`/invoices/new?client=${client.id}`} variant="primary" size="sm">
+                  New invoice
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <InvoiceTable invoices={rows} />
+          )}
+        </>
       )}
     </>
   );
