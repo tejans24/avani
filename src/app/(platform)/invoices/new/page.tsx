@@ -14,7 +14,7 @@ export default async function NewInvoicePage({
     db.client.findMany({
       where: { archived: false },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, netDays: true, netDaysMode: true },
     }),
     db.companySettings.findUniqueOrThrow({ where: { id: 1 } }),
   ]);
@@ -45,6 +45,7 @@ export default async function NewInvoicePage({
           defaults={{
             taxRateBps: settings.defaultTaxRateBps,
             netBusinessDays: settings.defaultNetBusinessDays,
+            netDaysMode: settings.defaultNetDaysMode,
             terms: settings.defaultTerms ?? "",
           }}
         />

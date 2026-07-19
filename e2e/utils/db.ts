@@ -67,8 +67,8 @@ export async function insertClient(overrides: Partial<Record<string, unknown>> =
   await withPg((pg) =>
     pg.query(
       `INSERT INTO "Client"
-        (id, name, "contactName", "billingEmail", "ccEmails", "addressLine1", city, state, "postalCode", country, archived, "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,NOW(),NOW())`,
+        (id, name, "contactName", "billingEmail", "ccEmails", "addressLine1", city, state, "postalCode", country, "netDays", "netDaysMode", archived, "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,NOW(),NOW())`,
       [
         c.id,
         c.name,
@@ -80,6 +80,8 @@ export async function insertClient(overrides: Partial<Record<string, unknown>> =
         c.state,
         c.postalCode,
         c.country,
+        c.netDays ?? null,
+        c.netDaysMode ?? null,
       ]
     )
   );

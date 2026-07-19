@@ -14,6 +14,12 @@ enum InvoiceStatus {
   VOID
 }
 
+/// Whether payment-term day counts skip weekends (BUSINESS) or not (CALENDAR).
+enum NetDaysMode {
+  BUSINESS
+  CALENDAR
+}
+
 /// Singleton (id = 1): the "From" block, payment instructions, and defaults.
 model CompanySettings {
   id                     Int      @id @default(1)
@@ -29,8 +35,10 @@ model CompanySettings {
   payViaLabel            String   @default("Manual transfer (ACH/Wire)")
   paymentInstructions    String   @db.Text
   defaultTerms           String?  @db.Text
-  /// Due date suggestion: issue date + this many business days
-  defaultNetBusinessDays Int      @default(15)
+  /// Company default payment terms: due date = issue date + this many days,
+  /// counted per defaultNetDaysMode. Clients may override both.
+  defaultNetBusinessDays Int         @default(15)
+  defaultNetDaysMode     NetDaysMode @default(BUSINESS)
   defaultTaxRateBps      Int      @default(0)
   nextInvoiceNumber      Int      @default(1)
   /// Per-reaction toggles keyed by settingKey, e.g. {"overdueEmails": false}
@@ -64,6 +72,10 @@ model Client {
   billingCadenceDays      Int?
   /// Per-client gate for the (globally-toggled) overdue reminder emails
   overdueRemindersEnabled Boolean @default(true)
+  /// Payment terms override: null = use the company default. netDays is the
+  /// count; netDaysMode is whether it skips weekends.
+  netDays                 Int?
+  netDaysMode             NetDaysMode?
   invoices     Invoice[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

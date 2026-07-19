@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsInput } from "@/lib/validations";
 import { formatBps } from "@/lib/money";
 import { updateSettings } from "@/actions/settings";
-import { FormTextInput, FormTextarea, FormNumberInput } from "@/components/form";
+import { FormTextInput, FormTextarea, FormNumberInput, FormSelect } from "@/components/form";
 import { Button as DsButton } from "@/ds/components/core/Button";
 import { Callout as DsCallout } from "@/ds/components/core/Callout";
 import { Eyebrow as DsEyebrow } from "@/ds/components/core/Eyebrow";
@@ -23,7 +23,9 @@ const dividerStyle: React.CSSProperties = { margin: "28px 0" };
 
 export function SettingsForm({ settings }: { settings: SettingsInput }) {
   const { control, handleSubmit } = useForm<SettingsInput>({
-    resolver: zodResolver(settingsSchema),
+    // defaultNetDaysMode has a zod .default(), which widens the schema input
+    // type; pin the resolver to the output shape (as with clientSchema).
+    resolver: zodResolver(settingsSchema) as Resolver<SettingsInput>,
     // `values` (not defaultValues) so server refreshes after save propagate in.
     values: settings,
   });
@@ -96,12 +98,21 @@ export function SettingsForm({ settings }: { settings: SettingsInput }) {
         <FormNumberInput
           control={control}
           name="defaultNetBusinessDays"
-          label="Default net terms (business days)"
+          label="Default payment terms — due in (days)"
           required
           min={0}
-          max={90}
+          max={365}
           step={1}
-          hint="Due date suggestion: issue date + this many business days."
+          hint="New invoices default to issue date + this many days. Clients can override."
+        />
+        <FormSelect
+          control={control}
+          name="defaultNetDaysMode"
+          label="Counted as"
+          options={[
+            { value: "BUSINESS", label: "Business days" },
+            { value: "CALENDAR", label: "Calendar days" },
+          ]}
         />
         <FormNumberInput
           control={control}
