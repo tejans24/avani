@@ -20,7 +20,7 @@ export default async function EditInvoicePage({ params }: { params: { id: string
     db.client.findMany({
       where: { OR: [{ archived: false }, { id: invoice.clientId }] },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, netDays: true, netDaysMode: true },
     }),
     db.companySettings.findUniqueOrThrow({ where: { id: 1 } }),
   ]);
@@ -53,6 +53,7 @@ export default async function EditInvoicePage({ params }: { params: { id: string
         defaults={{
           taxRateBps: settings.defaultTaxRateBps,
           netBusinessDays: settings.defaultNetBusinessDays,
+          netDaysMode: settings.defaultNetDaysMode,
           terms: settings.defaultTerms ?? "",
         }}
         invoice={input}

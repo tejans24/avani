@@ -210,19 +210,29 @@ describe("settingsSchema", () => {
     expect(settingsSchema.safeParse({ ...validSettings, email: "nope" }).success).toBe(false);
   });
 
-  it("bounds defaultNetBusinessDays to 0..90", () => {
+  it("bounds defaultNetBusinessDays to 0..365", () => {
     expect(
       settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: -1 }).success
     ).toBe(false);
     expect(
-      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 91 }).success
+      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 366 }).success
     ).toBe(false);
     expect(settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 0 }).success).toBe(
       true
     );
     expect(
-      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 90 }).success
+      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 365 }).success
     ).toBe(true);
+  });
+
+  it("defaults defaultNetDaysMode to BUSINESS and accepts CALENDAR", () => {
+    const parsed = settingsSchema.safeParse(validSettings);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.defaultNetDaysMode).toBe("BUSINESS");
+    expect(
+      settingsSchema.safeParse({ ...validSettings, defaultNetDaysMode: "CALENDAR" }).data
+        ?.defaultNetDaysMode
+    ).toBe("CALENDAR");
   });
 
   it("bounds tax rate", () => {

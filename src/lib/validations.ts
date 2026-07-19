@@ -43,6 +43,9 @@ export const clientSchema = z.object({
     .regex(/^[A-Z0-9]{2,6}$/, "2–6 letters or digits")
     .optional()
     .or(z.literal("")),
+  /** Payment-terms override: null/undefined = use the company default. */
+  netDays: z.number().int("Whole days only").min(0).max(365).nullable().optional(),
+  netDaysMode: z.enum(["BUSINESS", "CALENDAR"]).nullable().optional(),
 });
 
 export const lineItemSchema = z.object({
@@ -89,7 +92,8 @@ export const settingsSchema = z.object({
     .min(1, "Payment instructions are required")
     .max(5000),
   defaultTerms: z.string().optional(),
-  defaultNetBusinessDays: z.number().int().min(0).max(90),
+  defaultNetBusinessDays: z.number().int().min(0).max(365),
+  defaultNetDaysMode: z.enum(["BUSINESS", "CALENDAR"]).default("BUSINESS"),
   defaultTaxRateBps: z.number().int().min(0).max(10000),
 });
 

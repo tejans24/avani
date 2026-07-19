@@ -30,6 +30,9 @@ export async function upsertClient(
       overdueRemindersEnabled: parsed.data.overdueRemindersEnabled,
       // Blank prefix = "derive from name at first allocation" (stored null).
       invoicePrefix: parsed.data.invoicePrefix || null,
+      // Blank terms = "use the company default" (stored null).
+      netDays: parsed.data.netDays ?? null,
+      netDaysMode: parsed.data.netDaysMode ?? null,
     };
 
     if (data.invoicePrefix) {

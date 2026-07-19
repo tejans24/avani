@@ -28,6 +28,8 @@ const EMPTY_CLIENT: ClientInput = {
   billingCadenceDays: null,
   overdueRemindersEnabled: true,
   invoicePrefix: "",
+  netDays: null,
+  netDaysMode: null,
 };
 
 const CADENCE_OPTIONS = [
@@ -37,12 +39,19 @@ const CADENCE_OPTIONS = [
   { value: "30", label: "Every 30 days (monthly)" },
 ];
 
+export type CompanyTermsDefault = {
+  netDays: number;
+  netDaysMode: "BUSINESS" | "CALENDAR";
+};
+
 export function ClientForm({
   client,
   clientId,
+  companyDefault,
 }: {
   client: ClientInput | null;
   clientId?: string;
+  companyDefault: CompanyTermsDefault;
 }) {
   const router = useRouter();
   const { control, handleSubmit } = useForm<ClientInput>({
@@ -59,6 +68,9 @@ export function ClientForm({
   // reminders switch holds a boolean the ds Switch toggles directly.
   const { field: cadenceField } = useController({ control, name: "billingCadenceDays" });
   const { field: remindersField } = useController({ control, name: "overdueRemindersEnabled" });
+  const { field: netDaysField } = useController({ control, name: "netDays" });
+  const { field: netDaysModeField } = useController({ control, name: "netDaysMode" });
+  const defaultModeLabel = companyDefault.netDaysMode === "CALENDAR" ? "calendar" : "business";
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +189,48 @@ export function ClientForm({
                 {opt.label}
               </option>
             ))}
+          </Select>
+        </Field>
+        <Field
+          label="Payment terms — due in"
+          htmlFor="netDays"
+          hint={`Sets each new invoice's due date. Leave blank to use the company default (${companyDefault.netDays} ${defaultModeLabel} days).`}
+        >
+          <input
+            id="netDays"
+            type="number"
+            min={0}
+            max={365}
+            inputMode="numeric"
+            placeholder={`Default (${companyDefault.netDays})`}
+            value={netDaysField.value == null ? "" : String(netDaysField.value)}
+            onChange={(e) =>
+              netDaysField.onChange(e.target.value === "" ? null : Number(e.target.value))
+            }
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-base)",
+              color: "var(--ink)",
+              background: "var(--warm-white)",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-md)",
+            }}
+          />
+        </Field>
+        <Field label="Counted as" htmlFor="netDaysMode">
+          <Select
+            id="netDaysMode"
+            name={netDaysModeField.name}
+            value={netDaysModeField.value ?? ""}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              netDaysModeField.onChange(e.target.value === "" ? null : e.target.value)
+            }
+          >
+            <option value="">Use company default ({defaultModeLabel} days)</option>
+            <option value="BUSINESS">Business days</option>
+            <option value="CALENDAR">Calendar days</option>
           </Select>
         </Field>
         <div className="span-2" style={{ marginTop: 4 }}>

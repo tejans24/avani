@@ -76,6 +76,20 @@ export function addBusinessDaysUtc(d: Date, n: number): Date {
   return result;
 }
 
+/** Add n calendar days, UTC-based. Returns a new Date; input not mutated. */
+export function addCalendarDaysUtc(d: Date, n: number): Date {
+  const result = new Date(d.getTime());
+  result.setUTCDate(result.getUTCDate() + Math.trunc(n));
+  return result;
+}
+
+export type NetDaysMode = "BUSINESS" | "CALENDAR";
+
+/** Add payment-term days, honoring the business/calendar mode. */
+export function addNetDaysUtc(d: Date, n: number, mode: NetDaysMode): Date {
+  return mode === "CALENDAR" ? addCalendarDaysUtc(d, n) : addBusinessDaysUtc(d, n);
+}
+
 /** The current date truncated to UTC midnight. */
 export function todayUtc(): Date {
   const now = new Date();

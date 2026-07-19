@@ -1,20 +1,35 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { invoiceSchema, type InvoiceInput } from "@/lib/validations";
 import { computeInvoiceTotals, formatBps, formatCents } from "@/lib/money";
-import { addBusinessDaysUtc, dateToIso, todayUtc } from "@/lib/dates";
+import { addNetDaysUtc, dateToIso, isoToUtcDate, todayUtc } from "@/lib/dates";
 import { createInvoice, updateInvoice } from "@/actions/invoices";
 import { FormSelect, FormDateInput, FormNumberInput, FormTextarea } from "@/components/form";
 import { Button } from "@/components/platform/ds";
 import { LineItemsEditor } from "./LineItemsEditor";
 
+type NetDaysMode = "BUSINESS" | "CALENDAR";
+
+export interface InvoiceFormClient {
+  id: string;
+  name: string;
+  /** Payment-term override; null = use company default. */
+  netDays?: number | null;
+  netDaysMode?: NetDaysMode | null;
+}
+
 export interface InvoiceFormProps {
-  clients: { id: string; name: string }[];
-  defaults: { taxRateBps: number; netBusinessDays: number; terms: string };
+  clients: InvoiceFormClient[];
+  defaults: {
+    taxRateBps: number;
+    netBusinessDays: number;
+    netDaysMode: NetDaysMode;
+    terms: string;
+  };
   /** Pre-selected client (e.g. from a client page's "New invoice" button). */
   initialClientId?: string;
   /** Present = edit mode. */
@@ -104,6 +119,20 @@ export function InvoiceForm({ clients, defaults, initialClientId, invoice }: Inv
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Effective payment terms for a client (its override, else company default).
+  const termsFor = (clientId: string) => {
+    const c = clients.find((x) => x.id === clientId);
+    return {
+      days: c?.netDays ?? defaults.netBusinessDays,
+      mode: (c?.netDaysMode ?? defaults.netDaysMode) as NetDaysMode,
+    };
+  };
+  const dueDateFor = (clientId: string, issueIso: string) => {
+    const { days, mode } = termsFor(clientId);
+    return dateToIso(addNetDaysUtc(isoToUtcDate(issueIso), days, mode));
+  };
+
+  const initialIssue = dateToIso(todayUtc());
   const defaultValues: InvoiceInput = invoice
     ? {
         clientId: invoice.clientId,
@@ -115,8 +144,8 @@ export function InvoiceForm({ clients, defaults, initialClientId, invoice }: Inv
       }
     : {
         clientId: initialClientId ?? "",
-        issueDate: dateToIso(todayUtc()),
-        dueDate: dateToIso(addBusinessDaysUtc(todayUtc(), defaults.netBusinessDays)),
+        issueDate: initialIssue,
+        dueDate: dueDateFor(initialClientId ?? "", initialIssue),
         taxRateBps: defaults.taxRateBps,
         memo: defaults.terms,
         lineItems: [
@@ -128,10 +157,21 @@ export function InvoiceForm({ clients, defaults, initialClientId, invoice }: Inv
         ],
       };
 
-  const { control, handleSubmit } = useForm<InvoiceInput>({
+  const { control, handleSubmit, setValue } = useForm<InvoiceInput>({
     resolver: zodResolver(invoiceSchema),
     defaultValues,
   });
+
+  // In create mode, keep the due date in step with the selected client's terms
+  // and the issue date. Edit mode preserves the invoice's saved due date.
+  const watchedClientId = useWatch({ control, name: "clientId" });
+  const watchedIssueDate = useWatch({ control, name: "issueDate" });
+  useEffect(() => {
+    if (invoice) return;
+    if (!watchedClientId || !watchedIssueDate) return;
+    setValue("dueDate", dueDateFor(watchedClientId, watchedIssueDate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedClientId, watchedIssueDate]);
 
   const taxRateBps = useWatch({ control, name: "taxRateBps" });
   const taxHint = `${

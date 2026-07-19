@@ -2,12 +2,31 @@ import { describe, expect, it } from "vitest";
 
 import {
   addBusinessDaysUtc,
+  addCalendarDaysUtc,
+  addNetDaysUtc,
   dateToIso,
   formatDateLong,
   formatDateShort,
   isoToUtcDate,
   todayUtc,
 } from "@/lib/dates";
+
+describe("addCalendarDaysUtc / addNetDaysUtc", () => {
+  const wed = isoToUtcDate("2026-07-15"); // Wednesday
+
+  it("calendar days count weekends", () => {
+    expect(dateToIso(addCalendarDaysUtc(wed, 30))).toBe("2026-08-14");
+  });
+
+  it("addNetDaysUtc dispatches by mode", () => {
+    // 15 calendar days from Wed Jul 15 = Thu Jul 30
+    expect(dateToIso(addNetDaysUtc(wed, 15, "CALENDAR"))).toBe("2026-07-30");
+    // 15 business days = Wed Aug 5 (matches addBusinessDaysUtc)
+    expect(dateToIso(addNetDaysUtc(wed, 15, "BUSINESS"))).toBe(
+      dateToIso(addBusinessDaysUtc(wed, 15))
+    );
+  });
+});
 
 describe("isoToUtcDate", () => {
   it("parses to UTC midnight regardless of process timezone", () => {

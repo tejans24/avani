@@ -1,8 +1,12 @@
+import { db } from "@/lib/db";
 import { ClientForm } from "@/components/platform/clients/ClientForm";
 
 export const metadata = { title: "New client — Avani" };
+export const dynamic = "force-dynamic";
 
-export default function NewClientPage() {
+export default async function NewClientPage() {
+  const settings = await db.companySettings.findUniqueOrThrow({ where: { id: 1 } });
+
   return (
     <>
       <div className="page-head">
@@ -12,7 +16,13 @@ export default function NewClientPage() {
         </div>
       </div>
 
-      <ClientForm client={null} />
+      <ClientForm
+        client={null}
+        companyDefault={{
+          netDays: settings.defaultNetBusinessDays,
+          netDaysMode: settings.defaultNetDaysMode,
+        }}
+      />
     </>
   );
 }
