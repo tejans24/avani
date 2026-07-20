@@ -11,6 +11,8 @@ import {
   type TxnRow,
 } from "@/components/platform/transactions/TransactionsTable";
 import { MatchSuggestionBanner } from "@/components/platform/transactions/MatchSuggestionBanner";
+import { TransferSuggestionBanner } from "@/components/platform/transactions/TransferSuggestionBanner";
+import { transferSuggestions } from "@/lib/transfer-data";
 import { SyncNowButton } from "@/components/platform/accounts/SyncNowButton";
 import { Button } from "@/components/platform/ds";
 import { suggestionsForTransactions } from "@/lib/match-data";
@@ -119,6 +121,10 @@ export default async function TransactionsPage({
       candidate: suggestions.get(t.id)![0],
     }));
 
+  // Account-to-account transfer suggestions (global — the two legs can live on
+  // different accounts/pages). Capped so the strip stays scannable.
+  const transferPairs = (await transferSuggestions()).slice(0, 5);
+
   const rows: TxnRow[] = txns.map((t) => ({
     id: t.id,
     postedAt: dateToIso(t.postedAt),
@@ -166,7 +172,7 @@ export default async function TransactionsPage({
 
       <TransactionFilters accounts={accounts} categories={categories} values={filterValues} />
 
-      {suggestedRows.length > 0 && (
+      {(suggestedRows.length > 0 || transferPairs.length > 0) && (
         <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
           {suggestedRows.map((s) => (
             <MatchSuggestionBanner
@@ -176,6 +182,9 @@ export default async function TransactionsPage({
               amountCents={s.amountCents}
               postedAtIso={s.postedAtIso}
             />
+          ))}
+          {transferPairs.map((pair) => (
+            <TransferSuggestionBanner key={pair.a.transactionId} pair={pair} />
           ))}
         </div>
       )}

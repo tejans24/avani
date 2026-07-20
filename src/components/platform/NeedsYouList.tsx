@@ -6,6 +6,7 @@ import { suggestionsForTransactions } from "@/lib/match-data";
 import { computeYearEstimate } from "@/lib/tax-data";
 import { windowOpen } from "@/lib/compliance";
 import { isGoingCold, STAGE_LABEL } from "@/lib/bd-playbook";
+import { transferSuggestionCount } from "@/lib/transfer-data";
 
 type NeedsYouItem = { label: string; detail?: string; href: string };
 
@@ -110,6 +111,14 @@ export async function NeedsYouList() {
       label: `${unreviewed} transaction${unreviewed === 1 ? "" : "s"} to review`,
       detail: "Categorize for a clean P&L",
       href: "/transactions?status=unreviewed",
+    });
+  }
+  const transfers = await transferSuggestionCount();
+  if (transfers > 0) {
+    items.push({
+      label: `${transfers} possible account transfer${transfers === 1 ? "" : "s"} to confirm`,
+      detail: "Keep card payments out of P&L",
+      href: "/transactions",
     });
   }
   const openWindows = deadlines.filter((d) => windowOpen(d, now));
