@@ -57,11 +57,16 @@ export async function confirmInvoiceMatch(
       select: { id: true },
     });
 
-    await db.$transaction(async (tx) => {
-      await tx.invoice.update({
-        where: { id: invoiceId },
+    // Conditional atomic flip: if the invoice was already paid (e.g. a manual
+    // mark or another deposit confirmed first), only one caller flips SENT->PAID
+    // and emits invoice.paid. The transaction is linked only when this flip wins,
+    // so we never double-count a payment or double-notify.
+    const flipped = await db.$transaction(async (tx) => {
+      const res = await tx.invoice.updateMany({
+        where: { id: invoiceId, status: "SENT" },
         data: { status: "PAID", paidAt: txn.postedAt },
       });
+      if (res.count === 0) return false;
       await tx.transaction.update({
         where: { id: transactionId },
         data: {
@@ -83,7 +88,12 @@ export async function confirmInvoiceMatch(
         invoiceId,
         invoiceNumber: invoice.number,
       });
+      return true;
     });
+
+    if (!flipped) {
+      return { ok: false, error: "This invoice was already marked paid." };
+    }
 
     dispatchSoon();
     revalidateMatchPaths(invoiceId);
