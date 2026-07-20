@@ -21,6 +21,8 @@ const TYPE_LABEL: Record<string, { label: string; tone: string }> = {
   "taxes.quarter_approaching": { label: "Tax deadline", tone: "critical" },
   "compliance.window_open": { label: "Compliance", tone: "caution" },
   "sync.failed": { label: "Sync failed", tone: "critical" },
+  "client.followup_due": { label: "Follow-up due", tone: "caution" },
+  "client.going_cold": { label: "Going cold", tone: "caution" },
 };
 
 function summarize(type: string, p: Record<string, unknown>): string {
@@ -51,6 +53,10 @@ function summarize(type: string, p: Record<string, unknown>): string {
       return `${p.title} (due ${p.dueDateIso})`;
     case "sync.failed":
       return `${p.source}: ${p.error}`;
+    case "client.followup_due":
+      return `${p.clientName} — ${p.note} (due ${p.dueDateIso})`;
+    case "client.going_cold":
+      return `${p.clientName} — ${p.daysCold} days quiet`;
     default:
       return JSON.stringify(p).slice(0, 120);
   }
@@ -61,6 +67,7 @@ function eventHref(e: { entityType: string | null; entityId: string | null }): s
   if (e.entityType === "transaction") return "/transactions";
   if (e.entityType === "account" && e.entityId) return `/transactions?account=${e.entityId}`;
   if (e.entityType === "deadline") return "/reports/taxes";
+  if (e.entityType === "client" && e.entityId) return `/clients/${e.entityId}`;
   return null;
 }
 
