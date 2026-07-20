@@ -144,8 +144,16 @@ export async function markInvoicePaid(
       where: { id: existing.clientId },
       select: { name: true },
     });
-    await db.$transaction(async (tx) => {
-      await tx.invoice.update({ where: { id }, data: { status: "PAID", paidAt } });
+    // Conditional atomic transition: only ONE concurrent caller (manual mark vs.
+    // an auto-match confirming the same invoice) can flip SENT->PAID, so
+    // invoice.paid is emitted at most once. A stale check-then-update here
+    // would let both fire the event -> double receipt / double CRM log.
+    const flipped = await db.$transaction(async (tx) => {
+      const res = await tx.invoice.updateMany({
+        where: { id, status: "SENT" },
+        data: { status: "PAID", paidAt },
+      });
+      if (res.count === 0) return false;
       await emitEvent(tx, "invoice.paid", {
         invoiceId: id,
         number: existing.number,
@@ -154,7 +162,11 @@ export async function markInvoicePaid(
         paidAtIso: dateToIso(paidAt),
         via: "manual",
       });
+      return true;
     });
+    if (!flipped) {
+      return { ok: false, error: "This invoice was already marked paid." };
+    }
     dispatchSoon();
     revalidateInvoices(id);
     return { ok: true, id };
@@ -170,14 +182,21 @@ export async function voidInvoice(id: string): Promise<ActionResult> {
     if (existing.status === "PAID") {
       return { ok: false, error: "Paid invoices cannot be voided." };
     }
-    await db.$transaction(async (tx) => {
-      // Clearing shareToken revokes the client-facing link.
-      await tx.invoice.update({
-        where: { id },
+    // Conditional flip: only DRAFT/SENT can be voided, atomically — so a void
+    // racing a mark-paid (or a second void) can't both succeed. Clearing
+    // shareToken revokes the client-facing link.
+    const flipped = await db.$transaction(async (tx) => {
+      const res = await tx.invoice.updateMany({
+        where: { id, status: { in: ["DRAFT", "SENT"] } },
         data: { status: "VOID", shareToken: null },
       });
+      if (res.count === 0) return false;
       await emitEvent(tx, "invoice.voided", { invoiceId: id, number: existing.number });
+      return true;
     });
+    if (!flipped) {
+      return { ok: false, error: "This invoice can no longer be voided." };
+    }
     dispatchSoon();
     revalidateInvoices(id);
     return { ok: true, id };

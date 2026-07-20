@@ -137,6 +137,90 @@ describe("computeInvoiceTotals", () => {
   });
 });
 
+/**
+ * Money invariants — the guarantees that must hold for EVERY invoice, checked
+ * against thousands of randomized-but-bounded inputs. A seeded PRNG keeps any
+ * failure reproducible. These are the spec: if one breaks, an invoice total is
+ * wrong.
+ */
+describe("computeInvoiceTotals — invariants (property-based)", () => {
+  // Deterministic LCG so a failing case is reproducible across runs.
+  function makeRng(seed: number) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 0x100000000;
+    };
+  }
+
+  // Bounds mirror the validation schema: quantity 0.01..99999.99 (≤2dp),
+  // unitPriceCents 0..100_000_000, taxRateBps 0..10000.
+  function randomInvoice(rng: () => number) {
+    const n = 1 + Math.floor(rng() * 25);
+    const items = Array.from({ length: n }, () => ({
+      quantity: Math.round(rng() * 99999_99) / 100 || 0.01,
+      unitPriceCents: Math.floor(rng() * 100_000_001),
+    }));
+    const taxRateBps = Math.floor(rng() * 10001);
+    return { items, taxRateBps };
+  }
+
+  it("total == subtotal + tax, subtotal == Σ line amounts, tax is exact, all ≥ 0 and safe integers", () => {
+    const rng = makeRng(0xc0ffee);
+    for (let i = 0; i < 5000; i++) {
+      const { items, taxRateBps } = randomInvoice(rng);
+      const t = computeInvoiceTotals(items, taxRateBps);
+
+      // Subtotal is exactly the sum of the per-line amounts (no drift).
+      const sumLines = t.lineAmountsCents.reduce((a, b) => a + b, 0);
+      expect(t.subtotalCents).toBe(sumLines);
+
+      // Tax is the exact rounded basis-point computation.
+      expect(t.taxCents).toBe(Math.round((t.subtotalCents * taxRateBps) / 10000));
+
+      // Total is exactly subtotal + tax.
+      expect(t.totalCents).toBe(t.subtotalCents + t.taxCents);
+
+      // Nothing negative; everything an exact (safe) integer number of cents.
+      for (const v of [t.subtotalCents, t.taxCents, t.totalCents, ...t.lineAmountsCents]) {
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(Number.isSafeInteger(v)).toBe(true);
+      }
+
+      // Each line amount is the rounded product for that line.
+      t.lineAmountsCents.forEach((amt, idx) => {
+        expect(amt).toBe(computeLineAmountCents(items[idx].quantity, items[idx].unitPriceCents));
+      });
+    }
+  });
+
+  it("stays within safe-integer range at the maximum invoice size", () => {
+    // 25 lines (create form cap territory) at the maximum single-line amount.
+    const items = Array.from({ length: 25 }, () => ({
+      quantity: 99999.99,
+      unitPriceCents: 100_000_000,
+    }));
+    const t = computeInvoiceTotals(items, 10000);
+    expect(Number.isSafeInteger(t.totalCents)).toBe(true);
+    expect(t.totalCents).toBe(t.subtotalCents + t.taxCents);
+  });
+});
+
+/**
+ * dollarsToCents ⇄ formatCents round-trip: any integer-cent value formats to a
+ * dollar string that parses back to the same cents. Guards against display vs.
+ * stored drift on the money the user sees.
+ */
+describe("dollarsToCents / formatCents round-trip", () => {
+  it("round-trips a spread of cent values exactly", () => {
+    const values = [0, 1, 5, 99, 100, 101, 1234, 99999, 100000, 123456789, 100_000_000_00];
+    for (const cents of values) {
+      // formatCents → "$1,234.56"; dollarsToCents accepts the $ and commas.
+      expect(dollarsToCents(formatCents(cents))).toBe(cents);
+    }
+  });
+});
+
 describe("formatBps", () => {
   it("trims trailing zeros", () => {
     expect(formatBps(875)).toBe("8.75%");
