@@ -117,6 +117,23 @@ describe("findInvoiceMatches", () => {
     expect(result[0].confidence).toBe("HIGH");
   });
 
+  it("two same-client, same-amount invoices are BOTH medium — never a silent auto-pick", () => {
+    // The ambiguity guarantee: when a deposit could pay either of two identical
+    // invoices, nothing is HIGH, so the UI must ask the user which one. This
+    // prevents auto-marking the wrong invoice paid.
+    const invoices = [
+      invoice({ id: "a", number: "INV-ACME-0001", clientName: "Acme", totalCents: 250_000 }),
+      invoice({ id: "b", number: "INV-ACME-0002", clientName: "Acme", totalCents: 250_000 }),
+    ];
+    const result = findInvoiceMatches(
+      { amountCents: 250_000, postedAt: isoToUtcDate("2026-06-15"), description: "ACME ACH" },
+      invoices
+    );
+    expect(result).toHaveLength(2);
+    expect(result.every((r) => r.confidence === "MEDIUM")).toBe(true);
+    expect(result.some((r) => r.confidence === "HIGH")).toBe(false);
+  });
+
   it("returns [] when nothing matches the amount", () => {
     const invoices = [invoice({ id: "1", totalCents: 123_456 })];
     const result = findInvoiceMatches(
