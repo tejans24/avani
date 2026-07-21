@@ -5,6 +5,15 @@ import { resetDb, insertClient, insertInvoice, insertLineItem, queryRows } from 
 
 const FAKE_DIR = join(__dirname, "..", ".fake-emails");
 
+/** A due date N days ahead of the real clock, so a SENT invoice reads "Sent"
+ *  (not "Overdue") regardless of when the suite runs. */
+function futureIso(days: number): string {
+  const d = new Date();
+  const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}
+
 function readFakeEmails() {
   let files: string[] = [];
   try {
@@ -32,7 +41,7 @@ test("send flow: prefilled dialog, fake email with PDF, SENT transition", async 
     status: "DRAFT",
     totalCents: 594000,
     issueDate: "2026-07-16",
-    dueDate: "2026-08-07",
+    dueDate: futureIso(30),
     number: "INV-0007",
   });
   await insertLineItem(invoiceId, {
@@ -86,7 +95,7 @@ test("resend keeps status SENT and sends another email", async ({ page }) => {
     status: "SENT",
     totalCents: 100000,
     issueDate: "2026-07-01",
-    dueDate: "2026-07-20",
+    dueDate: futureIso(30),
     number: "INV-0008",
   });
 
