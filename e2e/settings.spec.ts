@@ -1,6 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { resetDb, insertClient, insertInvoice, queryRows } from "./utils/db";
 
+/** A due date N days ahead of the real clock, so a SENT invoice reads "Sent"
+ *  (not "Overdue") regardless of when the suite runs. */
+function futureIso(days: number): string {
+  const d = new Date();
+  const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return utc.toISOString().slice(0, 10);
+}
+
 test.beforeEach(async () => {
   await resetDb();
 });
@@ -25,7 +34,7 @@ test("sent invoice keeps its From snapshot after settings change", async ({
     status: "DRAFT",
     totalCents: 100000,
     issueDate: "2026-07-01",
-    dueDate: "2026-07-20",
+    dueDate: futureIso(30),
     number: "INV-0010",
   });
 
