@@ -228,6 +228,10 @@ model Transaction {
   category         Category?         @relation(fields: [categoryId], references: [id])
   matchedInvoiceId String?           @unique
   matchedInvoice   Invoice?          @relation(fields: [matchedInvoiceId], references: [id])
+  /// Shared id linking the two legs of a confirmed account-to-account transfer
+  /// (e.g. a bank payment and the credit-card payment it settles). Both legs
+  /// are categorized TRANSFER so neither double-counts in P&L / taxes.
+  transferGroupId  String?
   status           TransactionStatus @default(UNREVIEWED)
   notes            String?           @db.Text
   createdAt        DateTime          @default(now())
@@ -237,6 +241,7 @@ model Transaction {
   @@index([postedAt])
   @@index([categoryId])
   @@index([status])
+  @@index([transferGroupId])
 }
 
 model Category {
