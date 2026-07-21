@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clientDealSchema,
+  clientNextActionSchema,
   clientSchema,
+  clientStageSchema,
+  contactSchema,
+  interactionSchema,
   invoiceSchema,
   lineItemSchema,
   sendInvoiceSchema,
@@ -210,19 +215,29 @@ describe("settingsSchema", () => {
     expect(settingsSchema.safeParse({ ...validSettings, email: "nope" }).success).toBe(false);
   });
 
-  it("bounds defaultNetBusinessDays to 0..90", () => {
+  it("bounds defaultNetBusinessDays to 0..365", () => {
     expect(
       settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: -1 }).success
     ).toBe(false);
     expect(
-      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 91 }).success
+      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 366 }).success
     ).toBe(false);
     expect(settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 0 }).success).toBe(
       true
     );
     expect(
-      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 90 }).success
+      settingsSchema.safeParse({ ...validSettings, defaultNetBusinessDays: 365 }).success
     ).toBe(true);
+  });
+
+  it("defaults defaultNetDaysMode to BUSINESS and accepts CALENDAR", () => {
+    const parsed = settingsSchema.safeParse(validSettings);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.defaultNetDaysMode).toBe("BUSINESS");
+    expect(
+      settingsSchema.safeParse({ ...validSettings, defaultNetDaysMode: "CALENDAR" }).data
+        ?.defaultNetDaysMode
+    ).toBe("CALENDAR");
   });
 
   it("bounds tax rate", () => {
@@ -239,6 +254,97 @@ describe("settingsSchema", () => {
     expect(clientSchema.safeParse({ ...base, invoicePrefix: "A" }).success).toBe(false);
     expect(clientSchema.safeParse({ ...base, invoicePrefix: "TOOLONGG" }).success).toBe(false);
     expect(clientSchema.safeParse({ ...base, invoicePrefix: "AC-ME" }).success).toBe(false);
+  });
+});
+
+describe("contactSchema", () => {
+  it("accepts a minimal contact and defaults isPrimary to false", () => {
+    const result = contactSchema.safeParse({ name: "Dana Lee" });
+    expect(result.success).toBe(true);
+    expect(result.data?.isPrimary).toBe(false);
+  });
+
+  it("accepts a fully-specified contact with role and manager", () => {
+    const result = contactSchema.safeParse({
+      name: "Dana Lee",
+      title: "VP Engineering",
+      email: "dana@acme.example",
+      phone: "(555) 555-0101",
+      role: "DECISION_MAKER",
+      reportsToId: "ctc_123",
+      notes: "Prefers Slack. Skeptical of consultants — win with data.",
+      isPrimary: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires a name and rejects a bad email/role", () => {
+    expect(contactSchema.safeParse({ name: "" }).success).toBe(false);
+    expect(contactSchema.safeParse({ name: "Dana", email: "nope" }).success).toBe(false);
+    expect(contactSchema.safeParse({ name: "Dana", role: "CEO" }).success).toBe(false);
+  });
+
+  it("treats blank optional strings as valid (normalized in the action)", () => {
+    const result = contactSchema.safeParse({ name: "Dana", title: "", email: "", phone: "" });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("interactionSchema", () => {
+  it("accepts a valid manual log and defaults direction to OUTBOUND", () => {
+    const result = interactionSchema.safeParse({
+      type: "CALL",
+      occurredAt: "2026-07-19",
+      subject: "Intro call",
+      body: "Walked through the proposal.",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.direction).toBe("OUTBOUND");
+  });
+
+  it("rejects a bad type, direction, or date", () => {
+    expect(interactionSchema.safeParse({ type: "TEXT", occurredAt: "2026-07-19" }).success).toBe(
+      false
+    );
+    expect(
+      interactionSchema.safeParse({ type: "CALL", direction: "SIDEWAYS", occurredAt: "2026-07-19" })
+        .success
+    ).toBe(false);
+    expect(interactionSchema.safeParse({ type: "CALL", occurredAt: "07/19/2026" }).success).toBe(
+      false
+    );
+  });
+});
+
+describe("client BD schemas", () => {
+  it("clientStageSchema accepts the four stages and nothing else", () => {
+    for (const s of ["LEAD", "PROSPECT", "ACTIVE", "PAST"]) {
+      expect(clientStageSchema.safeParse(s).success).toBe(true);
+    }
+    expect(clientStageSchema.safeParse("CUSTOMER").success).toBe(false);
+  });
+
+  it("clientNextActionSchema accepts a note + due date, or a null date", () => {
+    expect(
+      clientNextActionSchema.safeParse({ nextActionNote: "Send proposal", nextActionDueDate: "2026-07-25" })
+        .success
+    ).toBe(true);
+    expect(
+      clientNextActionSchema.safeParse({ nextActionNote: "", nextActionDueDate: null }).success
+    ).toBe(true);
+    expect(
+      clientNextActionSchema.safeParse({ nextActionDueDate: "2026/07/25" }).success
+    ).toBe(false);
+  });
+
+  it("clientDealSchema bounds the value and validates the close date", () => {
+    expect(
+      clientDealSchema.safeParse({ dealValueCents: 5000_00, expectedCloseDate: "2026-09-01" }).success
+    ).toBe(true);
+    expect(clientDealSchema.safeParse({ dealValueCents: null, expectedCloseDate: null }).success).toBe(
+      true
+    );
+    expect(clientDealSchema.safeParse({ dealValueCents: -1 }).success).toBe(false);
   });
 });
 

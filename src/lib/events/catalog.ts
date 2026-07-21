@@ -100,6 +100,19 @@ export const EVENT_SCHEMAS = {
     source: z.string(),
     error: z.string(),
   }),
+  "client.followup_due": z.object({
+    clientId: z.string(),
+    clientName: z.string(),
+    stage: z.enum(["LEAD", "PROSPECT", "ACTIVE", "PAST"]),
+    note: z.string(),
+    dueDateIso: z.string(),
+  }),
+  "client.going_cold": z.object({
+    clientId: z.string(),
+    clientName: z.string(),
+    stage: z.enum(["LEAD", "PROSPECT", "ACTIVE", "PAST"]),
+    daysCold: z.number().int(),
+  }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

@@ -8,7 +8,10 @@ export const metadata = { title: "Edit client — Avani" };
 export const dynamic = "force-dynamic";
 
 export default async function EditClientPage({ params }: { params: { id: string } }) {
-  const client = await db.client.findUnique({ where: { id: params.id } });
+  const [client, settings] = await Promise.all([
+    db.client.findUnique({ where: { id: params.id } }),
+    db.companySettings.findUniqueOrThrow({ where: { id: 1 } }),
+  ]);
   if (!client) notFound();
 
   const input: ClientInput = {
@@ -26,6 +29,8 @@ export default async function EditClientPage({ params }: { params: { id: string 
     billingCadenceDays: client.billingCadenceDays,
     overdueRemindersEnabled: client.overdueRemindersEnabled,
     invoicePrefix: client.invoicePrefix ?? "",
+    netDays: client.netDays,
+    netDaysMode: client.netDaysMode,
   };
 
   return (
@@ -38,7 +43,14 @@ export default async function EditClientPage({ params }: { params: { id: string 
         <ClientRowActions clientId={client.id} archived={client.archived} />
       </div>
 
-      <ClientForm client={input} clientId={client.id} />
+      <ClientForm
+        client={input}
+        clientId={client.id}
+        companyDefault={{
+          netDays: settings.defaultNetBusinessDays,
+          netDaysMode: settings.defaultNetDaysMode,
+        }}
+      />
     </>
   );
 }

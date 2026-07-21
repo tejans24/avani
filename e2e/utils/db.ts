@@ -16,10 +16,10 @@ async function withPg<T>(fn: (pg: Client) => Promise<T>): Promise<T> {
 export async function resetDb() {
   await withPg(async (pg) => {
     await pg.query(
-      `TRUNCATE "InvoiceLineItem", "Invoice", "Client", "CompanySettings",
-                "Transaction", "CategoryRule", "Category", "FinancialAccount",
-                "TaxSettings", "QuarterlyEstimatePayment", "ComplianceDeadline",
-                "HandlerRun", "DomainEvent", "Notification"
+      `TRUNCATE "Interaction", "Contact", "InvoiceLineItem", "Invoice", "Client",
+                "CompanySettings", "Transaction", "CategoryRule", "Category",
+                "FinancialAccount", "TaxSettings", "QuarterlyEstimatePayment",
+                "ComplianceDeadline", "HandlerRun", "DomainEvent", "Notification"
        RESTART IDENTITY CASCADE`
     );
     for (const [i, c] of CATEGORY_SEEDS.entries()) {
@@ -67,8 +67,9 @@ export async function insertClient(overrides: Partial<Record<string, unknown>> =
   await withPg((pg) =>
     pg.query(
       `INSERT INTO "Client"
-        (id, name, "contactName", "billingEmail", "ccEmails", "addressLine1", city, state, "postalCode", country, archived, "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,NOW(),NOW())`,
+        (id, name, "contactName", "billingEmail", "ccEmails", "addressLine1", city, state, "postalCode", country, "netDays", "netDaysMode",
+         stage, "nextActionNote", "nextActionDueDate", "dealValueCents", "expectedCloseDate", archived, "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::"ClientStage",$14,$15,$16,$17,false,$18,NOW())`,
       [
         c.id,
         c.name,
@@ -80,10 +81,97 @@ export async function insertClient(overrides: Partial<Record<string, unknown>> =
         c.state,
         c.postalCode,
         c.country,
+        c.netDays ?? null,
+        c.netDaysMode ?? null,
+        c.stage ?? "ACTIVE",
+        c.nextActionNote ?? null,
+        c.nextActionDueDate ?? null,
+        c.dealValueCents ?? null,
+        c.expectedCloseDate ?? null,
+        // createdAt override lets going-cold specs age a client without waiting.
+        c.createdAt ?? new Date(),
       ]
     )
   );
   return c as { id: string; name: string; billingEmail: string; ccEmails: string[] };
+}
+
+/** Insert a contact directly (People-tab / org-tree specs). */
+export async function insertContact(
+  clientId: string,
+  overrides: Partial<Record<string, unknown>> = {}
+) {
+  const id = `testctc_${Math.random().toString(36).slice(2, 10)}`;
+  const c = {
+    id,
+    name: "Dana Lee",
+    title: "VP Engineering",
+    email: "dana@acme.example",
+    phone: null,
+    role: "DECISION_MAKER",
+    reportsToId: null,
+    notes: null,
+    isPrimary: false,
+    ...overrides,
+  } as Record<string, unknown>;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "Contact"
+        (id, "clientId", name, title, email, phone, role, "reportsToId", notes, "isPrimary", archived, "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7::"ContactRole",$8,$9,$10,false,NOW(),NOW())`,
+      [
+        c.id,
+        clientId,
+        c.name,
+        c.title,
+        c.email,
+        c.phone,
+        c.role ?? null,
+        c.reportsToId ?? null,
+        c.notes ?? null,
+        c.isPrimary ?? false,
+      ]
+    )
+  );
+  return c as { id: string; name: string };
+}
+
+/** Insert an interaction directly (Timeline specs). occurredAt accepts a Date or ISO string. */
+export async function insertInteraction(
+  clientId: string,
+  overrides: Partial<Record<string, unknown>> = {}
+) {
+  const id = `testixn_${Math.random().toString(36).slice(2, 10)}`;
+  const i = {
+    id,
+    contactId: null,
+    type: "NOTE",
+    direction: "OUTBOUND",
+    occurredAt: new Date(),
+    subject: null,
+    body: null,
+    source: null,
+    ...overrides,
+  } as Record<string, unknown>;
+  await withPg((pg) =>
+    pg.query(
+      `INSERT INTO "Interaction"
+        (id, "clientId", "contactId", type, direction, "occurredAt", subject, body, source, "createdAt")
+       VALUES ($1,$2,$3,$4::"InteractionType",$5::"InteractionDirection",$6,$7,$8,$9,NOW())`,
+      [
+        i.id,
+        clientId,
+        i.contactId ?? null,
+        i.type,
+        i.direction,
+        i.occurredAt,
+        i.subject ?? null,
+        i.body ?? null,
+        i.source ?? null,
+      ]
+    )
+  );
+  return i as { id: string };
 }
 
 /**

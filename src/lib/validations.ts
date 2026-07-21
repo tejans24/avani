@@ -43,6 +43,9 @@ export const clientSchema = z.object({
     .regex(/^[A-Z0-9]{2,6}$/, "2–6 letters or digits")
     .optional()
     .or(z.literal("")),
+  /** Payment-terms override: null/undefined = use the company default. */
+  netDays: z.number().int("Whole days only").min(0).max(365).nullable().optional(),
+  netDaysMode: z.enum(["BUSINESS", "CALENDAR"]).nullable().optional(),
 });
 
 export const lineItemSchema = z.object({
@@ -89,7 +92,8 @@ export const settingsSchema = z.object({
     .min(1, "Payment instructions are required")
     .max(5000),
   defaultTerms: z.string().optional(),
-  defaultNetBusinessDays: z.number().int().min(0).max(90),
+  defaultNetBusinessDays: z.number().int().min(0).max(365),
+  defaultNetDaysMode: z.enum(["BUSINESS", "CALENDAR"]).default("BUSINESS"),
   defaultTaxRateBps: z.number().int().min(0).max(10000),
 });
 
@@ -162,3 +166,67 @@ export type CsvImportInput = z.infer<typeof csvImportSchema>;
 export type RuleInput = z.infer<typeof ruleSchema>;
 export type TaxSettingsInput = z.infer<typeof taxSettingsSchema>;
 export type EstimatePaymentInput = z.infer<typeof estimatePaymentSchema>;
+
+// ============================================================
+// Phase 3 — CRM / BD layer (all internal-only)
+// ============================================================
+
+export const CLIENT_STAGES = ["LEAD", "PROSPECT", "ACTIVE", "PAST"] as const;
+export const CONTACT_ROLES = [
+  "DECISION_MAKER",
+  "CHAMPION",
+  "INFLUENCER",
+  "BLOCKER",
+  "USER",
+  "OTHER",
+] as const;
+export const INTERACTION_TYPES = ["EMAIL", "CALL", "MEETING", "NOTE"] as const;
+export const INTERACTION_DIRECTIONS = ["INBOUND", "OUTBOUND", "INTERNAL"] as const;
+
+/** A person mapped inside a client org. Empty strings normalize to null in the action. */
+export const contactSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  title: z.string().trim().max(200).optional().or(z.literal("")),
+  email: z.email("Enter a valid email").optional().or(z.literal("")),
+  phone: z.string().trim().max(50).optional().or(z.literal("")),
+  role: z.enum(CONTACT_ROLES).nullable().optional(),
+  /** Manager (org chart). null = top of the tree for this client. */
+  reportsToId: z.string().nullable().optional(),
+  /** Personality / politics — INTERNAL. */
+  notes: z.string().max(5000).optional().or(z.literal("")),
+  isPrimary: z.boolean().default(false),
+});
+
+/** One manually-logged touch in the relationship timeline. */
+export const interactionSchema = z.object({
+  type: z.enum(INTERACTION_TYPES),
+  direction: z.enum(INTERACTION_DIRECTIONS).default("OUTBOUND"),
+  occurredAt: z.string().regex(ISO_DATE_RE, "Use YYYY-MM-DD"),
+  contactId: z.string().nullable().optional(),
+  subject: z.string().trim().max(300).optional().or(z.literal("")),
+  body: z.string().max(5000).optional().or(z.literal("")),
+});
+
+/** Relationship stage (the coach reads this). */
+export const clientStageSchema = z.enum(CLIENT_STAGES);
+
+/** The next step + when it's due — drives the follow-up nudge. */
+export const clientNextActionSchema = z.object({
+  nextActionNote: z.string().trim().max(2000).optional().or(z.literal("")),
+  nextActionDueDate: z.string().regex(ISO_DATE_RE, "Use YYYY-MM-DD").nullable().optional(),
+});
+
+/** Simple deal size + expected close (no separate Opportunity entity in v1). */
+export const clientDealSchema = z.object({
+  dealValueCents: z.number().int().min(0).max(100_000_000_00).nullable().optional(),
+  expectedCloseDate: z.string().regex(ISO_DATE_RE, "Use YYYY-MM-DD").nullable().optional(),
+});
+
+export type ContactInput = z.infer<typeof contactSchema>;
+export type InteractionInput = z.infer<typeof interactionSchema>;
+export type ClientStage = (typeof CLIENT_STAGES)[number];
+export type ContactRole = (typeof CONTACT_ROLES)[number];
+export type InteractionType = (typeof INTERACTION_TYPES)[number];
+export type InteractionDirection = (typeof INTERACTION_DIRECTIONS)[number];
+export type ClientNextActionInput = z.infer<typeof clientNextActionSchema>;
+export type ClientDealInput = z.infer<typeof clientDealSchema>;

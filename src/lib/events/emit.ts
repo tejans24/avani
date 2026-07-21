@@ -11,6 +11,9 @@ function entityRef(type: EventType, payload: Record<string, unknown>) {
     return { entityType: "account", entityId: String(payload.accountId) };
   if ("deadlineKey" in payload)
     return { entityType: "deadline", entityId: String(payload.deadlineKey) };
+  // Pure client events (no invoiceId/transactionId above) link to the client.
+  if ("clientId" in payload)
+    return { entityType: "client", entityId: String(payload.clientId) };
   return { entityType: null, entityId: null };
 }
 

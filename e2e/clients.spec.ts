@@ -71,6 +71,8 @@ test.describe("clients", () => {
     await page.goto("/clients?archived=1");
     const row = page.locator(".data-table tbody tr", { hasText: "Acme Corp" });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Archived")).toBeVisible();
+    // The archived view still lists the client with its stage badge (Active
+    // is the default stage); the Archived tab itself signals the filter.
+    await expect(row.getByText("Active", { exact: true })).toBeVisible();
   });
 });

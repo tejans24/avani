@@ -25,6 +25,7 @@ export default async function SettingsPage() {
     paymentInstructions: settings.paymentInstructions,
     defaultTerms: settings.defaultTerms ?? "",
     defaultNetBusinessDays: settings.defaultNetBusinessDays,
+    defaultNetDaysMode: settings.defaultNetDaysMode,
     defaultTaxRateBps: settings.defaultTaxRateBps,
   };
 

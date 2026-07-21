@@ -17,6 +17,7 @@ import {
 } from "@/emails/invoice-email";
 import { emitEvent } from "@/lib/events/emit";
 import { dispatchSoon } from "@/lib/events/dispatch";
+import { logInteraction } from "@/lib/interactions";
 import { dateToIso } from "@/lib/dates";
 
 export type SendResult = { ok: true } | { ok: false; error: string };
@@ -104,6 +105,7 @@ export async function sendInvoice(
           shareToken,
         },
       });
+      const resend = invoice.status === "SENT";
       await emitEvent(tx, "invoice.sent", {
         invoiceId: id,
         number: invoice.number,
@@ -111,7 +113,16 @@ export async function sendInvoice(
         clientName: invoice.client.name,
         totalCents: invoice.totalCents,
         dueDateIso: dateToIso(invoice.dueDate),
-        resend: invoice.status === "SENT",
+        resend,
+      });
+      // Auto-log to the client's relationship timeline (internal CRM).
+      await logInteraction(tx, {
+        clientId: invoice.client.id,
+        type: "EMAIL",
+        direction: "OUTBOUND",
+        occurredAt: new Date(),
+        subject: `Invoice ${invoice.number} ${resend ? "re-sent" : "sent"} to ${recipients.data.to}`,
+        source: `invoice.sent:${invoice.number}`,
       });
     });
     dispatchSoon();
