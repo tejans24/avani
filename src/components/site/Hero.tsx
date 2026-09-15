@@ -1,6 +1,7 @@
 import React from "react";
 import { Eyebrow } from "@/ds/components/core/Eyebrow";
 import { Button } from "@/ds/components/core/Button";
+import { HeroScene } from "./HeroScene";
 
 const audiences = [
   "Public-sector teams",
@@ -19,49 +20,54 @@ export function Hero() {
           paddingBottom: "var(--section-y)",
         }}
       >
-        <div style={{ maxWidth: 900 }}>
-          <Eyebrow style={{ marginBottom: 26 }}>AI systems consulting</Eyebrow>
-          <h1
-            style={{
-              fontSize: "var(--text-display)",
-              lineHeight: 1.04,
-              letterSpacing: "-0.022em",
-              margin: "0 0 28px",
-              maxWidth: "15ch",
-            }}
-          >
-            Thoughtful systems. Real efficiency.{" "}
-            <span style={{ fontStyle: "italic", color: "var(--clay)" }}>
-              Responsible AI.
-            </span>
-          </h1>
-          <p
-            style={{
-              fontSize: "var(--text-lead)",
-              lineHeight: 1.5,
-              color: "var(--text-secondary)",
-              maxWidth: "46ch",
-              margin: "0 0 38px",
-            }}
-          >
-            We help growing businesses and public-sector teams run leaner and
-            build better with AI — done thoughtfully, not hastily.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 14,
-              alignItems: "center",
-            }}
-          >
-            <Button href="#contact" variant="accent" size="lg">
-              Start a conversation
-            </Button>
-            <Button href="#process" variant="secondary" size="lg">
-              See how we work
-            </Button>
+        <div className="hero-grid">
+          <div style={{ maxWidth: 900 }}>
+            <Eyebrow style={{ marginBottom: 26 }}>
+              AI systems consulting
+            </Eyebrow>
+            <h1
+              style={{
+                fontSize: "var(--text-display)",
+                lineHeight: 1.04,
+                letterSpacing: "-0.022em",
+                margin: "0 0 28px",
+                maxWidth: "15ch",
+              }}
+            >
+              Thoughtful systems. Real efficiency.{" "}
+              <span style={{ fontStyle: "italic", color: "var(--clay)" }}>
+                Responsible AI.
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: "var(--text-lead)",
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+                maxWidth: "46ch",
+                margin: "0 0 38px",
+              }}
+            >
+              We help growing businesses and public-sector teams run leaner and
+              build better with AI — done thoughtfully, not hastily.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 14,
+                alignItems: "center",
+              }}
+            >
+              <Button href="#contact" variant="accent" size="lg">
+                Start a conversation
+              </Button>
+              <Button href="#process" variant="secondary" size="lg">
+                See how we work
+              </Button>
+            </div>
           </div>
+          <HeroScene />
         </div>
         <div
           style={{

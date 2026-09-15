@@ -102,3 +102,75 @@ body {
     max-width: 320px;
   }
 }
+
+/* --- Hero: copy + heron scene ------------------------------------------ */
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: end;
+}
+.hero-scene {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  justify-self: end;
+  /* Resting state is fully visible; motion below only animates FROM hidden,
+     so the scene always renders even if the animation engine never runs. */
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-scene {
+    animation: hero-scene-in 900ms var(--ease-out) both;
+  }
+  @keyframes hero-scene-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  /* The heron settles a beat after the bank and water. */
+  .hero-scene__heron {
+    animation: hero-scene-in 900ms 180ms var(--ease-out) both;
+  }
+  /* Current: each line drifts a few pixels over ~20s, offset so they don't
+     move in lockstep. Barely there on purpose. */
+  .hero-scene__ripple {
+    animation: hero-ripple 22s var(--ease-in-out) infinite alternate;
+  }
+  .hero-scene__ripple:nth-child(2) {
+    animation-duration: 26s;
+    animation-delay: -9s;
+  }
+  .hero-scene__ripple:nth-child(3) {
+    animation-duration: 19s;
+    animation-delay: -4s;
+  }
+  .hero-scene__ripple:nth-child(4) {
+    animation-duration: 24s;
+    animation-delay: -14s;
+  }
+  @keyframes hero-ripple {
+    from {
+      transform: translateX(-6px);
+    }
+    to {
+      transform: translateX(6px);
+    }
+  }
+}
+@media (max-width: 860px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .hero-scene {
+    max-width: 380px;
+    justify-self: start;
+  }
+}
