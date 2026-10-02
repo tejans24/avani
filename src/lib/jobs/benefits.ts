@@ -126,7 +126,7 @@ export type ExtractedBenefit = {
   key: BenefitKey;
   label: string;
   value?: string;
-  /** The sentence the benefit was found in (trimmed). */
+  /** The words the benefit was found in: the sentence, or a window of a long one. */
   evidence: string;
 };
 
@@ -136,6 +136,16 @@ function sentences(text: string): string[] {
     .split(/(?<=[.!?])\s+|\n+|•/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** The words around a match: whole sentence if short, else a window. */
+function around(sentence: string, re: RegExp): string {
+  if (sentence.length <= 140) return sentence;
+  const m = re.exec(sentence);
+  if (!m) return sentence.slice(0, 140) + "…";
+  const start = Math.max(0, m.index - 50);
+  const end = Math.min(sentence.length, m.index + m[0].length + 50);
+  return (start > 0 ? "…" : "") + sentence.slice(start, end).trim() + (end < sentence.length ? "…" : "");
 }
 
 export function extractBenefits(text: string): ExtractedBenefit[] {
@@ -154,7 +164,7 @@ export function extractBenefits(text: string): ExtractedBenefit[] {
         }
       }
     }
-    out.push({ key: def.key, label: def.label, value, evidence: hit.slice(0, 300) });
+    out.push({ key: def.key, label: def.label, value, evidence: around(hit, def.detect) });
   }
   return out;
 }

@@ -7,7 +7,9 @@ const isProtectedRoute = createRouteMatcher([
   "/invoices(.*)",
   "/reports(.*)",
   "/settings(.*)",
+  "/jobs(.*)",
   "/api/invoices(.*)",
+  "/api/jobs(.*)",
 ]);
 
 // AUTH_MODE=test (local e2e / CI) bypasses Clerk entirely — no keys needed.

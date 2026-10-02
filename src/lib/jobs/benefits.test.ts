@@ -42,6 +42,16 @@ What we offer:
     expect(pto).toMatchObject({ key: "pto", value: "Unlimited", evidence: "We offer unlimited PTO." });
   });
 
+  it("narrows evidence to the words around the match in a long paragraph", () => {
+    const para =
+      "Benefits: medical, dental, and vision insurance with 100% of employee premiums covered; 401(k) with a 5% employer match; " +
+      "25 days of PTO plus 11 federal holidays; 12 weeks of paid parental leave; $2,000 annual learning budget.";
+    const b = byKey(para);
+    expect(b.parentalLeave.evidence).toContain("12 weeks of paid parental leave");
+    expect(b.parentalLeave.evidence.length).toBeLessThan(160);
+    expect(b.parentalLeave.evidence).not.toContain("vision insurance");
+  });
+
   it("returns nothing for boilerplate without benefits", () => {
     expect(extractBenefits("We are an equal opportunity employer.")).toEqual([]);
   });

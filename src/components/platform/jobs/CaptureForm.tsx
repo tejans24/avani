@@ -1,0 +1,190 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { captureJob, fetchCaptureDraft, previewCapture } from "@/actions/jobs";
+import { Button, Eyebrow } from "@/components/platform/ds";
+import { Field, Input, Textarea } from "@/components/form/shared";
+import type { CaptureDraft, CapturePayload } from "@/lib/jobs/capture";
+import { ActionMessage, useAction } from "./useAction";
+
+type Via = "bookmarklet" | "share" | "shortcut" | "paste";
+
+const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
+
+/**
+ * Add a job from your own browser, for sites that block server fetching.
+ * Entry points: the bookmarklet (opens this page and hands it the page data
+ * by postMessage), the Android share target / iOS Shortcut (?url=&title=&text=),
+ * or paste. Nothing saves until "Save job".
+ */
+export function CaptureForm({ initial }: { initial: { url?: string; title?: string; text?: string; via?: string } }) {
+  const router = useRouter();
+  const { pending, error, run } = useAction();
+  const [status, setStatus] = useState<string | null>(null);
+  const [via, setVia] = useState<Via>(
+    initial.via === "bookmarklet" ? "bookmarklet" : initial.via === "shortcut" ? "shortcut" : initial.url || initial.text ? "share" : "paste"
+  );
+  const [url, setUrl] = useState(initial.url ?? initial.text?.match(URL_IN_TEXT)?.[0] ?? "");
+  const [paste, setPaste] = useState("");
+  const [draft, setDraft] = useState<CaptureDraft | null>(null);
+  const [form, setForm] = useState({ title: "", companyName: "", location: "", postedOn: "", compMin: "", compMax: "", descriptionText: "" });
+  const jsonLdRef = useRef<unknown[] | undefined>(undefined);
+
+  const applyPayload = async (payload: CapturePayload) => {
+    jsonLdRef.current = payload.jsonLd;
+    const d = await previewCapture(payload);
+    setDraft(d);
+    setUrl(d.url);
+    setForm({
+      title: d.title ?? "",
+      companyName: d.companyName ?? "",
+      location: d.location ?? (d.remote ? "Remote" : ""),
+      postedOn: d.postedAt ? new Date(d.postedAt).toISOString().slice(0, 10) : "",
+      compMin: d.compMinCents ? String(Math.round(d.compMinCents / 100)) : "",
+      compMax: d.compMaxCents ? String(Math.round(d.compMaxCents / 100)) : "",
+      descriptionText: d.descriptionText,
+    });
+  };
+
+  // Bookmarklet handshake: tell the opener we're ready, accept one payload from it.
+  useEffect(() => {
+    if (initial.via !== "bookmarklet") return;
+    if (!window.opener) {
+      setStatus("The job site didn't allow the hand-off. Paste the job text below instead.");
+      setVia("paste");
+      return;
+    }
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window.opener || e.data?.type !== "avani-capture") return;
+      window.removeEventListener("message", onMessage);
+      setStatus("Got the page. Check the details, then save.");
+      void applyPayload(e.data.payload as CapturePayload);
+    };
+    window.addEventListener("message", onMessage);
+    window.opener.postMessage({ type: "avani-capture-ready" }, "*");
+    const t = setTimeout(() => setStatus((s) => s ?? "Waiting for the job page… if nothing happens, paste the text below."), 2500);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Shared or Shortcut-opened link: try fetching it server-side first.
+  useEffect(() => {
+    if (initial.via === "bookmarklet" || !url || draft) return;
+    setStatus("Reading the page…");
+    void fetchCaptureDraft(url).then(async (r) => {
+      if ("error" in r) {
+        setStatus(r.error);
+        return;
+      }
+      await applyPayload({ ...r.payload, pageTitle: r.payload.pageTitle ?? initial.title });
+      setStatus("Read the page. Check the details, then save.");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+
+  return (
+    <div style={{ display: "grid", gap: 20 }}>
+      {!draft && (
+        <div className="form-card" style={{ display: "grid", gap: 14 }}>
+          <Eyebrow index="01">The job</Eyebrow>
+          <Field label="Link to the posting" htmlFor="cap-url">
+            <Input id="cap-url" value={url} placeholder="https://…" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} />
+          </Field>
+          <Field label="Job text" htmlFor="cap-paste" hint="Select all on the job page and paste here if the site blocks reading it.">
+            <Textarea id="cap-paste" rows={8} value={paste} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPaste(e.target.value)} />
+          </Field>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={pending || !url}
+              onClick={() => {
+                setVia(via === "share" || via === "shortcut" ? via : "paste");
+                if (paste.trim()) void applyPayload({ url, text: paste });
+                else
+                  void fetchCaptureDraft(url).then((r) => ("error" in r ? setStatus(r.error) : applyPayload(r.payload)));
+              }}
+            >
+              {paste.trim() ? "Use this text" : "Read the page"}
+            </Button>
+            {status && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{status}</span>}
+          </div>
+        </div>
+      )}
+
+      {draft && (
+        <div className="form-card" style={{ display: "grid", gap: 14 }}>
+          <Eyebrow index="02">Check, then save</Eyebrow>
+          {status && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{status}</span>}
+          {draft.missing.length > 0 && (
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
+              The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}. Fill those in.
+            </p>
+          )}
+          <div className="form-grid">
+            <Field label="Title" htmlFor="cap-title">
+              <Input id="cap-title" value={form.title} onChange={set("title")} />
+            </Field>
+            <Field label="Company" htmlFor="cap-company">
+              <Input id="cap-company" value={form.companyName} onChange={set("companyName")} />
+            </Field>
+            <Field label="Location" htmlFor="cap-location" hint="Use “Remote” for remote roles.">
+              <Input id="cap-location" value={form.location} onChange={set("location")} />
+            </Field>
+            <Field label="Posted" htmlFor="cap-posted">
+              <Input id="cap-posted" type="date" value={form.postedOn} onChange={set("postedOn")} />
+            </Field>
+            <Field label="Pay min ($/yr)" htmlFor="cap-min">
+              <Input id="cap-min" inputMode="numeric" value={form.compMin} onChange={set("compMin")} />
+            </Field>
+            <Field label="Pay max ($/yr)" htmlFor="cap-max">
+              <Input id="cap-max" inputMode="numeric" value={form.compMax} onChange={set("compMax")} />
+            </Field>
+            <Field label="Description" htmlFor="cap-desc" className="span-2">
+              <Textarea id="cap-desc" rows={10} value={form.descriptionText} onChange={set("descriptionText")} />
+            </Field>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              disabled={pending}
+              onClick={() =>
+                run(
+                  () =>
+                    captureJob({
+                      url,
+                      title: form.title,
+                      companyName: form.companyName,
+                      location: form.location,
+                      descriptionText: form.descriptionText,
+                      postedOn: form.postedOn,
+                      compMin: form.compMin ? Number(form.compMin.replace(/[^\d]/g, "")) || undefined : undefined,
+                      compMax: form.compMax ? Number(form.compMax.replace(/[^\d]/g, "")) || undefined : undefined,
+                      capturedVia: via,
+                      jsonLd: jsonLdRef.current,
+                    }),
+                  (r) => router.push(`/jobs/${r.id}${r.note ? "?existing=1" : ""}`)
+                )
+              }
+            >
+              Save job
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setDraft(null)}>
+              Start over
+            </Button>
+            <ActionMessage error={error} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
