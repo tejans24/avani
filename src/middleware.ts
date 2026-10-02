@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
+import { isPublicPath } from "@/lib/route-access";
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/clients(.*)",
-  "/invoices(.*)",
-  "/reports(.*)",
-  "/settings(.*)",
-  "/jobs(.*)",
-  "/api/invoices(.*)",
-  "/api/jobs(.*)",
-]);
-
+// Default-deny: every path not listed in route-access.ts requires sign-in.
 // AUTH_MODE=test (local e2e / CI) bypasses Clerk entirely — no keys needed.
-// Server actions still enforce requireAuth(), which has the same bypass.
+// Server actions and API routes still enforce requireAuth(), which has the
+// same bypass, and the platform layout checks the ALLOWED_EMAILS allowlist.
 const middleware =
   process.env.AUTH_MODE === "test"
     ? () => NextResponse.next()
     : clerkMiddleware(async (auth, req) => {
-        if (isProtectedRoute(req)) await auth.protect();
+        if (!isPublicPath(req.nextUrl.pathname)) await auth.protect();
       });
 
 export default middleware;
