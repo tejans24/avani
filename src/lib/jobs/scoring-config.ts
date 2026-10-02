@@ -9,17 +9,34 @@
  * Patterns are matched case-insensitively against title + description.
  */
 
-export const SCORING_VERSION = 2;
+export const SCORING_VERSION = 3;
 
 /*
  * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
  * design authority; mission (public benefit, health, infrastructure,
  * environment, civic); remote or within ~1 hr of Baltimore; stable,
- * lender-recognizable pay in the $185–215K range (never under $180K); a
+ * lender-recognizable pay (see PAY below); a
  * competent person above. Dealbreakers: daily status reporting, narrow ticket
  * work, domain requirements that can't be honestly met, day-one certs with no
  * path, vendor-deliverable oversight programs, 50%+ travel.
  */
+
+/**
+ * Pay, in one place: the hard filter, the score bands, the fit check and the
+ * evaluator prompt all read these. Change them here, bump SCORING_VERSION,
+ * and the next refresh rescores everything.
+ *
+ * floor: a whole posted range under this is filtered out (Oct 2026: lowered
+ * from $180K to $130K for now). target: what the search is really for.
+ */
+export const PAY = {
+  floorCents: 130_000_00,
+  targetMinCents: 185_000_00,
+  targetMaxCents: 215_000_00,
+};
+
+/** $185K */
+export const payK = (cents: number) => `$${Math.round(cents / 100_000)}K`;
 
 export type Lane =
   | "GOV_CONTRACTOR"
@@ -140,11 +157,8 @@ export const HARD_FILTERS = {
     /\bc2c\b|\bcorp[- ]to[- ]corp\b/i,
   ],
 
-  /**
-   * Pay: reject only when the whole posted range is under the floor ("below
-   * $180K the trade stops making sense"). A range that straddles it is scored.
-   */
-  compFloorCents: 180_000_00,
+  /** Pay: reject only when the whole posted range is under PAY.floorCents. A range that straddles it is scored. */
+  compFloorCents: PAY.floorCents,
 
   /** Dealbreaker: heavy travel. */
   travelRejectPatterns: [
@@ -203,12 +217,14 @@ export type Rule = {
   pattern: RegExp;
 };
 
-/** Comp uses the posted range midpoint (annualized). Highest band wins. */
+/** Comp uses the posted range midpoint (annualized). Highest band wins. Derived from PAY. */
+const BELOW_TARGET_CENTS = Math.round((PAY.floorCents + PAY.targetMinCents) / 2 / 500_000) * 500_000;
 export const COMP_BANDS = [
-  { minCents: 200_000_00, points: 15, label: "Midpoint ≥ $200K" },
-  { minCents: 185_000_00, points: 12, label: "Midpoint in the $185–200K target" },
-  { minCents: 180_000_00, points: 2, label: "Midpoint $180–185K (thin)" },
-  { minCents: 0, points: -10, label: "Midpoint < $180K (range straddles the floor)" },
+  { minCents: PAY.targetMinCents + 15_000_00, points: 15, label: `Midpoint ≥ ${payK(PAY.targetMinCents + 15_000_00)}` },
+  { minCents: PAY.targetMinCents, points: 12, label: `Midpoint in the ${payK(PAY.targetMinCents)}–${payK(PAY.targetMaxCents)} target` },
+  { minCents: BELOW_TARGET_CENTS, points: 2, label: `Midpoint ${payK(BELOW_TARGET_CENTS)}–${payK(PAY.targetMinCents)} (under target)` },
+  { minCents: PAY.floorCents, points: -4, label: `Midpoint ${payK(PAY.floorCents)}–${payK(BELOW_TARGET_CENTS)} (well under target)` },
+  { minCents: 0, points: -10, label: `Midpoint < ${payK(PAY.floorCents)} (range straddles the floor)` },
 ] as const;
 /** No posted range: neutral score, but flagged in the UI. */
 export const COMP_MISSING_FLAG = "No comp range posted";

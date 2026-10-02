@@ -607,6 +607,9 @@ model JobPosting {
 
   /// MANUAL only: "bookmarklet" | "share" | "shortcut" | "paste".
   capturedVia      String?
+  /// Claude's fit analysis (lib/jobs/fit.ts FitAnalysis), kept until run again.
+  fitAnalysis      Json?
+  fitAnalyzedAt    DateTime?
   raw              Json
   activity         JobActivity[]
   tailored         TailoredResume[]

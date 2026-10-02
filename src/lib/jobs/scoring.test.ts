@@ -88,10 +88,14 @@ describe("scorePosting: hard filters", () => {
   });
 
   it("rejects pay ranges entirely under the floor, but scores ones that straddle it", () => {
-    expect(fails({ compMinCents: 140_000_00, compMaxCents: 175_000_00 })).toContain("Pay range entirely under $180K");
-    const r = scorePosting(posting({ compMinCents: 160_000_00, compMaxCents: 190_000_00 }), NOW);
+    expect(fails({ compMinCents: 100_000_00, compMaxCents: 125_000_00 })).toContain("Pay range entirely under $130K");
+    const r = scorePosting(posting({ compMinCents: 110_000_00, compMaxCents: 140_000_00 }), NOW);
     expect(r.filterFailures).toEqual([]);
     expect(r.breakdown.find((b) => b.rule === "comp-band")?.points).toBe(-10);
+    // Above the floor but under the target: kept, scored lower.
+    const under = scorePosting(posting({ compMinCents: 140_000_00, compMaxCents: 175_000_00 }), NOW);
+    expect(under.filterFailures).toEqual([]);
+    expect(under.breakdown.find((b) => b.rule === "comp-band")?.points).toBe(-4);
   });
 
   it("rejects the dealbreakers", () => {

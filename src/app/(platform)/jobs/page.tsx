@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { Badge, Button } from "@/components/platform/ds";
 import { StatTile } from "@/components/platform/StatTile";
 import type { ExtractedBenefit } from "@/lib/jobs/benefits";
-import { LANE_LABEL, WORK_MODE_LABEL, ago, formatComp, scoreTone } from "@/lib/jobs/display";
+import { LANE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, scoreTone } from "@/lib/jobs/display";
+import { FIT_VERDICT_LABEL, type FitAnalysis } from "@/lib/jobs/fit";
 import { JOB_STATUS_LABEL, type JobStatus } from "@/lib/jobs/pipeline";
 import type { Lane, WorkMode } from "@/lib/jobs/scoring-config";
 
@@ -164,12 +165,17 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                     <td>
                       <Link href={`/jobs/${p.id}`}>{p.title}</Link>
                       <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-                        {p.company.name}
+                        {p.company.name} · {postingSiteLabel(p)}
                         {p._count.aliases ? ` · also on ${p._count.aliases} other board${p._count.aliases === 1 ? "" : "s"}` : ""}
                         {p.closedAt ? " · no longer listed" : ""}
                       </div>
                       {!passed && (
                         <div style={{ fontSize: "var(--text-sm)", color: "var(--critical)" }}>{p.filterFailures[0]}</div>
+                      )}
+                      {p.fitAnalysis && (
+                        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                          Fit: {FIT_VERDICT_LABEL[(p.fitAnalysis as unknown as FitAnalysis).verdict]}
+                        </div>
                       )}
                     </td>
                     <td style={{ fontSize: "var(--text-sm)" }}>{LANE_LABEL[p.lane as Lane]}</td>

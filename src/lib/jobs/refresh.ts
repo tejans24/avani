@@ -1,4 +1,4 @@
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { emitEvent } from "@/lib/events/emit";
 import { formatAwardAmount, pickCurrentAward } from "@/lib/jobs/awards";
@@ -177,6 +177,12 @@ export async function ingestPostings(
           closedAt: null,
           ...(own
             ? {
+                // The fit analysis read the old text or pay: drop it rather than show it stale.
+                ...(existing.descriptionText !== item.descriptionText ||
+                existing.compMinCents !== item.compMinCents ||
+                existing.compMaxCents !== item.compMaxCents
+                  ? { fitAnalysis: Prisma.DbNull, fitAnalyzedAt: null }
+                  : {}),
                 title: item.title,
                 location: item.location,
                 url: item.url,

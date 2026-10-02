@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import { BenefitsPanel } from "@/components/platform/jobs/BenefitsPanel";
+import { FitPanel } from "@/components/platform/jobs/FitPanel";
 import { CompanyCallChecklist } from "@/components/platform/jobs/CompanyCallChecklist";
 import { JobActivityPanel } from "@/components/platform/jobs/JobActivityPanel";
 import { JobPipelineCard } from "@/components/platform/jobs/JobPipelineCard";
@@ -10,13 +11,17 @@ import { dateToIso } from "@/lib/dates";
 import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
-import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatComp, scoreTone } from "@/lib/jobs/display";
+import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, postingSourceText, scoreTone } from "@/lib/jobs/display";
+import type { FitAnalysis } from "@/lib/jobs/fit";
+import { resumeSchema } from "@/lib/jobs/resume-schema";
 import type { JobStatus } from "@/lib/jobs/pipeline";
 import { CATEGORY_CAPS, type Category, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
 import type { BreakdownEntry } from "@/lib/jobs/scoring";
 
 export const metadata = { title: "Job — Avani" };
 export const dynamic = "force-dynamic";
+// The fit evaluation (a server action on this page) takes a minute or more.
+export const maxDuration = 300;
 
 export default async function JobDetailPage({ params }: { params: { id: string } }) {
   const posting = await db.jobPosting.findUnique({
@@ -46,6 +51,18 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const comp = formatComp(posting.compMinCents, posting.compMaxCents);
   const categories = Object.keys(CATEGORY_CAPS) as Category[];
 
+  const fit = posting.fitAnalysis as unknown as FitAnalysis | null;
+  const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
+  const parsedMaster = master ? resumeSchema.safeParse(master.data) : null;
+  const cited = new Set(fit?.fitTable.flatMap((r) => r.bulletIds) ?? []);
+  const bulletText: Record<string, string> = {};
+  if (parsedMaster?.success) {
+    for (const b of [...parsedMaster.data.experience.flatMap((e) => e.bullets), ...parsedMaster.data.projects.flatMap((p) => p.bullets)]) {
+      if (cited.has(b.id)) bulletText[b.id] = b.text;
+    }
+  }
+  const aiEnabled = Boolean(process.env.ANTHROPIC_API_KEY) || process.env.TAILOR_MODE === "fake";
+
   return (
     <>
       <div className="page-head">
@@ -59,6 +76,9 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             {comp ? ` · ${comp}` : ""} · posted {ago(posting.postedAt ?? posting.firstSeenAt)}
             {posting.archivedAt ? " · archived" : ""}
             {posting.closedAt ? " · no longer listed" : ""}
+          </p>
+          <p className="sub" style={{ fontSize: "var(--text-sm)" }}>
+            {postingSourceText(posting)}
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -105,6 +125,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           ))}
         </div>
       )}
+
+      <FitPanel
+        postingId={posting.id}
+        analysis={fit}
+        bulletText={bulletText}
+        aiEnabled={aiEnabled}
+        autoRun={aiEnabled && passed && !posting.archivedAt && Boolean(parsedMaster?.success)}
+      />
 
       <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -212,14 +240,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)" }}>
           <li>
             <a href={posting.url} target="_blank" rel="noreferrer">
-              {SOURCE_LABEL[posting.source] ?? posting.source}
+              {postingSiteLabel(posting)}
             </a>{" "}
-            (first seen {dateToIso(posting.firstSeenAt)})
+            ({posting.source === "MANUAL" ? "added" : "first seen"} {dateToIso(posting.firstSeenAt)})
           </li>
           {posting.aliases.map((a) => (
             <li key={a.id}>
               <a href={a.url} target="_blank" rel="noreferrer">
-                {SOURCE_LABEL[a.source] ?? a.source}
+                {postingSiteLabel(a)}
               </a>{" "}
               (duplicate merged {dateToIso(a.firstSeenAt)})
             </li>

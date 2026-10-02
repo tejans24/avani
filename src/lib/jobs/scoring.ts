@@ -3,6 +3,7 @@ import {
   CATEGORY_CAPS,
   CURRENT_AWARD_POINTS,
   COMP_BANDS,
+  payK,
   COMP_MISSING_FLAG,
   DOMAIN_GAP_RULES,
   HARD_FILTERS,
@@ -145,7 +146,7 @@ function hardFilters(input: ScoringInput, text: string, workMode: WorkMode, remo
   }
 
   if (input.compMaxCents !== null && input.compMaxCents < H.compFloorCents) {
-    out.push(`Pay range entirely under $${H.compFloorCents / 100_000}K`);
+    out.push(`Pay range entirely under ${payK(H.compFloorCents)}`);
   }
 
   const travel = firstMatch(H.travelRejectPatterns, text);

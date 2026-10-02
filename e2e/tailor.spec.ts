@@ -78,3 +78,24 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   );
   expect(p).toEqual({ status: "APPLIED", version: 2 });
 });
+
+test("the evaluator runs on its own the first time a matching job is opened, and its verdict shows in the list", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const [{ id }] = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`);
+
+  await page.goto(`/jobs/${id}`);
+  const panel = page.getByTestId("fit-panel");
+  await expect(panel.getByText("Test evaluation")).toBeVisible();
+  await expect(panel.getByText("Fake evaluation of Senior Software Engineer, Medicaid Modernization at Chesapeake Civic Digital.")).toBeVisible();
+  await expect(panel.getByText(/App checks: location/)).toContainText("Remote");
+  await expect(panel.getByText("GATES")).toBeVisible();
+  await panel.getByText("FIT TABLE").click();
+  await expect(panel.getByText(/↳/).first()).toBeVisible(); // cited résumé bullets shown as text
+  await expect(page.getByText("From Greenhouse")).toBeVisible();
+
+  const [row] = await queryRows(`SELECT "fitAnalyzedAt" FROM "JobPosting" WHERE id = $1`, [id]);
+  expect(row.fitAnalyzedAt).not.toBeNull();
+
+  await page.goto("/jobs");
+  await expect(page.getByTestId("job-row").first()).toContainText("Fit: Apply");
+});

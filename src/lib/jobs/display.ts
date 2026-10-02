@@ -65,3 +65,47 @@ export function ago(d: Date | null, now = new Date()): string {
   if (days < 14) return `${days}d ago`;
   return `${Math.floor(days / 7)}w ago`;
 }
+
+const SITE_NAMES: [RegExp, string][] = [
+  [/(^|\.)linkedin\.com$/, "LinkedIn"],
+  [/(^|\.)indeed\.com$/, "Indeed"],
+  [/(^|\.)glassdoor\.com$/, "Glassdoor"],
+  [/(^|\.)ziprecruiter\.com$/, "ZipRecruiter"],
+  [/(^|\.)dice\.com$/, "Dice"],
+  [/(^|\.)builtin\.com$/, "Built In"],
+  [/(^|\.)wellfound\.com$/, "Wellfound"],
+  [/(^|\.)usajobs\.gov$/, "USAJOBS"],
+  [/(^|\.)climatebase\.org$/, "Climatebase"],
+  [/(^|\.)greenhouse\.io$/, "Greenhouse"],
+  [/(^|\.)lever\.co$/, "Lever"],
+  [/(^|\.)ashbyhq\.com$/, "Ashby"],
+  [/(^|\.)myworkdayjobs\.com$/, "Workday"],
+  [/(^|\.)smartrecruiters\.com$/, "SmartRecruiters"],
+  [/(^|\.)icims\.com$/, "iCIMS"],
+];
+
+const VIA_LABEL: Record<string, string> = {
+  bookmarklet: "the Add to Avani button",
+  share: "phone share",
+  shortcut: "iPhone Shortcut",
+  paste: "pasted text",
+};
+
+/** Where a job was found: the site for jobs you added, the feed otherwise. */
+export function postingSiteLabel(p: { source: string; url: string }): string {
+  if (p.source !== "MANUAL") return SOURCE_LABEL[p.source] ?? p.source;
+  let host: string;
+  try {
+    host = new URL(p.url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return SOURCE_LABEL.MANUAL;
+  }
+  return SITE_NAMES.find(([re]) => re.test(host))?.[1] ?? host;
+}
+
+/** "Added by you from careers.eab.com with the Add to Avani button". */
+export function postingSourceText(p: { source: string; url: string; capturedVia: string | null }): string {
+  if (p.source !== "MANUAL") return `From ${SOURCE_LABEL[p.source] ?? p.source}`;
+  const via = p.capturedVia ? VIA_LABEL[p.capturedVia] : undefined;
+  return `Added by you from ${postingSiteLabel(p)}${via ? ` with ${via}` : ""}`;
+}
