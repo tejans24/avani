@@ -443,3 +443,194 @@ model Interaction {
   @@index([clientId, occurredAt])
   @@index([contactId])
 }
+
+// ============================================================
+// Phase 4 — Job finder (STRICTLY INTERNAL)
+//
+// Personal job search: postings pulled from structured job APIs, hard-filtered
+// and scored against src/lib/jobs/scoring-config.ts, plus résumé tailoring.
+// Separate from the CRM layer on purpose — an employer is not a Client.
+// Nothing here is ever submitted anywhere: "Applied" is a status the owner
+// sets by hand after applying themselves.
+// ============================================================
+
+enum JobSource {
+  GREENHOUSE
+  LEVER
+  WORKDAY
+  USAJOBS
+  CLIMATEBASE
+  TECH_JOBS_FOR_GOOD
+}
+
+/// Which kind of employer a posting belongs to (scoring + résumé vocabulary).
+enum JobLane {
+  GOV_CONTRACTOR
+  COMMERCIAL_PLATFORM
+  HEALTH_SYSTEM
+  CLIMATE_CONSERVATION
+  INTERNAL_TOOLS
+  UNCLASSIFIED
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+  UNKNOWN
+}
+
+/// The owner's pipeline. NEW = unreviewed; SKIPPED hides it from the default view.
+enum JobStatus {
+  NEW
+  SHORTLISTED
+  APPLIED
+  INTERVIEWING
+  OFFER
+  CLOSED
+  SKIPPED
+}
+
+/// One feed to poll: a Greenhouse/Lever board slug, a Workday tenant, or a
+/// USAJOBS saved query. Managed in Settings; seeded from jobs/boards.ts.
+model JobBoard {
+  id            String       @id @default(cuid())
+  source        JobSource
+  /// Greenhouse/Lever board slug, Workday "tenant/site" path, or USAJOBS keyword set.
+  slug          String
+  companyName   String
+  /// Workday only: the tenant host, e.g. "caci.wd1.myworkdayjobs.com".
+  host          String?
+  enabled       Boolean      @default(true)
+  lastFetchedAt DateTime?
+  lastError     String?      @db.Text
+  postings      JobPosting[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([source, slug])
+}
+
+/// An employer. Holds the per-company interview-question notes.
+model JobCompany {
+  id               String       @id @default(cuid())
+  name             String
+  /// Lowercased, suffix-stripped ("Booz Allen Hamilton Inc." → "booz allen hamilton").
+  normalizedName   String       @unique
+  lane             JobLane?
+  /// Recruiting/staffing firm reposting other employers' roles → hard-filtered.
+  isStaffingAgency Boolean      @default(false)
+  /// Answers keyed by INTERVIEW_QUESTIONS keys (primeOrSub, awardedOrContingent,
+  /// optionYears, architectureOwner, aiToolsApproved, outsideWorkPolicy, ipCarveOut).
+  questions        Json         @default("{}")
+  notes            String?      @db.Text
+  postings         JobPosting[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model JobPosting {
+  id               String      @id @default(cuid())
+  source           JobSource
+  /// The source's own id for the posting (unique per source).
+  sourceJobId      String
+  boardId          String?
+  board            JobBoard?   @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  companyId        String
+  company          JobCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title            String
+  location         String
+  workMode         WorkMode    @default(UNKNOWN)
+  url              String
+  descriptionText  String      @db.Text
+  /// Posted range, annualized, integer cents. Hourly ranges × 2080.
+  compMinCents     Int?
+  compMaxCents     Int?
+  postedAt         DateTime?
+  firstSeenAt      DateTime    @default(now())
+  lastSeenAt       DateTime    @default(now())
+  /// Set when a refresh no longer sees the posting in its feed.
+  closedAt         DateTime?
+
+  /// normalize(title) | normalize(company) | normalize(location) — cross-source dedupe.
+  dedupeKey        String
+  /// Cross-source duplicate → points at the canonical (first-seen) posting.
+  duplicateOfId    String?
+  duplicateOf      JobPosting? @relation("JobDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates       JobPosting[] @relation("JobDuplicates")
+
+  // --- Derived by scoring (recomputed when SCORING_VERSION changes) ---
+  lane             JobLane     @default(UNCLASSIFIED)
+  /// Manual lane correction; wins over the classifier.
+  laneOverride     JobLane?
+  /// Hard-filter failures, e.g. ["clearance: TS/SCI required"]. Empty = passed.
+  filterFailures   String[]    @default([])
+  /// 0–100; null until scored. Rejected postings are still scored, for review.
+  score            Int?
+  /// [{ category, rule, points, evidence }] — every point is explained.
+  scoreBreakdown   Json        @default("[]")
+  /// Notes such as "no comp range posted" — neutral but worth knowing.
+  scoreFlags       String[]    @default([])
+  scoringVersion   Int?
+  scoredAt         DateTime?
+
+  // --- Owner pipeline ---
+  status           JobStatus   @default(NEW)
+  statusChangedAt  DateTime?
+  notes            String?     @db.Text
+
+  raw              Json
+  activity         JobActivity[]
+  tailored         TailoredResume[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([source, sourceJobId])
+  @@index([dedupeKey])
+  @@index([status, score])
+  @@index([companyId])
+}
+
+/// Status changes and dated notes on a posting (applied, interview, etc.).
+model JobActivity {
+  id         String     @id @default(cuid())
+  postingId  String
+  posting    JobPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  fromStatus JobStatus?
+  toStatus   JobStatus?
+  occurredAt DateTime
+  note       String?    @db.Text
+  createdAt  DateTime   @default(now())
+
+  @@index([postingId, occurredAt])
+}
+
+/// The master résumé. Append-only: each import is a new version; the UI never
+/// edits it. Imported by `npm run resume:import`, never committed to git.
+model ResumeMaster {
+  id        String           @id @default(cuid())
+  version   Int              @unique
+  /// Validated against src/lib/jobs/resume-schema.ts.
+  data      Json
+  tailored  TailoredResume[]
+  createdAt DateTime         @default(now())
+}
+
+/// A tailored variant for one posting. Each save is a new version.
+model TailoredResume {
+  id         String       @id @default(cuid())
+  postingId  String
+  posting    JobPosting   @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  masterId   String
+  master     ResumeMaster @relation(fields: [masterId], references: [id], onDelete: Restrict)
+  version    Int
+  /// Same shape as the master résumé. Bullets keep their master ids so the diff
+  /// view and the truthfulness check can trace every line back to master.
+  data       Json
+  /// Per-bullet review state: { [bulletId]: "accepted" | "rejected" | "edited" }.
+  decisions  Json         @default("{}")
+  coverNote  String?      @db.Text
+  createdAt  DateTime     @default(now())
+
+  @@unique([postingId, version])
+}

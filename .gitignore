@@ -14,3 +14,6 @@ tsconfig.tsbuildinfo
 
 # Test artifacts
 .fake-sms
+
+# Personal résumé data (master + tailored + exported PDFs) — never committed
+/resume
