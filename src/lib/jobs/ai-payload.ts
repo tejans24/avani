@@ -60,25 +60,35 @@ export function scrubPersonal(text: string, contact: Contact): string {
   return out;
 }
 
+type PayloadBullet = { id: string; text: string; skills: string[]; reserve: boolean };
+
 export type TailoringPayload = {
+  headline: string;
+  headlineOptions: string[];
   summary: string;
+  skills: { group: string; text: string }[];
   experience: {
     id: string;
     organization: string;
     title: string;
-    start: string;
-    end: string | null;
-    bullets: { id: string; text: string; skills: string[]; reserve: boolean }[];
+    periods: { start: string; end: string | null }[];
+    intro?: string;
+    bullets: PayloadBullet[];
   }[];
-  projects: { id: string; name: string; bullets: { id: string; text: string; skills: string[]; reserve: boolean }[] }[];
-  skills: { group: string; items: string[] }[];
-  education: { id: string; institution: string; degree: string; year?: string }[];
+  projects: { id: string; name: string; bullets: PayloadBullet[] }[];
+  /** Sent so gov-lane summaries can mention eligibility; rendered verbatim. */
+  clearance: string[];
   stories: { id: string; title: string; text: string; skills: string[] }[];
   posting: { title: string; company: string; lane: string; description: string };
   tailoringNotes?: string;
 };
 
-/** Allowlist copy: only content fields, every free-text field scrubbed. */
+/**
+ * Allowlist copy: only content fields, every free-text field scrubbed.
+ * Education and Additional lines are rendered verbatim from master and are
+ * not sent. The posting is scrubbed too: a posting that happens to mention
+ * the owner's city must not trip the final check.
+ */
 export function buildTailoringPayload(input: {
   master: Resume;
   posting: { title: string; company: string; lane: string; description: string };
@@ -86,24 +96,31 @@ export function buildTailoringPayload(input: {
 }): TailoringPayload {
   const { master } = input;
   const s = (t: string) => scrubPersonal(t, master.contact);
-  const bullets = (bs: Resume["experience"][number]["bullets"]) =>
+  const bullets = (bs: Resume["experience"][number]["bullets"]): PayloadBullet[] =>
     bs.map((b) => ({ id: b.id, text: s(b.text), skills: b.skills, reserve: b.reserve }));
 
   return {
+    headline: s(master.headline),
+    headlineOptions: master.headlineOptions.map(s),
     summary: s(master.summary),
+    skills: master.skills.map((g) => ({ group: g.group, text: s(g.text) })),
     experience: master.experience.map((e) => ({
       id: e.id,
-      organization: e.organization,
-      title: e.title,
-      start: e.start,
-      end: e.end,
+      organization: s(e.organization),
+      title: s(e.title),
+      periods: e.periods.map((p) => ({ start: p.start, end: p.end ?? null })),
+      intro: e.intro ? s(e.intro) : undefined,
       bullets: bullets(e.bullets),
     })),
     projects: master.projects.map((p) => ({ id: p.id, name: s(p.name), bullets: bullets(p.bullets) })),
-    skills: master.skills,
-    education: master.education.map((ed) => ({ id: ed.id, institution: ed.institution, degree: ed.degree, year: ed.year })),
+    clearance: master.clearance.map(s),
     stories: master.stories.map((st) => ({ id: st.id, title: s(st.title), text: s(st.text), skills: st.skills })),
-    posting: input.posting,
+    posting: {
+      title: s(input.posting.title),
+      company: s(input.posting.company),
+      lane: input.posting.lane,
+      description: s(input.posting.description),
+    },
     tailoringNotes: input.tailoringNotes ? s(input.tailoringNotes) : undefined,
   };
 }

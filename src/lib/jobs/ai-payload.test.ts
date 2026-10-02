@@ -16,8 +16,10 @@ const master = resumeSchema.parse({
     email: "jordan.quill@example.com",
     phone: "(410) 555-0142",
     location: "Baltimore, MD",
+    citizenship: "U.S. Citizen",
     links: [{ label: "GitHub", url: "https://github.com/jquill-dev" }],
   },
+  headline: "Principal Engineer",
   summary: "Senior engineer building event-driven systems on AWS.",
   experience: [
     {
@@ -25,20 +27,24 @@ const master = resumeSchema.parse({
       organization: "Acme Health",
       title: "Senior Software Engineer",
       location: "Towson, MD",
-      start: "2021-03",
-      end: null,
+      periods: [{ start: "2021-03", end: null }],
       bullets: [
         { id: "acme-1", text: "Built a FHIR intake API on Lambda.", skills: ["fhir"] },
         { id: "acme-2", text: "Wrote the runbook (contact Jordan Quill, 410-555-0142).", skills: [], reserve: true },
       ],
     },
   ],
-  skills: [{ group: "Cloud", items: ["AWS"] }],
-  education: [{ id: "umd", institution: "University of Maryland", degree: "B.S. Computer Science" }],
+  skills: [{ group: "Cloud", text: "AWS (Lambda, API Gateway)" }],
+  education: [{ id: "umd", text: "B.S. Computer Science, University of Maryland" }],
   stories: [{ id: "s1", title: "Cutover", text: "Emailed jordan.quill@example.com updates hourly.", skills: [] }],
 });
 
-const posting = { title: "Senior Engineer", company: "Nava", lane: "GOV_CONTRACTOR", description: "Build on AWS." };
+const posting = {
+  title: "Senior Engineer",
+  company: "Nava",
+  lane: "GOV_CONTRACTOR",
+  description: "Build on AWS. Hybrid option near Baltimore, MD.",
+};
 
 describe("buildTailoringPayload", () => {
   const payload = buildTailoringPayload({ master, posting, tailoringNotes: "Ping me at github.com/jquill-dev" });
@@ -48,6 +54,15 @@ describe("buildTailoringPayload", () => {
     expect(payload).not.toHaveProperty("contact");
     expect(body).not.toContain("Towson");
     expect(body).not.toContain("Baltimore");
+  });
+
+  it("leaves out education and the citizenship line", () => {
+    expect(body).not.toContain("University of Maryland");
+    expect(body).not.toContain("U.S. Citizen");
+  });
+
+  it("scrubs the posting too, so a posting naming the owner's city still sends", () => {
+    expect(payload.posting.description).toBe("Build on AWS. Hybrid option near [redacted].");
   });
 
   it("keeps the résumé content and bullet ids tailoring needs", () => {
