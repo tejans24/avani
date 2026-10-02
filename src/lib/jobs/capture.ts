@@ -11,6 +11,8 @@
  * preview form before saving. Nothing is saved without that confirmation.
  */
 
+import { parsePayRange } from "@/lib/jobs/pay";
+
 export type CapturePayload = {
   url: string;
   pageTitle?: string;
@@ -176,6 +178,14 @@ export function parseCapture(payload: CapturePayload): CaptureDraft {
     guessed: [],
   };
   fillFromPageSignals(draft, payload);
+  // No structured pay: most US postings state a range in the text.
+  if (!draft.compMinCents && !draft.compMaxCents) {
+    const pay = parsePayRange(draft.descriptionText) ?? (payload.text ? parsePayRange(payload.text) : null);
+    if (pay) {
+      draft.compMinCents = pay.minCents;
+      draft.compMaxCents = pay.maxCents;
+    }
+  }
   if (!draft.title) draft.missing.push("title");
   if (!draft.companyName) draft.missing.push("companyName");
   if (!draft.location) draft.missing.push("location");

@@ -161,6 +161,15 @@ describe("parseCapture", () => {
     expect(draft).toMatchObject({ title: "Software Architect", companyName: "Leidos", location: "Remote" });
   });
 
+  it("reads the pay range from the text when there's no structured pay", () => {
+    const draft = parseCapture({
+      url: "https://careers.eab.com/jobs/1",
+      text:
+        "Senior Engineer\nThe anticipated starting salary range for this role is $103,500 – $130,000 per year. Actual salary varies due to factors that may include but not be limited to relevant experience, skills, and location.",
+    });
+    expect(draft).toMatchObject({ compMinCents: 103_500_00, compMaxCents: 130_000_00 });
+  });
+
   it("never guesses beyond structured data", () => {
     const draft = parseCapture({
       url: "https://x.example/job",
