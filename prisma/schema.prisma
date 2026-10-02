@@ -461,6 +461,9 @@ enum JobSource {
   USAJOBS
   CLIMATEBASE
   TECH_JOBS_FOR_GOOD
+  /// Added by the owner from their own browser (bookmarklet, share sheet,
+  /// iOS Shortcut, or paste) — for sites that block server-side fetching.
+  MANUAL
 }
 
 /// Which kind of employer a posting belongs to (scoring + résumé vocabulary).
@@ -588,6 +591,8 @@ model JobPosting {
   statusChangedAt  DateTime?
   notes            String?     @db.Text
 
+  /// MANUAL only: "bookmarklet" | "share" | "shortcut" | "paste".
+  capturedVia      String?
   raw              Json
   activity         JobActivity[]
   tailored         TailoredResume[]
