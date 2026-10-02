@@ -589,6 +589,13 @@ model JobPosting {
   // --- Owner pipeline ---
   status           JobStatus   @default(NEW)
   statusChangedAt  DateTime?
+  appliedAt        DateTime?
+  /// The exact tailored version sent with the application (frozen snapshot).
+  appliedResumeId  String?     @unique
+  appliedResume    TailoredResume? @relation("AppliedResume", fields: [appliedResumeId], references: [id], onDelete: SetNull)
+  /// Next follow-up; set from the pipeline cadence or by hand. Drives nudges.
+  nextActionNote   String?
+  nextActionDue    DateTime?   @db.Date
   notes            String?     @db.Text
 
   /// MANUAL only: "bookmarklet" | "share" | "shortcut" | "paste".
@@ -603,13 +610,23 @@ model JobPosting {
   @@index([dedupeKey])
   @@index([status, score])
   @@index([companyId])
+  @@index([nextActionDue])
+}
+
+enum JobActivityKind {
+  STATUS_CHANGE
+  INTERVIEW
+  RECRUITER_CONTACT
+  FOLLOW_UP
+  NOTE
 }
 
 /// Status changes and dated notes on a posting (applied, interview, etc.).
 model JobActivity {
-  id         String     @id @default(cuid())
+  id         String          @id @default(cuid())
   postingId  String
-  posting    JobPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  posting    JobPosting      @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  kind       JobActivityKind
   fromStatus JobStatus?
   toStatus   JobStatus?
   occurredAt DateTime
@@ -644,6 +661,8 @@ model TailoredResume {
   /// Per-bullet review state: { [bulletId]: "accepted" | "rejected" | "edited" }.
   decisions  Json         @default("{}")
   coverNote  String?      @db.Text
+  /// Set when this version was sent; a sent version can no longer be edited.
+  appliedTo  JobPosting?  @relation("AppliedResume")
   createdAt  DateTime     @default(now())
 
   @@unique([postingId, version])
