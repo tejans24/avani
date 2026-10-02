@@ -561,12 +561,13 @@ model JobPosting {
   /// Set when a refresh no longer sees the posting in its feed.
   closedAt         DateTime?
 
-  /// normalize(title) | normalize(company) | normalize(location) — cross-source dedupe.
-  dedupeKey        String
-  /// Cross-source duplicate → points at the canonical (first-seen) posting.
-  duplicateOfId    String?
-  duplicateOf      JobPosting? @relation("JobDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicates       JobPosting[] @relation("JobDuplicates")
+  /// normalize(title) | normalize(company) | normalize(location), see
+  /// src/lib/jobs/dedupe.ts. Unique: a duplicate is never stored as a second
+  /// posting; it becomes a JobPostingAlias of this one instead.
+  dedupeKey        String      @unique
+  aliases          JobPostingAlias[]
+  /// Hidden from every list but kept with its history. Restorable.
+  archivedAt       DateTime?
 
   // --- Derived by scoring (recomputed when SCORING_VERSION changes) ---
   lane             JobLane     @default(UNCLASSIFIED)
@@ -610,7 +611,6 @@ model JobPosting {
   updatedAt        DateTime    @updatedAt
 
   @@unique([source, sourceJobId])
-  @@index([dedupeKey])
   @@index([status, score])
   @@index([companyId])
   @@index([nextActionDue])
@@ -622,6 +622,38 @@ enum JobActivityKind {
   RECRUITER_CONTACT
   FOLLOW_UP
   NOTE
+}
+
+/// The same job seen again from another source or under a new id. Lets a
+/// refresh recognize it (and the UI link to every place it's posted) without
+/// storing a duplicate posting.
+model JobPostingAlias {
+  id          String     @id @default(cuid())
+  postingId   String
+  posting     JobPosting @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  source      JobSource
+  sourceJobId String
+  url         String
+  firstSeenAt DateTime   @default(now())
+  lastSeenAt  DateTime   @default(now())
+
+  @@unique([source, sourceJobId])
+  @@index([postingId])
+}
+
+/// Tombstone for a deleted posting so refreshes never bring it back. Matched
+/// by source id and by dedupe key (catches reposts under a new id).
+model JobDismissal {
+  id          String    @id @default(cuid())
+  source      JobSource
+  sourceJobId String
+  dedupeKey   String
+  title       String
+  companyName String
+  deletedAt   DateTime  @default(now())
+
+  @@unique([source, sourceJobId])
+  @@index([dedupeKey])
 }
 
 /// Status changes and dated notes on a posting (applied, interview, etc.).
