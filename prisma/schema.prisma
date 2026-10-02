@@ -597,6 +597,9 @@ model JobPosting {
   nextActionNote   String?
   nextActionDue    DateTime?   @db.Date
   notes            String?     @db.Text
+  /// Owner's steer for tailoring ("recruiter cares most about Medicaid work").
+  /// Shapes emphasis only; it cannot add claims that aren't in master.
+  tailoringNotes   String?     @db.Text
 
   /// MANUAL only: "bookmarklet" | "share" | "shortcut" | "paste".
   capturedVia      String?

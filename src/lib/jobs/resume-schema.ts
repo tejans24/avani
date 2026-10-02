@@ -9,6 +9,8 @@ import { z } from "zod";
  * from ids, never from fuzzy text matching. `skills` tags drive relevance
  * ranking when bullets are selected and reordered for a posting.
  *
+ * The default (untailored) résumé shows every bullet without `reserve: true`.
+ *
  * `month` is "YYYY-MM"; `end: null` means "Present".
  */
 
@@ -21,6 +23,11 @@ export const bulletSchema = z.object({
   text: z.string().trim().min(1).max(600),
   /** Skill tags, e.g. ["aws-serverless", "event-driven", "python"]. */
   skills: z.array(z.string().trim().min(1)).default([]),
+  /**
+   * Reserve bullet: true and owned, but left off the default résumé.
+   * Tailoring may bring it in when a posting asks for its skills.
+   */
+  reserve: z.boolean().default(false),
 });
 
 export const experienceSchema = z.object({
@@ -62,6 +69,23 @@ export const resumeSchema = z.object({
       year: z.string().trim().optional(),
     })
   ),
+  /**
+   * Short first-person accounts (situation, what you did, result with
+   * numbers). Source material for cover notes and interview prep; never
+   * pasted into the résumé itself. Count as master for truthfulness.
+   */
+  stories: z
+    .array(
+      z.object({
+        id,
+        title: z.string().trim().min(1).max(120),
+        text: z.string().trim().min(1).max(2000),
+        skills: z.array(z.string().trim().min(1)).default([]),
+        /** Optional link to the experience entry it happened in. */
+        experienceId: z.string().optional(),
+      })
+    )
+    .default([]),
 });
 
 export type Resume = z.infer<typeof resumeSchema>;
