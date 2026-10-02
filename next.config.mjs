@@ -24,6 +24,14 @@ const csp = [
 ].join("; ");
 
 const nextConfig = {
+  experimental: {
+    // The résumé PDF embeds Carlito from src/pdf/fonts; make sure the font
+    // files ship with the serverless function.
+    outputFileTracingIncludes: {
+      "/api/jobs/tailored/[id]/pdf": ["./src/pdf/fonts/**"],
+      "/jobs/[id]/tailor/preview": ["./src/pdf/fonts/**"],
+    },
+  },
   async headers() {
     return [
       {

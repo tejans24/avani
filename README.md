@@ -106,3 +106,63 @@ src/components/form/     RHF-bound wrappers over the design system
 src/ds/                  the Avani design system (tokens + components)
 e2e/                     Playwright specs + fixtures (Amex CSV, Mercury JSON)
 ```
+
+## Job finder (`/jobs`)
+
+A private job search inside the platform: pulls postings from public job APIs,
+filters and scores them against your criteria, shows benefits at a glance,
+tracks applications, and tailors your résumé per posting. **It never applies
+for you**: "Applied" is a status you set after applying yourself.
+
+- **Criteria** live in one file: `src/lib/jobs/scoring-config.ts` (hard
+  filters, weighted scoring, lanes, the verify-on-the-call checklist). Bump
+  `SCORING_VERSION` after editing; the next refresh rescores everything.
+- **Refresh**: the event tick refreshes two due boards per run (each board
+  about daily). `npm run jobs:refresh` refreshes all boards now.
+- **Duplicates are rejected**: the same job from another source, or reposted
+  under a new id, becomes an alias of the existing posting. Deleted postings
+  leave a tombstone so refreshes never bring them back; anything you applied
+  to can only be archived.
+- **Adding jobs yourself** (sites that block servers, like LinkedIn): Jobs →
+  Add a job has a bookmarklet, the Android share target (install the app),
+  an iOS Shortcut recipe, and paste.
+- **Résumé**: import `master.json` at Jobs → Résumé (append-only; keep the
+  file out of git, `/resume` is ignored). Tailoring selects and lightly
+  rewords master content only; a code check blocks added numbers, em dashes,
+  and headlines outside your approved list, and flags terms that aren't in
+  master. Contact details never go to the AI (`src/lib/jobs/ai-payload.ts`).
+  PDFs reproduce your résumé layout (`src/lib/jobs/resume-layout.ts`) in
+  Carlito, which is metric-compatible with Calibri. Preview, then download.
+
+- **Federal awards** (Jobs → Awards): USAspending.gov IT and research
+  contracts awarded in the last 90 days at EPA, NOAA, DOE, USGS, FEMA, NASA,
+  CMS and VA (one agency per tick, each about daily; agencies are editable in
+  `src/lib/jobs/awards.ts`). Winners show up as leads, with links to add their
+  job board; postings at companies holding a current award get an "awarded
+  work" boost, and each job page lists the company's awards (period of
+  performance for the call). The DOE national labs hire on their own career
+  sites, not USAJOBS.
+
+### Adding a job source
+
+Most additions are just a board: Jobs → Boards → Add a board (Greenhouse,
+Lever, Ashby, SmartRecruiters, Workday, USAJOBS). To check a list of
+companies first: `npm run jobs:verify-boards -- --apply` probes each one on
+the documented public job APIs (and Workday `robots.txt`) and adds the ones
+that answer. `npm run jobs:discover-contractors` lists MD/DC/VA IT
+contractors from USAspending award data to grow the list.
+
+A new kind of source is one plugin:
+
+1. Write `src/lib/jobs/sources/<name>.ts` implementing `SourcePlugin`
+   (`fetchBoard(board, ctx, { titleFilter })` → `NormalizedPosting[]`). Use
+   `ctx.fetchJson` (polite in live mode, fixtures in `JOBS_SOURCE_MODE=fake`),
+   throw on a failed fetch, and apply `titleFilter` before any detail fetch.
+2. Register it in `src/lib/jobs/sources/index.ts`.
+3. Add its name to the `JobSource` enum in `prisma/schema.prisma` and create a
+   migration.
+4. Add a test with a recorded-style response in
+   `src/lib/jobs/sources/sources.test.ts`.
+
+Only documented public job APIs, or sites whose `robots.txt` allows it.
+Anything else goes through browser capture.

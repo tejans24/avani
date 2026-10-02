@@ -1,0 +1,36 @@
+{
+  "jobs": [
+    {
+      "id": "tw-1",
+      "title": "Staff Software Engineer, Grid Data Platform",
+      "location": "Remote - US",
+      "isRemote": true,
+      "publishedAt": "2026-09-30T00:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/tidewaterclimate/tw-1",
+      "descriptionPlain": "Tidewater Climate is a Series B company helping utilities decarbonize. Own the grid data platform end-to-end; design and build Kafka pipelines in Python and Postgres. Hands-on. Equity and unlimited PTO.",
+      "compensation": {
+        "summaryComponents": [
+          {
+            "compensationType": "Salary",
+            "interval": "1 YEAR",
+            "currencyCode": "USD",
+            "minValue": 185000,
+            "maxValue": 215000
+          }
+        ]
+      }
+    },
+    {
+      "id": "tw-2",
+      "title": "Founding Engineer",
+      "location": "San Francisco, CA",
+      "isRemote": false,
+      "publishedAt": "2026-09-30T00:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/tidewaterclimate/tw-2",
+      "descriptionPlain": "Fast-paced startup. Wear many hats. On-site 5 days a week in the office.",
+      "compensation": {
+        "summaryComponents": []
+      }
+    }
+  ]
+}

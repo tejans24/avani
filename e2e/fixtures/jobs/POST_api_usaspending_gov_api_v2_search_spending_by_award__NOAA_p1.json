@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "Award ID": "1305M326C0007",
+      "Recipient Name": "SEVERN WEATHER SYSTEMS LLC",
+      "Award Amount": 12900000,
+      "Description": "FORECAST DATA PIPELINE SUPPORT",
+      "Start Date": "2026-09-01",
+      "End Date": "2029-08-31",
+      "Awarding Agency": "Department of Commerce",
+      "Awarding Sub Agency": "National Oceanic and Atmospheric Administration",
+      "NAICS": {
+        "code": "541512"
+      },
+      "Place of Performance State Code": "MD",
+      "generated_internal_id": "CONT_AWD_1305M326C0007_TEST"
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": false
+  }
+}

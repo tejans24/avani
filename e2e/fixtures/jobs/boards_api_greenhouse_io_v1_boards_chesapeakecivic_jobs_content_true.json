@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "id": 4001,
+      "title": "Senior Software Engineer, Medicaid Modernization",
+      "absolute_url": "https://boards.greenhouse.io/chesapeakecivic/jobs/4001",
+      "first_published": "2026-09-28T14:00:00Z",
+      "location": {
+        "name": "Remote (US)"
+      },
+      "content": "&lt;p&gt;Chesapeake Civic Digital is a small team of 9 helping state agencies serve residents.&lt;/p&gt;\n&lt;p&gt;You will own our Medicaid eligibility platform end-to-end: design and build event-driven services on AWS\n(Lambda, Step Functions, DynamoDB) and integrate with multiple external systems via FHIR. This is a hands-on\nrole with real architecture decisions while we modernize a legacy mainframe system.&lt;/p&gt;\n&lt;p&gt;We are piloting LLMs with RAG and guardrails to help caseworkers.&lt;/p&gt;\n&lt;p&gt;Benefits: medical, dental, and vision insurance with 100% of employee premiums covered; 401(k) with a 5% employer match; 25 days of PTO plus 11 federal holidays; 12 weeks of paid parental leave; $2,000 annual learning budget.&lt;/p&gt;\n&lt;p&gt;The base salary range for this role is $190,000 - $220,000. Remote (US). Public Trust required.&lt;/p&gt;"
+    },
+    {
+      "id": 4002,
+      "title": "Platform Engineer",
+      "absolute_url": "https://boards.greenhouse.io/chesapeakecivic/jobs/4002",
+      "first_published": "2026-09-27T14:00:00Z",
+      "location": {
+        "name": "Denver, CO"
+      },
+      "content": "&lt;p&gt;Hybrid: 3 days a week in the office. Salary $150,000 - $170,000.&lt;/p&gt;"
+    },
+    {
+      "id": 4003,
+      "title": "Sales Engineer",
+      "absolute_url": "https://boards.greenhouse.io/chesapeakecivic/jobs/4003",
+      "first_published": "2026-09-27T14:00:00Z",
+      "location": {
+        "name": "Remote"
+      },
+      "content": "&lt;p&gt;Sell.&lt;/p&gt;"
+    }
+  ]
+}
