@@ -153,11 +153,10 @@ test("bookmarklet works on a careers site that severs window.opener, and Claude 
   const popup = await popupPromise;
   await popup.route("https://fonts.googleapis.com/**", (r) => r.abort());
 
-  await expect(popup.getByText("Got the page. Check the details, then save.")).toBeVisible();
   // The data travelled in the URL fragment, which is cleared after reading.
-  expect(new URL(popup.url()).hash).toBe("");
+  await expect.poll(() => new URL(popup.url()).hash).toBe("");
 
-  await popup.getByRole("button", { name: "Fill with Claude" }).click();
+  // No job data on the page, so Claude reads it automatically (no click).
   await expect(popup.getByText("Filled by Claude from the page. Check every field, then save.")).toBeVisible();
   await expect(popup.getByLabel("Title")).toHaveValue("Senior Cloud Architect");
   await expect(popup.getByLabel("Company")).toHaveValue("Example Federal");

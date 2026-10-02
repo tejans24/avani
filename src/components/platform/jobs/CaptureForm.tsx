@@ -43,6 +43,7 @@ export function CaptureForm({
   const fillWithClaude = async () => {
     setAiBusy(true);
     setAiWarnings([]);
+    setStatus("Reading the page with Claude…");
     const r = await fillCaptureWithClaude(pageRef.current);
     setAiBusy(false);
     if ("error" in r) {
@@ -79,6 +80,18 @@ export function CaptureForm({
       descriptionText: d.descriptionText,
     });
   };
+
+  // No structured job data on the page: let Claude read the captured page text
+  // right away (once), instead of waiting for a click. The button stays for retries.
+  const autoFilled = useRef(false);
+  useEffect(() => {
+    if (!draft || !aiEnabled || autoFilled.current) return;
+    const essentialsMissing = draft.missing.some((m) => m === "title" || m === "companyName" || m === "location");
+    if (!essentialsMissing || pageRef.current.text.trim().length < 40) return;
+    autoFilled.current = true;
+    void fillWithClaude();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, aiEnabled]);
 
   // Bookmarklet: the page data arrives in the URL fragment (#d=…), which is
   // never sent to a server and doesn't depend on window.opener (job sites
@@ -163,11 +176,11 @@ export function CaptureForm({
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
                 The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}.
-                {aiEnabled ? " Fill them in, or let Claude read the page." : " Fill those in."}
+                {aiEnabled ? " Claude reads the page to fill them; check the result." : " Fill those in, or set ANTHROPIC_API_KEY to have Claude read the page."}
               </p>
               {aiEnabled && pageRef.current.text.trim().length >= 40 && (
                 <Button type="button" variant="secondary" size="sm" disabled={aiBusy} onClick={fillWithClaude}>
-                  {aiBusy ? "Reading…" : "Fill with Claude"}
+                  {aiBusy ? "Reading…" : "Read again with Claude"}
                 </Button>
               )}
             </div>
