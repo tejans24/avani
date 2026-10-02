@@ -92,6 +92,7 @@ const docSchema = z.object({
   experience: z.array(
     z.object({
       id: z.string(),
+      omitted: z.boolean().optional(),
       bullets: z.array(z.object({ id: z.string(), text: z.string().max(1200), status: z.enum(["pending", "accepted", "edited", "rejected"]) })),
     })
   ),

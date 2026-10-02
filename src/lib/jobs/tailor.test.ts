@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resumeSchema } from "@/lib/jobs/resume-schema";
-import { checkDocStyle, checkTruth, docFromOutput, hasBlocking, quickTailor, renderResume, type TailorOutput } from "@/lib/jobs/tailor";
+import { checkDocStyle, checkTruth, docFromOutput, hasBlocking, omittedRoleGaps, quickTailor, renderResume, type TailorOutput } from "@/lib/jobs/tailor";
 
 const master = resumeSchema.parse({
   contact: { firstName: "Jordan", lastName: "Quill", email: "j@example.com" },
@@ -120,6 +120,27 @@ describe("renderResume", () => {
     expect(r.experience[0].bullets.map((b) => b.id)).toEqual(["avani-1"]);
     expect(r.experience[1].bullets).toEqual([]);
     expect(r.contact.firstName).toBe("Jordan");
+  });
+});
+
+describe("leaving roles out", () => {
+  it("drops an omitted role from the résumé and from the checks", () => {
+    const doc = docFromOutput(master, output(), "claude");
+    doc.experience[1].omitted = true;
+    doc.experience[1].bullets[0].text = "Shipped to 9,000,000 users — fast.";
+    expect(renderResume(master, doc).experience.map((e) => e.id)).toEqual(["avani"]);
+    expect(checkTruth(master, doc).some((i) => i.where === "bullet:va-1")).toBe(false);
+    expect(checkDocStyle(master, doc).some((i) => i.where === "bullet:va-1")).toBe(false);
+  });
+
+  it("warns about a gap, except when the oldest role is dropped", () => {
+    const now = new Date("2026-10-02T12:00:00Z");
+    const doc = docFromOutput(master, output(), "claude");
+    doc.experience[1].omitted = true; // VA, the oldest
+    expect(omittedRoleGaps(master, doc, now)).toEqual([]);
+    doc.experience[1].omitted = false;
+    doc.experience[0].omitted = true; // the current role
+    expect(omittedRoleGaps(master, doc, now)).toEqual([{ roleId: "avani", gaps: ["Jul 2024 to Oct 2026"] }]);
   });
 });
 

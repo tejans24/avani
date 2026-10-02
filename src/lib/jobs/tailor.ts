@@ -51,7 +51,8 @@ export type BulletStatus = "pending" | "accepted" | "edited" | "rejected";
 export type TailoredDoc = {
   headline: string;
   summary: string;
-  experience: { id: string; bullets: { id: string; text: string; status: BulletStatus }[] }[];
+  /** omitted: the whole role is left off this version (header and bullets). */
+  experience: { id: string; omitted?: boolean; bullets: { id: string; text: string; status: BulletStatus }[] }[];
   skillGroupOrder: string[];
   coverNote: string;
   rationale: string;
@@ -141,6 +142,7 @@ export function checkTruth(master: Resume, doc: TailoredDoc): TruthIssue[] {
   }
 
   for (const role of doc.experience) {
+    if (role.omitted) continue; // not on the résumé, nothing to check
     for (const b of role.bullets) {
       if (b.status === "rejected") continue;
       const src = bullets.get(b.id);
@@ -174,7 +176,7 @@ export function checkDocStyle(master: Resume, doc: TailoredDoc): { where: string
   };
   push("headline", doc.headline, master.headline);
   push("summary", doc.summary, master.summary);
-  for (const r of doc.experience) for (const b of r.bullets) if (b.status !== "rejected") push(`bullet:${b.id}`, b.text, bullets.get(b.id)?.text ?? "");
+  for (const r of doc.experience) if (!r.omitted) for (const b of r.bullets) if (b.status !== "rejected") push(`bullet:${b.id}`, b.text, bullets.get(b.id)?.text ?? "");
   push("coverNote", doc.coverNote, "");
   return out;
 }
@@ -185,7 +187,8 @@ export function hasBlocking(truth: TruthIssue[], style: { issues: StyleIssue[] }
 
 /**
  * The résumé to render: master's frame, the document's choices, rejected
- * bullets left out. A role with no kept bullets still shows its header line.
+ * bullets and omitted roles left out. A role with no kept bullets still shows
+ * its header line.
  */
 export function renderResume(master: Resume, doc: TailoredDoc): Resume {
   const byRole = new Map(doc.experience.map((r) => [r.id, r]));
@@ -200,6 +203,7 @@ export function renderResume(master: Resume, doc: TailoredDoc): Resume {
     summary: doc.summary,
     skills,
     experience: master.experience
+      .filter((e) => !byRole.get(e.id)?.omitted)
       .map((e) => {
         const kept = (byRole.get(e.id)?.bullets ?? []).filter((b) => b.status !== "rejected");
         const src = new Map(e.bullets.map((b) => [b.id, b]));
@@ -247,4 +251,55 @@ export function quickTailor(master: Resume, posting: { title: string; descriptio
     rationale: "Quick tailor: picked and reordered your bullets by overlap with the posting. Wording is unchanged.",
   };
   return docFromOutput(master, out, "quick");
+}
+
+// --- Leaving roles out ---------------------------------------------------------
+
+const monthIndex = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+const monthLabel = (i: number) => `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i % 12]} ${Math.floor(i / 12)}`;
+
+/**
+ * Gaps that leaving roles out would open in the work history: months an
+ * omitted role covered that no kept role covers, after the earliest kept
+ * role starts. Dropping the oldest roles just starts the résumé later, so it
+ * isn't a gap. `now` closes "Present" periods.
+ */
+export function omittedRoleGaps(master: Resume, doc: TailoredDoc, now: Date): { roleId: string; gaps: string[] }[] {
+  const omitted = new Set(doc.experience.filter((r) => r.omitted).map((r) => r.id));
+  if (!omitted.size) return [];
+  const nowIdx = now.getUTCFullYear() * 12 + now.getUTCMonth();
+  const covered = new Set<number>();
+  let earliestKept = Infinity;
+  for (const e of master.experience) {
+    if (omitted.has(e.id)) continue;
+    for (const p of e.periods) {
+      const start = monthIndex(p.start);
+      earliestKept = Math.min(earliestKept, start);
+      for (let i = start; i <= (p.end ? monthIndex(p.end) : nowIdx); i++) covered.add(i);
+    }
+  }
+  return master.experience
+    .filter((e) => omitted.has(e.id))
+    .map((e) => {
+      const months = e.periods
+        .flatMap((p) => {
+          const out: number[] = [];
+          for (let i = monthIndex(p.start); i <= (p.end ? monthIndex(p.end) : nowIdx); i++) out.push(i);
+          return out;
+        })
+        .filter((i) => i > earliestKept && !covered.has(i))
+        .sort((a, b) => a - b);
+      const gaps: string[] = [];
+      let runStart = -1;
+      months.forEach((m, n) => {
+        if (runStart < 0) runStart = m;
+        if (months[n + 1] !== m + 1) {
+          // Under three months reads as a normal move between jobs.
+          if (m - runStart + 1 >= 3) gaps.push(`${monthLabel(runStart)} to ${monthLabel(m)}`);
+          runStart = -1;
+        }
+      });
+      return { roleId: e.id, gaps };
+    })
+    .filter((g) => g.gaps.length > 0);
 }

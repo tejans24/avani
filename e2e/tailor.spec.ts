@@ -49,12 +49,21 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   const agency = page.getByTestId("role-agency");
   await agency.getByRole("button", { name: "Reject" }).nth(1).click();
   await expect(agency.getByText("Rejected", { exact: true })).toHaveCount(1);
+
+  // Leaving out the current role would open a gap; the oldest one wouldn't.
+  await firm.getByRole("button", { name: "Leave out" }).click();
+  await expect(firm.getByText(/Leaves a gap in your history, Mar 2021 to/)).toBeVisible();
+  await firm.getByRole("button", { name: "Include role" }).click();
+  await agency.getByRole("button", { name: "Leave out" }).click();
+  await expect(agency.getByText("Left out of this version.")).toBeVisible();
+  await expect(agency.getByText(/Leaves a gap/)).toHaveCount(0);
   await page.getByRole("button", { name: "Save as new version" }).click();
   await page.waitForURL(/tailor\?v=/);
   await expect(page.getByText(/^v2 ·/)).toBeVisible();
   const [v2] = await queryRows(`SELECT data FROM "TailoredResume" WHERE version = 2`);
   const agencyBullets = v2.data.experience.find((r: { id: string }) => r.id === "agency").bullets;
   expect(agencyBullets.find((b: { id: string }) => b.id === "agency-2").status).toBe("rejected");
+  expect(v2.data.experience.find((r: { id: string }) => r.id === "agency").omitted).toBe(true);
 
   // Preview shows the exact file; download is a separate step.
   await page.getByRole("link", { name: "Preview PDF" }).click();

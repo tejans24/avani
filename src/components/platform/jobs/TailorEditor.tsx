@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { generateTailored, markAppliedWithVersion, saveTailoredVersion } from "@/actions/tailor";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import type { Resume } from "@/lib/jobs/resume-schema";
-import { checkDocStyle, checkTruth, hasBlocking, type BulletStatus, type TailoredDoc } from "@/lib/jobs/tailor";
+import { checkDocStyle, checkTruth, hasBlocking, omittedRoleGaps, type BulletStatus, type TailoredDoc } from "@/lib/jobs/tailor";
 import { ActionMessage, useAction } from "./useAction";
 
 const STATUS_TONE: Record<BulletStatus, string> = { pending: "caution", accepted: "positive", edited: "brand", rejected: "neutral" };
@@ -68,6 +68,14 @@ export function TailorEditor(props: {
       list.splice(Math.max(0, Math.min(list.length, idx + delta)), 0, b);
       return d;
     });
+  const setOmitted = (roleId: string, omitted: boolean) =>
+    update((d) => {
+      const r = d.experience.find((x) => x.id === roleId);
+      if (r) r.omitted = omitted;
+      else d.experience.push({ id: roleId, omitted, bullets: [] });
+      return d;
+    });
+  const gaps = useMemo(() => (doc ? new Map(omittedRoleGaps(props.master, doc, new Date()).map((g) => [g.roleId, g.gaps])) : new Map<string, string[]>()), [doc, props.master]);
   const addBullet = (roleId: string, id: string) =>
     update((d) => {
       d.experience.find((r) => r.id === roleId)!.bullets.push({ id, text: masterText.get(id)!, status: "accepted" });
@@ -179,11 +187,28 @@ export function TailorEditor(props: {
             const unused = role.bullets.filter((b) => !r.bullets.some((x) => x.id === b.id));
             return (
               <div key={role.id} className="form-card" style={{ display: "grid", gap: 10 }} data-testid={`role-${role.id}`}>
-                <div style={{ fontWeight: 600 }}>
-                  {role.title}, {role.organization}
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 600, flex: 1, textDecoration: r.omitted ? "line-through" : "none", opacity: r.omitted ? 0.55 : 1 }}>
+                    {role.title}, {role.organization}
+                  </div>
+                  {!isSent && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setOmitted(role.id, !r.omitted)}>
+                      {r.omitted ? "Include role" : "Leave out"}
+                    </Button>
+                  )}
                 </div>
-                {r.bullets.length === 0 && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Header only (no bullets).</div>}
-                {r.bullets.map((b, idx) => {
+                {r.omitted && (
+                  <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                    Left out of this version.
+                    {(gaps.get(role.id) ?? []).map((g) => (
+                      <div key={g} style={{ color: "var(--caution)" }}>
+                        Leaves a gap in your history, {g}. Expect a question about it, or keep the role as a header line.
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!r.omitted && r.bullets.length === 0 && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Header only (no bullets).</div>}
+                {!r.omitted && r.bullets.map((b, idx) => {
                   const original = masterText.get(b.id) ?? "";
                   const changed = b.text !== original;
                   const key = `${role.id}:${b.id}`;
@@ -237,7 +262,7 @@ export function TailorEditor(props: {
                     </div>
                   );
                 })}
-                {!isSent && unused.length > 0 && (
+                {!isSent && !r.omitted && unused.length > 0 && (
                   <details style={{ fontSize: "var(--text-sm)" }}>
                     <summary style={{ cursor: "pointer", color: "var(--text-secondary)" }}>{unused.length} more from master</summary>
                     <ul style={{ margin: "8px 0 0", paddingLeft: 0, listStyle: "none", display: "grid", gap: 6 }}>
