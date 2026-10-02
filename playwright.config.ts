@@ -39,6 +39,7 @@ export default defineConfig({
       CLERK_SECRET_KEY: "sk_test_placeholder",
       MERCURY_MODE: "fake",
       JOBS_SOURCE_MODE: "fake",
+      TAILOR_MODE: "fake",
       SMS_MODE: "fake",
       TICK_SECRET: "test-tick-secret",
     },

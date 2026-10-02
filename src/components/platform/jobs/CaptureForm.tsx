@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { captureJob, fetchCaptureDraft, previewCapture } from "@/actions/jobs";
+import { captureJob, fetchCaptureDraft, fillCaptureWithClaude, previewCapture } from "@/actions/jobs";
 import { Button, Eyebrow } from "@/components/platform/ds";
 import { Field, Input, Textarea } from "@/components/form/shared";
 import type { CaptureDraft, CapturePayload } from "@/lib/jobs/capture";
@@ -18,7 +18,13 @@ const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
  * by postMessage), the Android share target / iOS Shortcut (?url=&title=&text=),
  * or paste. Nothing saves until "Save job".
  */
-export function CaptureForm({ initial }: { initial: { url?: string; title?: string; text?: string; via?: string } }) {
+export function CaptureForm({
+  initial,
+  aiEnabled,
+}: {
+  initial: { url?: string; title?: string; text?: string; via?: string };
+  aiEnabled: boolean;
+}) {
   const router = useRouter();
   const { pending, error, run } = useAction();
   const [status, setStatus] = useState<string | null>(null);
@@ -30,9 +36,36 @@ export function CaptureForm({ initial }: { initial: { url?: string; title?: stri
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [form, setForm] = useState({ title: "", companyName: "", location: "", postedOn: "", compMin: "", compMax: "", descriptionText: "" });
   const jsonLdRef = useRef<unknown[] | undefined>(undefined);
+  const pageRef = useRef<{ pageTitle?: string; text: string }>({ text: "" });
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+
+  const fillWithClaude = async () => {
+    setAiBusy(true);
+    setAiWarnings([]);
+    const r = await fillCaptureWithClaude(pageRef.current);
+    setAiBusy(false);
+    if ("error" in r) {
+      setStatus(r.error);
+      return;
+    }
+    const f = r.fields;
+    setForm((prev) => ({
+      title: f.title || prev.title,
+      companyName: f.companyName || prev.companyName,
+      location: f.location || (f.workMode === "REMOTE" ? "Remote" : prev.location),
+      postedOn: /^\d{4}-\d{2}-\d{2}$/.test(f.postedOn) ? f.postedOn : prev.postedOn,
+      compMin: f.payMin ? String(Math.round(f.payMin)) : prev.compMin,
+      compMax: f.payMax ? String(Math.round(f.payMax)) : prev.compMax,
+      descriptionText: f.descriptionText || prev.descriptionText,
+    }));
+    setAiWarnings(r.warnings);
+    setStatus("Filled by Claude from the page. Check every field, then save.");
+  };
 
   const applyPayload = async (payload: CapturePayload) => {
     jsonLdRef.current = payload.jsonLd;
+    pageRef.current = { pageTitle: payload.pageTitle, text: payload.text ?? "" };
     const d = await previewCapture(payload);
     setDraft(d);
     setUrl(d.url);
@@ -47,27 +80,30 @@ export function CaptureForm({ initial }: { initial: { url?: string; title?: stri
     });
   };
 
-  // Bookmarklet handshake: tell the opener we're ready, accept one payload from it.
+  // Bookmarklet: the page data arrives in the URL fragment (#d=…), which is
+  // never sent to a server and doesn't depend on window.opener (job sites
+  // with Cross-Origin-Opener-Policy, like Phenom-hosted careers sites, sever
+  // it). Read it once, then clear it from the address bar.
+  const bookmarkletRead = useRef(false);
   useEffect(() => {
-    if (initial.via !== "bookmarklet") return;
-    if (!window.opener) {
-      setStatus("The job site didn't allow the hand-off. Paste the job text below instead.");
+    // Once only: dev-mode effects run twice, and the fragment is cleared on the first read.
+    if (initial.via !== "bookmarklet" || bookmarkletRead.current) return;
+    bookmarkletRead.current = true;
+    const hash = window.location.hash;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (!hash.startsWith("#d=")) {
+      setStatus("The job page's data didn't come through. Paste the job text below instead.");
       setVia("paste");
       return;
     }
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== window.opener || e.data?.type !== "avani-capture") return;
-      window.removeEventListener("message", onMessage);
+    try {
+      const payload = JSON.parse(decodeURIComponent(hash.slice(3))) as CapturePayload;
       setStatus("Got the page. Check the details, then save.");
-      void applyPayload(e.data.payload as CapturePayload);
-    };
-    window.addEventListener("message", onMessage);
-    window.opener.postMessage({ type: "avani-capture-ready" }, "*");
-    const t = setTimeout(() => setStatus((s) => s ?? "Waiting for the job page… if nothing happens, paste the text below."), 2500);
-    return () => {
-      window.removeEventListener("message", onMessage);
-      clearTimeout(t);
-    };
+      void applyPayload(payload);
+    } catch {
+      setStatus("The job page's data was cut off. Paste the job text below instead.");
+      setVia("paste");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -124,9 +160,24 @@ export function CaptureForm({ initial }: { initial: { url?: string; title?: stri
           <Eyebrow index="02">Check, then save</Eyebrow>
           {status && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{status}</span>}
           {draft.missing.length > 0 && (
-            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
-              The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}. Fill those in.
-            </p>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
+                The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}.
+                {aiEnabled ? " Fill them in, or let Claude read the page." : " Fill those in."}
+              </p>
+              {aiEnabled && pageRef.current.text.trim().length >= 40 && (
+                <Button type="button" variant="secondary" size="sm" disabled={aiBusy} onClick={fillWithClaude}>
+                  {aiBusy ? "Reading…" : "Fill with Claude"}
+                </Button>
+              )}
+            </div>
+          )}
+          {aiWarnings.length > 0 && (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
+              {aiWarnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
           )}
           <div className="form-grid">
             <Field label="Title" htmlFor="cap-title">

@@ -3,9 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Eyebrow } from "@/components/platform/ds";
 
-/** The bookmarklet runs on the job page: collect, open Avani, hand over on "ready". */
+/**
+ * The bookmarklet runs on the job page: it collects the URL, title, visible
+ * text and JSON-LD, and opens Avani with that data in the URL fragment.
+ * (A postMessage hand-off failed on sites that set Cross-Origin-Opener-
+ * Policy, which severs window.opener.) Text is capped so the URL stays well
+ * inside browser limits; JSON-LD is dropped first if the page is huge.
+ */
 function bookmarkletFor(origin: string): string {
-  const src = `(()=>{const A=${JSON.stringify(origin)};const ld=[...document.querySelectorAll('script[type="application/ld+json"]')].map(s=>{try{return JSON.parse(s.textContent)}catch(e){return null}}).filter(Boolean);const p={url:location.href,pageTitle:document.title,text:(document.body.innerText||"").slice(0,60000),jsonLd:ld};const w=window.open(A+"/jobs/capture?via=bookmarklet","avani-capture");const h=e=>{if(e.origin===A&&e.data&&e.data.type==="avani-capture-ready"){w.postMessage({type:"avani-capture",payload:p},A);window.removeEventListener("message",h)}};window.addEventListener("message",h)})();`;
+  const src = `(()=>{const A=${JSON.stringify(origin)};const ld=[...document.querySelectorAll('script[type="application/ld+json"]')].map(s=>{try{return JSON.parse(s.textContent)}catch(e){return null}}).filter(Boolean);const p={url:location.href,pageTitle:document.title,text:(document.body.innerText||"").slice(0,40000),jsonLd:ld};let s=JSON.stringify(p);if(s.length>300000){p.jsonLd=[];s=JSON.stringify(p)}window.open(A+"/jobs/capture?via=bookmarklet#d="+encodeURIComponent(s),"_blank")})();`;
   return `javascript:${encodeURIComponent(src)}`;
 }
 

@@ -447,3 +447,25 @@ export async function refreshAwardQueryNow(id: string): Promise<ActionResult> {
     return fail(e);
   }
 }
+
+// --- Claude-assisted capture ------------------------------------------------------
+
+/**
+ * Read a job page's text with Claude when it has no structured job data.
+ * Runs server-side; the owner's contact details (from the master résumé, if
+ * imported) are scrubbed from the page text before it is sent.
+ */
+export async function fillCaptureWithClaude(input: { pageTitle?: string; text: string }) {
+  try {
+    await requireAuth();
+    const text = z.string().trim().min(40, "Not enough page text to read").max(60_000).parse(input.text);
+    const { extractJobWithClaude } = await import("@/lib/jobs/capture-ai");
+    const { resumeSchema } = await import("@/lib/jobs/resume-schema");
+    const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
+    const parsed = master ? resumeSchema.safeParse(master.data) : null;
+    const r = await extractJobWithClaude({ pageTitle: input.pageTitle, text, contact: parsed?.success ? parsed.data.contact : null });
+    return { ok: true as const, ...r };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Couldn't read the page" };
+  }
+}

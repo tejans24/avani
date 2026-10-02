@@ -127,3 +127,44 @@ test("paste capture adds a job; capturing a duplicate opens the existing one", a
   const [{ n }] = await queryRows(`SELECT count(*)::int AS n FROM "JobPosting" WHERE title ILIKE '%Medicaid%'`);
   expect(n).toBe(1);
 });
+
+test("bookmarklet works on a careers site that severs window.opener, and Claude fills a page with no job data", async ({ page, context }) => {
+  // A Phenom-style careers page: Cross-Origin-Opener-Policy set, no JSON-LD.
+  await context.route("https://careers.example.test/**", (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: "text/html",
+      headers: { "Cross-Origin-Opener-Policy": "same-origin" },
+      body: `<html><head><title>Senior Cloud Architect - Example Federal</title></head><body>
+<nav>Careers Home Search jobs</nav><h1>Senior Cloud Architect (Remote)</h1>
+<p>Design and build AWS platforms end-to-end for federal health programs. This role is remote.</p>
+<p>Requirements: 8+ years with AWS and Terraform.</p><footer>Cookie settings</footer></body></html>`,
+    })
+  );
+
+  await page.goto("/jobs/capture");
+  const href = await page.getByRole("link", { name: "Add to Avani" }).getAttribute("href");
+  const job = await context.newPage();
+  await job.goto("https://careers.example.test/job/R1");
+  const popupPromise = context.waitForEvent("page");
+  await job.evaluate((code) => {
+    (0, eval)(code);
+  }, decodeURIComponent(href!.replace(/^javascript:/, "")));
+  const popup = await popupPromise;
+  await popup.route("https://fonts.googleapis.com/**", (r) => r.abort());
+
+  await expect(popup.getByText("Got the page. Check the details, then save.")).toBeVisible();
+  // The data travelled in the URL fragment, which is cleared after reading.
+  expect(new URL(popup.url()).hash).toBe("");
+
+  await popup.getByRole("button", { name: "Fill with Claude" }).click();
+  await expect(popup.getByText("Filled by Claude from the page. Check every field, then save.")).toBeVisible();
+  await expect(popup.getByLabel("Title")).toHaveValue("Senior Cloud Architect");
+  await expect(popup.getByLabel("Company")).toHaveValue("Example Federal");
+  await expect(popup.getByLabel("Location")).toHaveValue("Remote");
+
+  await popup.getByRole("button", { name: "Save job" }).click();
+  await popup.waitForURL(/\/jobs\/[a-z0-9]+$/);
+  const [saved] = await queryRows(`SELECT "capturedVia", url FROM "JobPosting" WHERE title = 'Senior Cloud Architect'`);
+  expect(saved).toEqual({ capturedVia: "bookmarklet", url: "https://careers.example.test/job/R1" });
+});

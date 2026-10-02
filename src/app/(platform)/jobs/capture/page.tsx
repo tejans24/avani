@@ -18,7 +18,7 @@ export default function CapturePage({ searchParams }: { searchParams: { url?: st
         </div>
       </div>
       <div style={{ display: "grid", gap: 20 }}>
-        <CaptureForm initial={searchParams} />
+        <CaptureForm initial={searchParams} aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY) || process.env.TAILOR_MODE === "fake"} />
         <CaptureHelpers />
       </div>
     </>
