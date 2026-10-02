@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { candidateSlugs, chooseBoard, countPostings, probeUrl } from "@/lib/jobs/board-probe";
+import { MISSION_EMPLOYERS } from "@/lib/jobs/companies";
 import { CONTRACTORS } from "@/lib/jobs/contractors";
 
 describe("candidateSlugs", () => {
@@ -46,9 +47,9 @@ describe("chooseBoard", () => {
   });
 });
 
-describe("CONTRACTORS", () => {
-  it("has unique names", () => {
-    const names = CONTRACTORS.map((c) => c.name.toLowerCase());
+describe("company lists", () => {
+  it("have unique names across contractors and mission employers", () => {
+    const names = [...CONTRACTORS, ...MISSION_EMPLOYERS].map((c) => c.name.toLowerCase());
     expect(new Set(names).size).toBe(names.length);
   });
 });

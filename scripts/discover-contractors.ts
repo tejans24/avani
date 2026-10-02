@@ -50,8 +50,12 @@ async function fetchState(state: string, start: string, end: string, min: number
 async function main() {
   const args = process.argv.slice(2);
   const out = args.find((a) => a.endsWith(".json")) ?? "contractors-discovered.json";
-  const years = Number(args[args.indexOf("--years") + 1]) || 2;
-  const min = Number(args[args.indexOf("--min") + 1]) || 1_000_000;
+  const flag = (name: string, fallback: number) => {
+    const i = args.indexOf(name);
+    return i >= 0 && Number(args[i + 1]) > 0 ? Number(args[i + 1]) : fallback;
+  };
+  const years = flag("--years", 2);
+  const min = flag("--min", 1_000_000);
   const end = new Date();
   const start = new Date(end);
   start.setFullYear(end.getFullYear() - years);

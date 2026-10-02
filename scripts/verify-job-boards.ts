@@ -1,10 +1,13 @@
 /**
  * Verify which contractors can be fetched as job boards, politely.
  *
- *   npx tsx scripts/verify-job-boards.ts [out.json] [--include-clearance-heavy]
+ *   npx tsx scripts/verify-job-boards.ts [out.json] [--set contractors|mission|all]
+ *     [--include-clearance-heavy]
  *     [--workday "Company=https://tenant.wd5.myworkdayjobs.com/Site" ...]
  *
- * For each company in src/lib/jobs/contractors.ts, tries its likely board ids
+ * For each company in src/lib/jobs/contractors.ts (regional gov contractors)
+ * and/or src/lib/jobs/companies.ts (nationwide climate, health and civic
+ * employers; --set, default all), tries its likely board ids
  * on the documented public job APIs (Greenhouse, Lever, Ashby,
  * SmartRecruiters), one request at a time with a pause between requests.
  * For Workday career sites passed with --workday (copy the URL from the
@@ -16,6 +19,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { candidateSlugs, chooseBoard, countPostings, probeUrl, type BoardVerdict, type ProbeSource } from "../src/lib/jobs/board-probe";
+import { MISSION_EMPLOYERS } from "../src/lib/jobs/companies";
 import { CONTRACTORS } from "../src/lib/jobs/contractors";
 import { JOB_FINDER_USER_AGENT, isAllowed } from "../src/lib/jobs/robots";
 
@@ -81,8 +85,15 @@ async function main() {
     }
   });
 
+  const setIdx = args.indexOf("--set");
+  const set = setIdx >= 0 ? args[setIdx + 1] : "all";
+  const names = [
+    ...(set === "mission" ? [] : CONTRACTORS.filter((c) => includeCleared || !c.clearanceHeavy).map((c) => c.name)),
+    ...(set === "contractors" ? [] : MISSION_EMPLOYERS.map((e) => e.name)),
+  ];
+
   const report: { name: string; verdict: BoardVerdict }[] = [];
-  for (const c of CONTRACTORS.filter((c) => includeCleared || !c.clearanceHeavy)) {
+  for (const c of names.map((name) => ({ name }))) {
     const wd = workday.get(c.name.toLowerCase());
     const verdict = wd ? await checkWorkday(c.name, wd) : await probeCompany(c.name);
     report.push({ name: c.name, verdict });
