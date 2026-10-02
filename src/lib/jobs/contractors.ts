@@ -14,7 +14,17 @@
  */
 
 export type ContractorTier = "large" | "mid" | "small";
-export type ContractorFocus = "cms-health" | "civic-digital" | "federal-it" | "health-research" | "infrastructure" | "defense-intel";
+export type ContractorFocus =
+  | "cms-health"
+  | "civic-digital"
+  | "federal-it"
+  | "health-research"
+  | "infrastructure"
+  | "defense-intel"
+  | "climate-environment";
+
+/** Agencies a contractor is commonly associated with (hint; awards data confirms). */
+export type Agency = "EPA" | "NOAA" | "DOE" | "NASA" | "USGS" | "FEMA" | "CMS" | "VA";
 
 export type Contractor = {
   name: string;
@@ -24,6 +34,7 @@ export type Contractor = {
   region: "Baltimore" | "DC" | "NoVA" | "MD" | "Remote-first";
   clearanceHeavy?: boolean;
   nonprofit?: boolean;
+  agencies?: Agency[];
 };
 
 export const CONTRACTORS: Contractor[] = [
@@ -80,4 +91,21 @@ export const CONTRACTORS: Contractor[] = [
   { name: "Aquia", tier: "small", focus: ["federal-it", "civic-digital"], region: "Remote-first" },
   { name: "Code for America", tier: "mid", focus: ["civic-digital"], region: "Remote-first", nonprofit: true },
   { name: "U.S. Digital Response", tier: "small", focus: ["civic-digital"], region: "Remote-first", nonprofit: true },
+
+  // --- Climate & environment agencies (EPA, NOAA, DOE, NASA Earth science) ---
+  // Several are Maryland-based around NOAA (Silver Spring) and NASA Goddard (Greenbelt).
+  { name: "Eastern Research Group", tier: "mid", focus: ["climate-environment"], region: "DC", agencies: ["EPA"] },
+  { name: "Abt Global", tier: "large", focus: ["climate-environment", "health-research"], region: "MD", agencies: ["EPA"] },
+  { name: "Industrial Economics", tier: "small", focus: ["climate-environment"], region: "Remote-first", agencies: ["EPA", "NOAA"] },
+  { name: "RTI International", tier: "large", focus: ["climate-environment", "health-research"], region: "Remote-first", nonprofit: true, agencies: ["EPA"] },
+  { name: "Tetra Tech", tier: "large", focus: ["climate-environment", "infrastructure"], region: "NoVA", agencies: ["EPA", "FEMA"] },
+  { name: "I.M. Systems Group", tier: "mid", focus: ["climate-environment"], region: "MD", agencies: ["NOAA"] },
+  { name: "Earth Resources Technology", tier: "mid", focus: ["climate-environment"], region: "MD", agencies: ["NOAA"] },
+  { name: "Global Science & Technology", tier: "mid", focus: ["climate-environment"], region: "MD", agencies: ["NOAA", "NASA"] },
+  { name: "Science Systems and Applications", tier: "mid", focus: ["climate-environment"], region: "MD", agencies: ["NASA", "NOAA"] },
+  { name: "ADNET Systems", tier: "mid", focus: ["climate-environment"], region: "MD", agencies: ["NASA"] },
+  { name: "Lynker", tier: "mid", focus: ["climate-environment"], region: "Remote-first", agencies: ["NOAA"] },
+  { name: "Riverside Technology", tier: "small", focus: ["climate-environment"], region: "Remote-first", agencies: ["NOAA"] },
+  { name: "Science and Technology Corporation", tier: "small", focus: ["climate-environment"], region: "NoVA", agencies: ["NOAA", "NASA"] },
+  { name: "Dewberry", tier: "large", focus: ["infrastructure", "climate-environment"], region: "NoVA", agencies: ["FEMA"] },
 ];

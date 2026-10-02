@@ -10,11 +10,13 @@
  * scoring. Nothing here asserts which job system a company uses; that is
  * discovered and verified live.
  *
- * Government climate roles (EPA, NOAA, DOE and the national labs) come from
- * the USAJOBS source, not this list.
+ * Federal climate civil-service roles (EPA, NOAA, DOE) come from USAJOBS.
+ * The national labs do NOT post on USAJOBS: they are contractor-operated
+ * FFRDCs with their own career sites, listed below. Weapons labs (LANL,
+ * LLNL, Sandia) are left out: their roles almost all need Q/L clearances.
  */
 
-export type EmployerStage = "public" | "nonprofit" | "late-private" | "startup";
+export type EmployerStage = "public" | "nonprofit" | "late-private" | "startup" | "national-lab";
 export type EmployerFocus = "climate" | "conservation" | "energy-grid" | "earth-data" | "health" | "civic";
 
 export type Employer = {
@@ -57,6 +59,13 @@ export const MISSION_EMPLOYERS: Employer[] = [
   { name: "Voltus", stage: "startup", focus: ["energy-grid"] },
   { name: "Raptor Maps", stage: "startup", focus: ["energy-grid", "earth-data"] },
   { name: "Overstory", stage: "startup", focus: ["conservation", "earth-data"] },
+
+  // --- DOE national labs (own career sites; stable, mission-first) ---
+  { name: "National Renewable Energy Laboratory", stage: "national-lab", focus: ["energy-grid", "climate"] },
+  { name: "Pacific Northwest National Laboratory", stage: "national-lab", focus: ["energy-grid", "climate", "earth-data"] },
+  { name: "Lawrence Berkeley National Laboratory", stage: "national-lab", focus: ["energy-grid", "climate", "earth-data"] },
+  { name: "Oak Ridge National Laboratory", stage: "national-lab", focus: ["energy-grid", "earth-data"] },
+  { name: "Argonne National Laboratory", stage: "national-lab", focus: ["energy-grid", "climate"] },
 
   // --- Health & civic: nationwide remote ---
   { name: "Included Health", stage: "late-private", focus: ["health"] },

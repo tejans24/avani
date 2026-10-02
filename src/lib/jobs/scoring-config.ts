@@ -340,6 +340,10 @@ export const KNOWN_GOV_CONTRACTORS = [
   "caci", "gdit", "general dynamics information technology", "leidos", "saic",
   "booz allen", "booz allen hamilton", "actionet", "peraton", "maximus", "nava",
   "ad hoc", "skylight", "oddball", "truss", "coforma", "bixal", "fearless",
+  "eastern research group", "abt global", "abt associates", "industrial economics",
+  "tetra tech", "i.m. systems group", "imsg", "earth resources technology",
+  "global science & technology", "science systems and applications", "adnet",
+  "lynker", "riverside technology", "science and technology corporation", "dewberry",
 ];
 
 export const LANE_PATTERNS: Record<Exclude<Lane, "UNCLASSIFIED">, RegExp[]> = {
