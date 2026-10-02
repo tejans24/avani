@@ -128,17 +128,19 @@ test("paste capture adds a job; capturing a duplicate opens the existing one", a
   expect(n).toBe(1);
 });
 
-test("bookmarklet works on a careers site that severs window.opener, and Claude fills a page with no job data", async ({ page, context }) => {
-  // A Phenom-style careers page: Cross-Origin-Opener-Policy set, no JSON-LD.
+test("bookmarklet works on a Phenom-style careers site with no JSON-LD and a severed window.opener", async ({ page, context }) => {
+  // Like careers.icf.com: Cross-Origin-Opener-Policy set, no JSON-LD, the job
+  // only in the platform's own phApp object, and a generic <h1>.
   await context.route("https://careers.example.test/**", (r) =>
     r.fulfill({
       status: 200,
       contentType: "text/html",
       headers: { "Cross-Origin-Opener-Policy": "same-origin" },
-      body: `<html><head><title>Senior Cloud Architect - Example Federal</title></head><body>
-<nav>Careers Home Search jobs</nav><h1>Senior Cloud Architect (Remote)</h1>
-<p>Design and build AWS platforms end-to-end for federal health programs. This role is remote.</p>
-<p>Requirements: 8+ years with AWS and Terraform.</p><footer>Cookie settings</footer></body></html>`,
+      body: `<html><head><title>Job Details | Example Federal Careers</title>
+<meta property="og:site_name" content="Example Federal Careers">
+<script>window.phApp={ddo:{jobDetail:{data:{job:{title:"Senior Cloud Architect",cityStateCountry:"Remote, United States",postedDate:"2026-09-30",description:"<p>Design and build AWS platforms end-to-end for federal health programs.</p>"}}}}};</script>
+</head><body><nav>Careers Home Search jobs</nav><h1>Job Details</h1>
+<p>Design and build AWS platforms end-to-end for federal health programs.</p><footer>Cookie settings</footer></body></html>`,
     })
   );
 
@@ -156,14 +158,17 @@ test("bookmarklet works on a careers site that severs window.opener, and Claude 
   // The data travelled in the URL fragment, which is cleared after reading.
   await expect.poll(() => new URL(popup.url()).hash).toBe("");
 
-  // No job data on the page, so Claude reads it automatically (no click).
-  await expect(popup.getByText("Filled by Claude from the page. Check every field, then save.")).toBeVisible();
+  // Filled from the page itself; Claude isn't needed.
+  await expect(popup.getByText(/were taken from the page heading, title and address/)).toBeVisible();
   await expect(popup.getByLabel("Title")).toHaveValue("Senior Cloud Architect");
   await expect(popup.getByLabel("Company")).toHaveValue("Example Federal");
-  await expect(popup.getByLabel("Location")).toHaveValue("Remote");
+  await expect(popup.getByLabel("Location")).toHaveValue("Remote, United States");
+  await expect(popup.getByLabel("Posted")).toHaveValue("2026-09-30");
+  await expect(popup.getByText("Filled by Claude from the page.", { exact: false })).toHaveCount(0);
 
   await popup.getByRole("button", { name: "Save job" }).click();
   await popup.waitForURL(/\/jobs\/[a-z0-9]+$/);
-  const [saved] = await queryRows(`SELECT "capturedVia", url FROM "JobPosting" WHERE title = 'Senior Cloud Architect'`);
-  expect(saved).toEqual({ capturedVia: "bookmarklet", url: "https://careers.example.test/job/R1" });
+  const [saved] = await queryRows(`SELECT "capturedVia", url, "descriptionText" FROM "JobPosting" WHERE title = 'Senior Cloud Architect'`);
+  expect(saved).toMatchObject({ capturedVia: "bookmarklet", url: "https://careers.example.test/job/R1" });
+  expect(saved.descriptionText).toBe("Design and build AWS platforms end-to-end for federal health programs.");
 });

@@ -15,7 +15,7 @@ const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
 /**
  * Add a job from your own browser, for sites that block server fetching.
  * Entry points: the bookmarklet (opens this page and hands it the page data
- * by postMessage), the Android share target / iOS Shortcut (?url=&title=&text=),
+ * in the URL fragment), the Android share target / iOS Shortcut (?url=&title=&text=),
  * or paste. Nothing saves until "Save job".
  */
 export function CaptureForm({
@@ -184,6 +184,13 @@ export function CaptureForm({
                 </Button>
               )}
             </div>
+          )}
+          {draft.guessed.length > 0 && (
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+              No job data on the page, so {draft.guessed.map((m) => ({ title: "title", companyName: "company", location: "location" })[m]).join(", ")}{" "}
+              {draft.guessed.length === 1 ? "was" : "were"} taken from the page heading, title and address. Check{" "}
+              {draft.guessed.length === 1 ? "it" : "them"}.
+            </p>
           )}
           {aiWarnings.length > 0 && (
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", color: "var(--caution)" }}>

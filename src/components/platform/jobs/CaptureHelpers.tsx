@@ -5,13 +5,14 @@ import { Eyebrow } from "@/components/platform/ds";
 
 /**
  * The bookmarklet runs on the job page: it collects the URL, title, visible
- * text and JSON-LD, and opens Avani with that data in the URL fragment.
+ * text, JSON-LD, the <h1>, OpenGraph tags and Phenom's job object, and opens
+ * Avani with that data in the URL fragment.
  * (A postMessage hand-off failed on sites that set Cross-Origin-Opener-
  * Policy, which severs window.opener.) Text is capped so the URL stays well
  * inside browser limits; JSON-LD is dropped first if the page is huge.
  */
 function bookmarkletFor(origin: string): string {
-  const src = `(()=>{const A=${JSON.stringify(origin)};const ld=[...document.querySelectorAll('script[type="application/ld+json"]')].map(s=>{try{return JSON.parse(s.textContent)}catch(e){return null}}).filter(Boolean);const p={url:location.href,pageTitle:document.title,text:(document.body.innerText||"").slice(0,40000),jsonLd:ld};let s=JSON.stringify(p);if(s.length>300000){p.jsonLd=[];s=JSON.stringify(p)}window.open(A+"/jobs/capture?via=bookmarklet#d="+encodeURIComponent(s),"_blank")})();`;
+  const src = `(()=>{const A=${JSON.stringify(origin)};const ld=[...document.querySelectorAll('script[type="application/ld+json"]')].map(s=>{try{return JSON.parse(s.textContent)}catch(e){return null}}).filter(Boolean);const m=n=>{const e=document.querySelector('meta[property="'+n+'"],meta[name="'+n+'"]');return e?e.content:undefined};const h=document.querySelector("h1");let em;try{const j=window.phApp&&phApp.ddo&&phApp.ddo.jobDetail&&phApp.ddo.jobDetail.data&&phApp.ddo.jobDetail.data.job;if(j){em={};for(const k of ["title","companyName","location","cityStateCountry","cityState","city","state","country","description","postedDate","dateCreated","workplaceType","type"])if(typeof j[k]==="string")em[k]=j[k].slice(0,20000)}}catch(e){}const p={url:location.href,pageTitle:document.title,text:(document.body.innerText||"").slice(0,40000),jsonLd:ld,meta:{h1:h?h.innerText.slice(0,300):undefined,ogTitle:m("og:title"),siteName:m("og:site_name")},embedded:em};let s=JSON.stringify(p);if(s.length>300000){p.jsonLd=[];s=JSON.stringify(p)}window.open(A+"/jobs/capture?via=bookmarklet#d="+encodeURIComponent(s),"_blank")})();`;
   return `javascript:${encodeURIComponent(src)}`;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalJobUrl, findJobPosting, htmlToText, parseCapture } from "@/lib/jobs/capture";
+import { canonicalJobUrl, companyFromHost, companyFromPlatformPath, findJobPosting, htmlToText, parseCapture } from "@/lib/jobs/capture";
 
 describe("canonicalJobUrl", () => {
   it("strips tracking params and fragments", () => {
@@ -96,6 +96,94 @@ describe("parseCapture", () => {
   it("falls back to pasted text and lists what the owner must fill in", () => {
     const draft = parseCapture({ url: "https://careers.example.com/jobs/9", text: "  We are hiring a remote engineer.  " });
     expect(draft.descriptionText).toBe("We are hiring a remote engineer.");
-    expect(draft.missing).toEqual(["title", "companyName", "location"]);
+    expect(draft.missing).toEqual(["title", "location"]);
+    expect(draft).toMatchObject({ companyName: "Example", guessed: ["companyName"] });
+  });
+
+  it("reads a page with no JSON-LD from its heading, title and address", () => {
+    const draft = parseCapture({
+      url: "https://careers.icf.com/us/en/job/R2603278/Senior-Cloud-Architect-Remote",
+      pageTitle: "Senior Cloud Architect (Remote) in Reston, Virginia | ICF Careers",
+      meta: { h1: "Senior Cloud Architect (Remote)", siteName: "ICF Careers" },
+      text: "Careers Home\nSenior Cloud Architect (Remote)\nDesign AWS platforms.",
+    });
+    expect(draft).toMatchObject({
+      title: "Senior Cloud Architect",
+      companyName: "ICF",
+      location: "Remote",
+      remote: true,
+      missing: [],
+      guessed: ["title", "companyName", "location"],
+    });
+  });
+
+  it("prefers a careers platform's own job object (Phenom)", () => {
+    const draft = parseCapture({
+      url: "https://careers.icf.com/us/en/job/R1",
+      pageTitle: "Job Details | ICF",
+      meta: { h1: "Job Details" },
+      text: "Job Details\nApply now",
+      embedded: {
+        title: "Data Engineer",
+        cityStateCountry: "Reston, Virginia, United States",
+        description: "<p>Build pipelines.</p>",
+        postedDate: "2026-09-28",
+      },
+    });
+    expect(draft).toMatchObject({
+      title: "Data Engineer",
+      companyName: "ICF",
+      location: "Reston, Virginia, United States",
+      remote: false,
+      descriptionText: "Build pipelines.",
+    });
+    expect(draft.postedAt?.toISOString().slice(0, 10)).toBe("2026-09-28");
+  });
+
+  it("finds a Location line and skips generic headings", () => {
+    const draft = parseCapture({
+      url: "https://jobs.lever.co/acme/1",
+      pageTitle: "Careers",
+      meta: { h1: "Careers", ogTitle: "Acme Health - Platform Engineer" },
+      text: "Platform Engineer\nLocation: Baltimore, MD\nWe build things.",
+    });
+    expect(draft.title).toBe("Platform Engineer");
+    expect(draft.companyName).toBe("Acme Health");
+    expect(draft.location).toBe("Baltimore, MD");
+  });
+
+  it("splits a company-first page title (Workday style) the right way round", () => {
+    const draft = parseCapture({
+      url: "https://leidos.wd5.myworkdayjobs.com/External/job/Remote/Software-Architect_R-1",
+      pageTitle: "Leidos - Software Architect",
+      text: "Software Architect\nremote type\nFully Remote",
+    });
+    expect(draft).toMatchObject({ title: "Software Architect", companyName: "Leidos", location: "Remote" });
+  });
+
+  it("never guesses beyond structured data", () => {
+    const draft = parseCapture({
+      url: "https://x.example/job",
+      meta: { h1: "Something Else" },
+      jsonLd: [{ "@type": "JobPosting", title: "Engineer", hiringOrganization: { name: "Acme" }, jobLocation: { address: { addressLocality: "Towson", addressRegion: "MD" } } }],
+    });
+    expect(draft).toMatchObject({ title: "Engineer", companyName: "Acme", location: "Towson, MD", guessed: [] });
+  });
+});
+
+describe("companyFromPlatformPath", () => {
+  it("names the company from a board slug", () => {
+    expect(companyFromPlatformPath("https://jobs.lever.co/acme-health/1")).toBe("Acme Health");
+    expect(companyFromPlatformPath("https://careers.icf.com/x")).toBeUndefined();
+  });
+});
+
+describe("companyFromHost", () => {
+  it("uses the employer's domain, Workday tenants, and never a job platform", () => {
+    expect(companyFromHost("https://careers.icf.com/x")).toBe("ICF");
+    expect(companyFromHost("https://jobs.boozallen.com/x")).toBe("Boozallen");
+    expect(companyFromHost("https://leidos.wd5.myworkdayjobs.com/External/job/1")).toBe("Leidos");
+    expect(companyFromHost("https://boards.greenhouse.io/acme/jobs/1")).toBeUndefined();
+    expect(companyFromHost("https://www.linkedin.com/jobs/view/1/")).toBeUndefined();
   });
 });
