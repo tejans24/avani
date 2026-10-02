@@ -146,3 +146,19 @@ export function serializeForAi(payload: TailoringPayload, contact: Contact): str
   assertNoPersonalData(body, contact);
   return body;
 }
+
+/**
+ * The request split for prompt caching: the résumé part is identical for
+ * every posting (cacheable prefix), the posting part varies. Each part goes
+ * through the same check as serializeForAi.
+ */
+export function serializeForAiParts(payload: TailoringPayload, contact: Contact): { resume: string; posting: string } {
+  const { posting, tailoringNotes, ...resume } = payload;
+  const parts = {
+    resume: JSON.stringify(resume),
+    posting: JSON.stringify({ posting, tailoringNotes: tailoringNotes ?? null }),
+  };
+  assertNoPersonalData(parts.resume, contact);
+  assertNoPersonalData(parts.posting, contact);
+  return parts;
+}

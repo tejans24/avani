@@ -1,0 +1,25 @@
+{
+  "contact": { "firstName": "Jordan", "lastName": "Quill", "email": "jordan@example.com", "phone": "(410) 555-0142", "location": "Baltimore, MD", "citizenship": "U.S. Citizen", "links": [] },
+  "headline": "Principal Engineer and Architect",
+  "headlineOptions": ["Principal Engineer"],
+  "summary": "Engineer with 15 years building regulated systems on AWS for federal agencies and healthcare.",
+  "skills": [
+    { "group": "Languages", "text": "Python, TypeScript, Java" },
+    { "group": "Healthcare interoperability", "text": "FHIR, X12 270/271, Medicaid eligibility" }
+  ],
+  "experience": [
+    { "id": "firm", "organization": "Example Consultancy", "title": "Principal Engineer", "location": "Remote", "periods": [{ "start": "2021-03", "end": null }],
+      "bullets": [
+        { "id": "firm-1", "text": "Built event-driven eligibility services on AWS Lambda and Step Functions with FHIR integrations.", "skills": ["aws-serverless", "fhir-healthcare"] },
+        { "id": "firm-2", "text": "Ran proposals and hiring for a small consulting team.", "skills": [] },
+        { "id": "firm-3", "text": "Built RAG evaluation suites with guardrails for caseworker tools.", "skills": ["llm-rag"], "reserve": true }
+      ] },
+    { "id": "agency", "organization": "Example Digital Service", "title": "Senior Engineer", "location": "Washington, DC", "periods": [{ "start": "2016-01", "end": "2021-02" }],
+      "bullets": [
+        { "id": "agency-1", "text": "Modernized a legacy mainframe benefits system while both ran in production.", "skills": [] },
+        { "id": "agency-2", "text": "Mentored five engineers and ran code reviews.", "skills": [] }
+      ] }
+  ],
+  "clearance": ["Eligible for Public Trust."],
+  "education": [{ "id": "edu-1", "text": "B.S. Computer Science, Example University" }]
+}

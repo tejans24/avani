@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PersonalDataLeakError,
+  serializeForAiParts,
   assertNoPersonalData,
   buildTailoringPayload,
   scrubPersonal,
@@ -101,5 +102,16 @@ describe("assertNoPersonalData", () => {
 
   it("catches a phone number written without punctuation", () => {
     expect(() => assertNoPersonalData('{"t":"call 5550142"}', master.contact)).toThrow(PersonalDataLeakError);
+  });
+});
+
+describe("serializeForAiParts", () => {
+  it("splits the stable résumé part from the posting part, both checked", () => {
+    const payload = buildTailoringPayload({ master, posting, tailoringNotes: "Lead with FHIR" });
+    const parts = serializeForAiParts(payload, master.contact);
+    expect(JSON.parse(parts.resume)).not.toHaveProperty("posting");
+    expect(JSON.parse(parts.posting)).toMatchObject({ posting: { company: "Nava" }, tailoringNotes: "Lead with FHIR" });
+    const leaky = { ...payload, tailoringNotes: "email me at jordan.quill@example.com" };
+    expect(() => serializeForAiParts(leaky, master.contact)).toThrow(PersonalDataLeakError);
   });
 });
