@@ -11,6 +11,16 @@
 
 export const SCORING_VERSION = 1;
 
+/*
+ * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
+ * design authority; mission (public benefit, health, infrastructure,
+ * environment, civic); remote or within ~1 hr of Baltimore; stable,
+ * lender-recognizable pay in the $185–215K range (never under $180K); a
+ * competent person above. Dealbreakers: daily status reporting, narrow ticket
+ * work, domain requirements that can't be honestly met, day-one certs with no
+ * path, vendor-deliverable oversight programs, 50%+ travel.
+ */
+
 export type Lane =
   | "GOV_CONTRACTOR"
   | "COMMERCIAL_PLATFORM"
@@ -112,15 +122,61 @@ export const HARD_FILTERS = {
     /\b(staffing|recruiting) (firm|agency|partner)\b/i,
     /\bc2c\b|\bcorp[- ]to[- ]corp\b/i,
   ],
+
+  /**
+   * Pay: reject only when the whole posted range is under the floor ("below
+   * $180K the trade stops making sense"). A range that straddles it is scored.
+   */
+  compFloorCents: 180_000_00,
+
+  /** Dealbreaker: heavy travel. */
+  travelRejectPatterns: [
+    /\b(up to |approximately |about |~)?([5-9]\d|100)\s?%\s*(of the time )?(travel|travelling|traveling)\b/i,
+    /\btravel (up to |approximately |about |~)?([5-9]\d|100)\s?%/i,
+  ],
+
+  /** Dealbreaker: daily status reporting as a core duty. */
+  statusReportingRejectPatterns: [
+    /\b(prepare|provide|produce|submit|deliver)s? daily (status|progress) reports?\b/i,
+    /\bdaily (status|progress) reports? (to|for) (the )?(client|government|cor|pm|program manager)\b/i,
+  ],
+
+  /**
+   * Dealbreaker: a certification required on day one with no path around it.
+   * Passes when the posting allows obtaining it after hire.
+   */
+  requiredCertRejectPatterns: [
+    /\b(must|required to) (currently )?(hold|have|possess)[^.]{0,60}\b(security\+|cissp|cism|casp\+?|ccsp|pmp|itil|ccna|aws certified[\w -]*|azure (administrator|solutions architect)[\w -]*)(?!\w)/i,
+    /\b(dod|doD) (8570|8140)\b[^.]{0,60}\b(required|must)\b/i,
+    /\biat (level )?(ii|iii|2|3)\b[^.]{0,40}\brequired\b/i,
+  ],
+  requiredCertAllowPatterns: [
+    /\b(within|in) (the first )?\d+ (days|months)( of (hire|start|employment))?\b/i,
+    /\b(ability|able|willing(ness)?) to obtain\b[^.]{0,40}\b(cert|certification|security\+|cissp)/i,
+  ],
+
+  /**
+   * Mission is a must-have: these industries are rejected outright. Positive
+   * mission signals are scored below (MISSION_RULES); an unclear mission is
+   * flagged, not rejected.
+   */
+  antiMissionPatterns: [
+    /\b(ad[- ]?tech|programmatic advertising|demand[- ]side platform|real[- ]time bidding|ad (network|exchange)s?)\b/i,
+    /\b(sports betting|online casino|igaming|gambling)\b/i,
+  ],
 };
 
 // ---------------------------------------------------------------------------
 // Scoring: start at BASE_SCORE, add every matching rule's points, cap each
 // category, clamp to 0–100. Every applied rule is recorded in the breakdown
 // with the text that triggered it.
+//
+// Weighting follows the owner's criteria: scope and design authority matter
+// most (the "miserable in six months" predictor), then mission and pay, then
+// the kind of work (AI, modernization, team size), then stack and tempo.
 // ---------------------------------------------------------------------------
 
-export const BASE_SCORE = 50;
+export const BASE_SCORE = 45;
 
 export type Rule = {
   id: string;
@@ -131,87 +187,131 @@ export type Rule = {
 
 /** Comp uses the posted range midpoint (annualized). Highest band wins. */
 export const COMP_BANDS = [
-  { minCents: 200_000_00, points: 20, label: "Midpoint ≥ $200K" },
-  { minCents: 180_000_00, points: 12, label: "Midpoint ≥ $180K" },
-  { minCents: 160_000_00, points: 0, label: "Midpoint $160–180K" },
-  { minCents: 0, points: -15, label: "Midpoint < $160K" },
+  { minCents: 200_000_00, points: 15, label: "Midpoint ≥ $200K" },
+  { minCents: 185_000_00, points: 12, label: "Midpoint in the $185–200K target" },
+  { minCents: 180_000_00, points: 2, label: "Midpoint $180–185K (thin)" },
+  { minCents: 0, points: -10, label: "Midpoint < $180K (range straddles the floor)" },
 ] as const;
 /** No posted range: neutral score, but flagged in the UI. */
 export const COMP_MISSING_FLAG = "No comp range posted";
 
-export const CATEGORY_CAPS: Record<
-  "comp" | "shape" | "stack" | "redFlags",
-  { min: number; max: number }
-> = {
-  comp: { min: -15, max: 20 },
-  shape: { min: -20, max: 15 },
-  stack: { min: 0, max: 25 },
+export type Category = "scope" | "mission" | "comp" | "work" | "stack" | "redFlags";
+
+export const CATEGORY_CAPS: Record<Category, { min: number; max: number }> = {
+  scope: { min: -25, max: 20 },
+  mission: { min: 0, max: 12 },
+  comp: { min: -10, max: 15 },
+  work: { min: -10, max: 15 },
+  stack: { min: 0, max: 10 },
   redFlags: { min: -30, max: 0 },
 };
 
-/** Role shape: IC engineer on a team with a manager and defined work. */
-export const SHAPE_RULES: Rule[] = [
-  { id: "fully-remote", label: "Explicitly fully remote", points: 4,
-    pattern: /\b(fully remote|100% remote|remote[- ]first)\b/i },
-  { id: "ic-engineer-title", label: "IC engineer title", points: 6,
-    pattern: /\b(senior|staff|lead)?\s*(software|platform|data|backend|full[- ]?stack|cloud) engineer\b/i },
-  { id: "architect-title", label: "Architect title", points: -5,
-    pattern: /\barchitect\b/i },
-  { id: "lead-title", label: "Tech lead / lead role", points: -4,
-    pattern: /\b(tech(nical)? lead|team lead|engineering lead)\b/i },
+/**
+ * Scope + design authority: own a system or product end to end, hands-on,
+ * deciding how it's built. Architect or lead titles are fine when the job
+ * also writes code; architect-only and narrow ticket work are not.
+ */
+export const SCOPE_RULES: Rule[] = [
+  { id: "end-to-end", label: "End-to-end ownership of a system or product", points: 8,
+    pattern: /\b(end[- ]to[- ]end|own (the )?(entire|whole|full)|full (technical )?ownership|from (discovery|concept|design) (through|to) (production|delivery|launch))\b/i },
+  { id: "design-authority", label: "Decides how it's built (architecture / technical direction)", points: 6,
+    pattern: /\b(architecture decisions|technical direction|design and (build|implement|develop)|architect and (build|implement|develop)|set(ting)? the technical (strategy|direction)|technical decision[- ]mak(ing|er))\b/i },
+  { id: "hands-on", label: "Explicitly hands-on", points: 5,
+    pattern: /(?<!\bnot (a |an )?)(?<!\bno )\b(hands[- ]on|write (production )?code|coding (architect|lead)|player[- ]coach|individual contributor)\b/i },
+  { id: "greenfield-or-rebuild", label: "Greenfield build or full rebuild", points: 4,
+    pattern: /\b(greenfield|build (it |the platform |the system )?from (the ground up|scratch)|net[- ]new (platform|system|product))\b/i },
+  { id: "architect-only", label: "Architect-only (no coding)", points: -12,
+    pattern: /\b(not a (hands[- ]on|coding) role|no (hands[- ]on )?coding|will not (write|be writing) code|enterprise architect|architecture (review )?board|governance (artifacts|documentation) (only|primarily))\b/i },
+  { id: "narrow-ticket-work", label: "Narrow ticket / maintenance work", points: -15,
+    pattern: /\b(work (assigned|on assigned) (tickets|stories)|resolve (help ?desk |service ?now |jira )?tickets|(bug fixes|break[- ]fix) (and|&) (enhancements|maintenance)|operations and maintenance \(o&m\)|sustainment (and|&) maintenance)\b/i },
   { id: "people-manager", label: "People-management role", points: -8,
-    pattern: /\b(engineering manager|manage a team of|direct reports)\b/i },
-  { id: "ticket-driven", label: "Defined, ticket-driven work", points: 4,
-    pattern: /\b(jira|user stories|sprint(s)?|scrum|agile team|backlog)\b/i },
-  { id: "reports-to-manager", label: "Reports to an engineering manager", points: 3,
-    pattern: /\breports? to (the |an? )?(engineering manager|software manager|director)\b/i },
-  { id: "contingent-award", label: "Contingent upon contract award", points: -10,
+    pattern: /\b(engineering manager|manage a team of|direct reports|performance reviews for)\b/i },
+  { id: "vendor-oversight", label: "Oversight of other vendors' deliverables", points: -15,
+    pattern: /\b((oversee|monitor|track|review) (other )?(vendor|contractor)s?'? deliverables|vendor management|iv&v|independent verification and validation|integrated master schedule)\b/i },
+];
+
+/** Mission you'd explain to your kids. Gov/health/climate lanes get credit too. */
+export const MISSION_RULES: Rule[] = [
+  { id: "health", label: "Health / patients / care", points: 6,
+    pattern: /\b(patients?|health ?care|public health|medicaid|medicare|clinical|care delivery|veterans'? (health|benefits))\b/i },
+  { id: "public-benefit", label: "Public benefit / civic services", points: 6,
+    pattern: /\b(public benefit|civic|benefits (delivery|programs)|social services|snap|unemployment insurance|veterans|grants?|nonprofit|non-profit|government services|serve (the public|residents|citizens))\b/i },
+  { id: "environment", label: "Environment / climate / conservation", points: 6,
+    pattern: /\b(climate|conservation|environment(al)?|clean energy|decarboni[sz]|biodiversity|land trust)\b/i },
+  { id: "infrastructure", label: "Public infrastructure", points: 4,
+    pattern: /\b(public infrastructure|transportation|transit|water systems|broadband|critical infrastructure)\b/i },
+];
+export const MISSION_UNCLEAR_FLAG = "Mission unclear from the posting";
+/** Lanes that count as mission even with no keyword hit. */
+export const MISSION_LANES: Lane[] = ["GOV_CONTRACTOR", "HEALTH_SYSTEM", "CLIMATE_CONSERVATION"];
+
+/** The kind of work: AI in the core, modernization/integration, team size. */
+export const WORK_RULES: Rule[] = [
+  { id: "ai-core", label: "AI as part of the work (LLMs, RAG, evaluation)", points: 8,
+    pattern: /\b(llms?|large language models?|rag|retrieval[- ]augmented|generative ai|genai|ai (agents?|platform|systems)|model evaluation|evals|guardrails|prompt engineering|machine learning (platform|systems))\b/i },
+  { id: "legacy-modernization", label: "Legacy modernization", points: 6,
+    pattern: /\b(legacy (system|application|modernization|migration)s?|moderni[sz](e|ation|ing)|mainframe|cobol|strangler|migrat(e|ion|ing) (off|from) (legacy|on[- ]?prem))\b/i },
+  { id: "integration-heavy", label: "Integration-heavy (APIs, interoperability, data exchange)", points: 5,
+    pattern: /\b(interoperability|systems integration|integrat(e|ion|ing) (with )?(multiple|disparate|legacy|external|third[- ]party) (systems|sources|partners)|data exchange|fhir|hl7|x12|edi)\b/i },
+  { id: "small-team", label: "Small team where breadth matters", points: 4,
+    pattern: /\b(small (engineering |product |cross[- ]functional )?team|team of ([3-9]|1[0-2])\b|tight[- ]knit team)\b/i },
+  { id: "large-program", label: "Very large program (breadth is noise)", points: -5,
+    pattern: /\b(team of (\d{3,}|[2-9]\d)|\d{3,}\+? (engineers|developers|person program)|one of (dozens|hundreds) of)\b/i },
+  { id: "contingent-award", label: "Contingent upon contract award", points: -8,
     pattern: /\b(contingent (up)?on (contract )?award|pending (contract )?award)\b/i },
-  { id: "period-of-performance", label: "Period of performance / option years", points: 5,
+  { id: "period-of-performance", label: "Awarded work with period of performance / option years", points: 4,
     pattern: /\b(period of performance|option years?|base year plus)\b/i },
 ];
 
-/** Stack match: each distinct hit counts once; category capped at +25. */
+/** Stack match: a light tiebreaker now; each distinct hit counts once. */
 export const STACK_RULES: Rule[] = [
-  { id: "aws-serverless", label: "AWS serverless (API Gateway, Lambda, Step Functions)", points: 5,
+  { id: "aws-serverless", label: "AWS serverless (API Gateway, Lambda, Step Functions)", points: 3,
     pattern: /\b(api gateway|lambda|step functions)\b/i },
-  { id: "aws-containers", label: "AWS containers (ECS/EKS)", points: 3,
+  { id: "aws-containers", label: "AWS containers (ECS/EKS)", points: 2,
     pattern: /\b(ecs|eks|fargate)\b/i },
-  { id: "aws-data", label: "AWS data (DynamoDB, Glue, Redshift, Athena)", points: 4,
+  { id: "aws-data", label: "AWS data (DynamoDB, Glue, Redshift, Athena)", points: 2,
     pattern: /\b(dynamodb|aws glue|redshift|athena)\b/i },
-  { id: "event-driven", label: "Event-driven systems / Kafka", points: 5,
+  { id: "event-driven", label: "Event-driven systems / Kafka", points: 3,
     pattern: /\b(event[- ]driven|kafka|kinesis|eventbridge|pub\/sub|message queues?)\b/i },
-  { id: "canonical-data-model", label: "Canonical data models", points: 3,
+  { id: "canonical-data-model", label: "Canonical data models", points: 2,
     pattern: /\b(canonical (data )?model|data model(l)?ing|master data)\b/i },
-  { id: "fhir-healthcare", label: "FHIR / healthcare interoperability", points: 5,
+  { id: "fhir-healthcare", label: "FHIR / healthcare interoperability", points: 3,
     pattern: /\b(fhir|hl7|interoperability|ehr|cms\.gov|medicaid|medicare)\b/i },
-  { id: "oauth-oidc", label: "OAuth2 / OIDC", points: 3,
+  { id: "oauth-oidc", label: "OAuth2 / OIDC", points: 2,
     pattern: /\b(oauth ?2?|openid connect|oidc|login\.gov)\b/i },
-  { id: "llm-rag", label: "RAG / LLM evaluation and guardrails", points: 5,
+  { id: "llm-rag", label: "RAG / LLM evaluation and guardrails", points: 3,
     pattern: /\b(rag|retrieval[- ]augmented|llm|guardrails|evals?|generative ai)\b/i },
-  { id: "typescript-react", label: "TypeScript / React", points: 3,
+  { id: "typescript-react", label: "TypeScript / React", points: 2,
     pattern: /\b(typescript|react)\b/i },
-  { id: "python", label: "Python", points: 3, pattern: /\bpython\b/i },
-  { id: "postgres", label: "Postgres", points: 2, pattern: /\b(postgres(ql)?)\b/i },
+  { id: "python", label: "Python", points: 2, pattern: /\bpython\b/i },
+  { id: "postgres", label: "Postgres", points: 1, pattern: /\b(postgres(ql)?)\b/i },
 ];
 
 /** Red flags: each distinct hit counts once; category capped at −30. */
 export const RED_FLAG_RULES: Rule[] = [
-  { id: "fast-paced-startup", label: "\"Fast-paced startup\"", points: -6,
-    pattern: /\bfast[- ]paced (startup|start-up|environment)\b/i },
-  { id: "many-hats", label: "\"Wear many hats\"", points: -6,
-    pattern: /\bwear (many|multiple) hats\b/i },
+  { id: "fast-paced-startup", label: "\"Fast-paced startup\" (pay stability)", points: -5,
+    pattern: /\bfast[- ]paced (startup|start-up)\b/i },
   { id: "founding", label: "Founding / first engineering hire", points: -8,
     pattern: /\b(founding engineer|first (engineering )?hire|engineer #?\s?[1-5]\b)/i },
-  { id: "on-call-heavy", label: "Heavy on-call", points: -6,
-    pattern: /\b(24\/7 on[- ]call|on[- ]call (rotation )?(every|weekly)|pager duty heavy)\b/i },
-  { id: "series-a-c", label: "Series A–C company", points: -6,
+  { id: "series-a-c", label: "Series A–C (not lender-recognizable yet)", points: -6,
     pattern: /\bseries [abc]\b/i },
-  { id: "java-csharp-expert", label: "Expert Java / C# required", points: -8,
+  { id: "pager-tempo", label: "Pager-driven tempo (\"zero downtime\" identity, 24/7 on-call)", points: -8,
+    pattern: /\b(zero (downtime|outages)|no downtime|24\/7 on[- ]call|on[- ]call (rotation )?(every|weekly)|always[- ]on support|99\.99+% (uptime|availability) (is|are) (critical|mandatory|required))\b/i },
+  { id: "weekly-status-reporting", label: "Recurring status reporting", points: -4,
+    pattern: /\b(weekly|bi-?weekly) (status|progress) reports?\b/i },
+  { id: "java-csharp-expert", label: "Expert Java / C# required", points: -6,
     pattern: /\b(expert|deep|extensive|\d+\+ years)[^.]{0,40}\b(java|c#|\.net)\b/i },
 ];
-/** "Ownership" counts as a red flag only when it appears this often or more. */
-export const OWNERSHIP_REPEAT = { threshold: 3, points: -5, label: "\"Ownership\" repeated" };
+
+/**
+ * Domain requirements the owner can't honestly meet (e.g. the utilities
+ * posting). Flagged with a penalty rather than rejected, because "nice to
+ * have" and "required" read alike; the owner decides.
+ */
+export const DOMAIN_GAP_RULES: Rule[] = [
+  { id: "utilities-domain", label: "Requires utilities-industry experience", points: -10,
+    pattern: /\b(experience|background) (in|with) (the )?(electric |gas |water )?utilit(y|ies)( industry| sector)?\b/i },
+];
 
 // ---------------------------------------------------------------------------
 // Lanes: highest total hits wins; ties → UNCLASSIFIED. USAJOBS postings and
@@ -247,15 +347,24 @@ export const LANE_PATTERNS: Record<Exclude<Lane, "UNCLASSIFIED">, RegExp[]> = {
 export const FEDERAL_VOCABULARY_LANES: Lane[] = ["GOV_CONTRACTOR"];
 
 // ---------------------------------------------------------------------------
-// Per-company interview questions (JobCompany.questions keys).
+// Verify on the call: must-haves no posting can prove. Shown as a checklist
+// on every job; answers live in JobCompany.questions. An offer should not be
+// accepted with "competentManager" unanswered or "no".
 // ---------------------------------------------------------------------------
 
 export const INTERVIEW_QUESTIONS = [
-  { key: "primeOrSub", label: "Prime or sub on the contract?" },
-  { key: "awardedOrContingent", label: "Awarded, or contingent upon award?" },
-  { key: "optionYears", label: "Period of performance and option years remaining?" },
-  { key: "architectureOwner", label: "Who owns architecture decisions?" },
-  { key: "aiToolsApproved", label: "Which AI coding tools are approved?" },
-  { key: "outsideWorkPolicy", label: "Policy on outside work (keeping Avani)?" },
-  { key: "ipCarveOut", label: "IP assignment carve-out for prior/outside work?" },
+  { key: "competentManager", label: "Who would I report to, and do they decide on technical grounds and use what I know?", mustHave: true },
+  { key: "wholeProblemScope", label: "Do I own a system or product end to end, or a slice of one?", mustHave: true },
+  { key: "designAuthority", label: "Do I write code and decide how it's built?", mustHave: true },
+  { key: "outsideWorkPolicy", label: "Outside work allowed? Any conflict with commercial healthcare clients?", mustHave: true },
+  { key: "ipCarveOut", label: "IP assignment carve-out for prior and outside work?", mustHave: true },
+  { key: "teamSize", label: "How big is the team and the program?", mustHave: false },
+  { key: "opsTempo", label: "On-call and uptime expectations in practice?", mustHave: false },
+  { key: "statusReporting", label: "How much status reporting is part of the job?", mustHave: false },
+  { key: "certRequirements", label: "Any certifications required, and is there a grace period?", mustHave: false },
+  { key: "aiInTheWork", label: "Is AI part of the actual work? Which AI coding tools are approved?", mustHave: false },
+  { key: "primeOrSub", label: "Prime or sub on the contract?", mustHave: false },
+  { key: "awardedOrContingent", label: "Awarded, or contingent upon award?", mustHave: false },
+  { key: "optionYears", label: "Period of performance and option years remaining?", mustHave: false },
+  { key: "level", label: "What level is this, and what does the next level look like?", mustHave: false },
 ] as const;
