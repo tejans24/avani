@@ -69,7 +69,9 @@ export function buildAwardSearchBody(q: AwardQueryDef, now: Date, page: number) 
           : { type: "awarding", tier: "toptier", name: q.agencyName },
       ],
       naics_codes: { require: AWARD_NAICS },
-      time_period: [{ start_date: isoDay(start), end_date: isoDay(now) }],
+      // New awards only: without it, any old contract with a recent
+      // modification matches (verified against the live API).
+      time_period: [{ start_date: isoDay(start), end_date: isoDay(now), date_type: "new_awards_only" }],
     },
     fields: AWARD_FIELDS,
     sort: "Award Amount",

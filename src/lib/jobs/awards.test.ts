@@ -20,7 +20,7 @@ describe("buildAwardSearchBody", () => {
       { type: "awarding", tier: "subtier", name: "National Oceanic and Atmospheric Administration", toptier_name: "Department of Commerce" },
     ]);
     expect(body.filters.award_type_codes).toEqual(["A", "B", "C", "D"]);
-    expect(body.filters.time_period).toEqual([{ start_date: "2026-07-04", end_date: "2026-10-02" }]);
+    expect(body.filters.time_period).toEqual([{ start_date: "2026-07-04", end_date: "2026-10-02", date_type: "new_awards_only" }]);
     expect(body.page).toBe(2);
   });
 
