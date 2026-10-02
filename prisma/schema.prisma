@@ -473,8 +473,11 @@ enum JobLane {
   UNCLASSIFIED
 }
 
+/// OCCASIONAL_HYBRID = remote by default with occasional in-office days
+/// (monthly/quarterly/as needed). HYBRID = set in-office days every week.
 enum WorkMode {
   REMOTE
+  OCCASIONAL_HYBRID
   HYBRID
   ONSITE
   UNKNOWN

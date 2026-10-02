@@ -24,10 +24,58 @@ export type Lane =
 // scored, so rejections can be reviewed under "Filtered out").
 // ---------------------------------------------------------------------------
 
+export type WorkMode = "REMOTE" | "OCCASIONAL_HYBRID" | "HYBRID" | "ONSITE" | "UNKNOWN";
+
+/**
+ * Work-mode classification, checked in order: the first group with a match
+ * decides. Source-provided flags (e.g. Greenhouse "Remote" location, Workday
+ * remoteType) are applied first; these patterns read the description.
+ */
+export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
+  {
+    mode: "ONSITE",
+    patterns: [
+      /\b(100% (on[- ]?site|in[- ]office)|fully on[- ]?site|on[- ]?site (position|role) (only)?|not (a )?remote|no remote)\b/i,
+    ],
+  },
+  {
+    mode: "HYBRID",
+    patterns: [
+      /\b[2-5]\s*(\+\s*)?(days?|x) (a|per|each) week (in|on)[- ]?(the )?(office|site)\b/i,
+      /\b(in[- ]office|on[- ]?site) [2-5] days\b/i,
+    ],
+  },
+  {
+    mode: "OCCASIONAL_HYBRID",
+    patterns: [
+      /\b(occasional|periodic|infrequent|as[- ]needed) (travel|visits?|on[- ]?site|in[- ]office|meetings?)\b/i,
+      /\b(once|1-2 days?|one day|a few days) (a|per) (month|quarter)\b/i,
+      /\b(monthly|quarterly) (on[- ]?site|in[- ]person|team) (visits?|meetings?|days?|gatherings?)\b/i,
+      /\bremote[^.]{0,60}\b(occasional|as needed)\b/i,
+    ],
+  },
+  // Generic "hybrid" with no occasional qualifier → assume regular hybrid.
+  { mode: "HYBRID", patterns: [/\bhybrid\b/i] },
+  {
+    mode: "REMOTE",
+    patterns: [/\b(fully remote|100% remote|remote[- ]first|remote \(us\)|remote[- ]us|work from anywhere in the us)\b/i, /\bremote\b/i],
+  },
+];
+
 export const HARD_FILTERS = {
   maxPostedAgeDays: 30,
 
-  /** Remote is always fine if US-based. Hybrid/onsite must be one of these. */
+  /**
+   * Default: remote, or remote with occasional in-office days at a
+   * commutable office. Regular hybrid and onsite are filtered out (still
+   * viewable under "Filtered out"). UNKNOWN passes but is flagged.
+   */
+  allowedWorkModes: ["REMOTE", "OCCASIONAL_HYBRID", "UNKNOWN"] as WorkMode[],
+  /** Work modes that also require the office to be in commutableLocations. */
+  workModesNeedingCommute: ["OCCASIONAL_HYBRID", "HYBRID", "ONSITE"] as WorkMode[],
+  workModeUnknownFlag: "Work arrangement not stated",
+
+  /** Offices within ~1 hr of Baltimore, matched against the location string. */
   commutableLocations: [
     // ~1 hr of Baltimore. Matched against the posting's location string.
     "baltimore", "towson", "columbia, md", "ellicott city", "catonsville",
@@ -103,6 +151,8 @@ export const CATEGORY_CAPS: Record<
 
 /** Role shape: IC engineer on a team with a manager and defined work. */
 export const SHAPE_RULES: Rule[] = [
+  { id: "fully-remote", label: "Explicitly fully remote", points: 4,
+    pattern: /\b(fully remote|100% remote|remote[- ]first)\b/i },
   { id: "ic-engineer-title", label: "IC engineer title", points: 6,
     pattern: /\b(senior|staff|lead)?\s*(software|platform|data|backend|full[- ]?stack|cloud) engineer\b/i },
   { id: "architect-title", label: "Architect title", points: -5,
