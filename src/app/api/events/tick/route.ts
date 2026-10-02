@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { runDetectors } from "@/lib/events/detectors";
 import { dispatchPending } from "@/lib/events/dispatch";
 import { runJobRefresh } from "@/lib/jobs/refresh";
+import { runAwardsRefresh } from "@/lib/jobs/awards-refresh";
 import "@/lib/events/register";
 
 export const runtime = "nodejs";
@@ -13,7 +14,8 @@ export const maxDuration = 60;
 /**
  * The clock. Vercel cron hits this every 15 minutes (vercel.json). Three jobs:
  * 1. run detectors (turn dates crossing into events)
- * 2. refresh a couple of due job boards (JOBS_REFRESH=off disables)
+ * 2. refresh a couple of due job boards and one federal-awards agency
+ *    (JOBS_REFRESH=off disables)
  * 3. sweep + dispatch unprocessed events (this is also the retry path)
  *
  * Auth: TICK_SECRET query param or Vercel cron's Authorization header.
@@ -46,11 +48,23 @@ export async function GET(req: Request) {
 
   // Job finder: refresh a few due boards per tick (each board ~daily). A
   // failure here must never stop the rest of the tick.
-  let jobs: { boards: number; failed: number; announced: number } | { error: string } = { boards: 0, failed: 0, announced: 0 };
+  let jobs: { boards: number; failed: number; announced: number; awardQueries: number } | { error: string } = {
+    boards: 0,
+    failed: 0,
+    announced: 0,
+    awardQueries: 0,
+  };
   if (process.env.JOBS_REFRESH !== "off") {
     try {
       const run = await runJobRefresh({ now, maxBoards: 2 });
-      jobs = { boards: run.boards.length, failed: run.boards.filter((b) => !b.ok).length, announced: run.announced };
+      // One federal-awards agency per tick (each agency about daily).
+      const awards = await runAwardsRefresh({ now, maxQueries: 1 });
+      jobs = {
+        boards: run.boards.length,
+        failed: run.boards.filter((b) => !b.ok).length + awards.filter((a) => !a.ok).length,
+        announced: run.announced,
+        awardQueries: awards.length,
+      };
     } catch (e) {
       jobs = { error: e instanceof Error ? e.message : String(e) };
     }

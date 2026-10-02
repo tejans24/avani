@@ -1,6 +1,7 @@
 import {
   BASE_SCORE,
   CATEGORY_CAPS,
+  CURRENT_AWARD_POINTS,
   COMP_BANDS,
   COMP_MISSING_FLAG,
   DOMAIN_GAP_RULES,
@@ -42,6 +43,8 @@ export type ScoringInput = {
   workModeHint?: WorkMode | null;
   isStaffingAgency?: boolean;
   laneOverride?: Lane | null;
+  /** The company's strongest current federal award, if any (awards.ts). */
+  currentAward?: { summary: string } | null;
 };
 
 export type BreakdownEntry = {
@@ -209,6 +212,15 @@ export function scorePosting(input: ScoringInput, now: Date = new Date()): Scori
     breakdown.push({ category: "mission", rule: "mission-lane", label: `Mission lane (${lane})`, points: 6, evidence: input.companyName });
   }
   applyRules("work", WORK_RULES, text, breakdown);
+  if (input.currentAward) {
+    breakdown.push({
+      category: "work",
+      rule: "current-award",
+      label: "Company holds a current federal award",
+      points: CURRENT_AWARD_POINTS,
+      evidence: input.currentAward.summary,
+    });
+  }
   applyRules("stack", STACK_RULES, text, breakdown);
   applyRules("redFlags", RED_FLAG_RULES, text, breakdown);
   applyRules("redFlags", DOMAIN_GAP_RULES, text, breakdown);

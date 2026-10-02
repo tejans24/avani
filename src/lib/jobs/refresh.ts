@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { emitEvent } from "@/lib/events/emit";
+import { formatAwardAmount, pickCurrentAward } from "@/lib/jobs/awards";
 import { extractBenefits } from "@/lib/jobs/benefits";
 import { normalizeCompany, resolveBatch, sourceIdKey, type ExistingIndex, type Incoming } from "@/lib/jobs/dedupe";
 import { SCORING_VERSION, passesTitlePrefilter, type Lane } from "@/lib/jobs/scoring-config";
@@ -65,10 +66,25 @@ async function upsertCompany(name: string) {
   });
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "NOAA · $48.3M · through Aug 2031" for the company's strongest current award. */
+export async function currentAwardSummary(companyId: string, now: Date): Promise<{ summary: string } | null> {
+  const awards = await db.contractAward.findMany({
+    where: { companyId, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+    select: { agency: true, subAgency: true, endDate: true, amountCents: true, piid: true, startDate: true },
+  });
+  const best = pickCurrentAward(awards, now);
+  if (!best) return null;
+  const who = best.subAgency && best.subAgency !== best.agency ? best.subAgency : best.agency;
+  const until = best.endDate ? ` · through ${MONTHS[best.endDate.getUTCMonth()]} ${best.endDate.getUTCFullYear()}` : "";
+  return { summary: `${who} · ${formatAwardAmount(best.amountCents)}${until} (${best.piid})` };
+}
+
 /** Scoring + benefits columns for a posting, from its current content. */
 export function derivedFields(
   p: Pick<NormalizedPosting, "title" | "descriptionText" | "location" | "companyName" | "source" | "postedAt" | "compMinCents" | "compMaxCents" | "workModeHint">,
-  opts: { isStaffingAgency: boolean; laneOverride: Lane | null; now: Date }
+  opts: { isStaffingAgency: boolean; laneOverride: Lane | null; now: Date; currentAward?: { summary: string } | null }
 ) {
   const r = scorePosting(
     {
@@ -83,6 +99,7 @@ export function derivedFields(
       workModeHint: p.workModeHint,
       isStaffingAgency: opts.isStaffingAgency,
       laneOverride: opts.laneOverride,
+      currentAward: opts.currentAward ?? null,
     },
     opts.now
   );
@@ -172,6 +189,7 @@ export async function ingestPostings(
                   isStaffingAgency: existing.company.isStaffingAgency,
                   laneOverride: existing.laneOverride,
                   now: opts.now,
+                  currentAward: await currentAwardSummary(existing.companyId, opts.now),
                 }),
               }
             : {}),
@@ -184,7 +202,12 @@ export async function ingestPostings(
 
     // create
     const company = await upsertCompany(item.companyName);
-    const derived = derivedFields(item as NormalizedPosting, { isStaffingAgency: company.isStaffingAgency, laneOverride: null, now: opts.now });
+    const derived = derivedFields(item as NormalizedPosting, {
+      isStaffingAgency: company.isStaffingAgency,
+      laneOverride: null,
+      now: opts.now,
+      currentAward: await currentAwardSummary(company.id, opts.now),
+    });
     try {
       const created = await db.jobPosting.create({
         data: {
@@ -272,22 +295,30 @@ export async function refreshBoard(boardId: string, ctx: FetchCtx): Promise<Boar
   return { boardId, companyName: board.companyName, ok: true, report: rest };
 }
 
+/**
+ * Recompute one posting's derived fields from its stored content, company
+ * flags, lane override and current award. The one rescoring path, used by
+ * version bumps, award updates, and owner edits (lane, staffing flag).
+ */
+export async function rescorePosting(id: string, now: Date): Promise<void> {
+  const p = await db.jobPosting.findUniqueOrThrow({ where: { id }, include: { company: { select: { name: true, isStaffingAgency: true } } } });
+  await db.jobPosting.update({
+    where: { id },
+    data: derivedFields(
+      { ...p, companyName: p.company.name, source: p.source as SourceName, workModeHint: p.workMode === "UNKNOWN" ? null : p.workMode },
+      { isStaffingAgency: p.company.isStaffingAgency, laneOverride: p.laneOverride, now, currentAward: await currentAwardSummary(p.companyId, now) }
+    ),
+  });
+}
+
 /** Rescore postings scored under an older SCORING_VERSION (after config edits). */
 export async function rescoreStale(now: Date, limit = 500): Promise<number> {
   const stale = await db.jobPosting.findMany({
     where: { OR: [{ scoringVersion: null }, { scoringVersion: { not: SCORING_VERSION } }] },
-    include: { company: { select: { name: true, isStaffingAgency: true } } },
+    select: { id: true },
     take: limit,
   });
-  for (const p of stale) {
-    await db.jobPosting.update({
-      where: { id: p.id },
-      data: derivedFields(
-        { ...p, companyName: p.company.name, source: p.source as SourceName, workModeHint: null },
-        { isStaffingAgency: p.company.isStaffingAgency, laneOverride: p.laneOverride, now }
-      ),
-    });
-  }
+  for (const p of stale) await rescorePosting(p.id, now);
   return stale.length;
 }
 

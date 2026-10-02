@@ -36,6 +36,7 @@ const DEFAULT_TIER: Record<EventType, NotifyTier> = {
   "client.followup_due": "action",
   "client.going_cold": "action",
   "jobs.new_matches": "action",
+  "jobs.awards_found": "info",
   "job.followup_due": "action",
   "job.application_stale": "info",
 };

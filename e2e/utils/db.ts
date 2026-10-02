@@ -16,7 +16,7 @@ async function withPg<T>(fn: (pg: Client) => Promise<T>): Promise<T> {
 export async function resetDb() {
   await withPg(async (pg) => {
     await pg.query(
-      `TRUNCATE "JobActivity", "TailoredResume", "ResumeMaster", "JobPostingAlias", "JobDismissal",
+      `TRUNCATE "ContractAward", "AwardQuery", "JobActivity", "TailoredResume", "ResumeMaster", "JobPostingAlias", "JobDismissal",
                 "JobPosting", "JobCompany", "JobBoard",
                 "Interaction", "Contact", "InvoiceLineItem", "Invoice", "Client",
                 "CompanySettings", "Transaction", "CategoryRule", "Category",

@@ -128,6 +128,10 @@ export const EVENT_SCHEMAS = {
     note: z.string(),
     dueDateIso: z.string(),
   }),
+  "jobs.awards_found": z.object({
+    count: z.number().int(),
+    top: z.array(z.object({ recipient: z.string(), agency: z.string(), amount: z.string() })),
+  }),
   "job.application_stale": z.object({
     postingId: z.string(),
     title: z.string(),

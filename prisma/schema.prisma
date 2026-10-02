@@ -536,6 +536,7 @@ model JobCompany {
   benefits         Json         @default("{}")
   notes            String?      @db.Text
   postings         JobPosting[]
+  awards           ContractAward[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -703,4 +704,63 @@ model TailoredResume {
   createdAt  DateTime     @default(now())
 
   @@unique([postingId, version])
+}
+
+// --- Federal contract awards (USAspending) ---------------------------------
+// Who just won work at the agencies you care about: a recent IT award means
+// hiring, often before postings appear. Also answers "awarded or contingent?"
+// and "period of performance?" for a company you're talking to.
+
+/// One agency to watch (refreshed about daily, like a job board).
+model AwardQuery {
+  id            String          @id @default(cuid())
+  /// Short label shown in the UI, e.g. "NOAA".
+  label         String
+  /// "toptier" (a department or independent agency) or "subtier" (e.g. NOAA under Commerce).
+  agencyTier    String
+  /// The agency name exactly as USAspending spells it.
+  agencyName    String
+  /// For subtier agencies: the department, e.g. "Department of Commerce".
+  toptierName   String?
+  /// "climate" | "health-civic": groups the Awards page.
+  group         String
+  enabled       Boolean         @default(true)
+  lastFetchedAt DateTime?
+  lastError     String?         @db.Text
+  awards        ContractAward[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([agencyTier, agencyName])
+}
+
+model ContractAward {
+  id                  String      @id @default(cuid())
+  /// USAspending's generated_internal_id (stable across updates).
+  awardKey            String      @unique
+  /// The contract number (PIID).
+  piid                String
+  recipientName       String
+  /// normalizeCompany(recipientName): links awards to JobCompany.
+  normalizedRecipient String
+  companyId           String?
+  company             JobCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  queryId             String?
+  query               AwardQuery? @relation(fields: [queryId], references: [id], onDelete: SetNull)
+  agency              String
+  subAgency           String?
+  description         String?     @db.Text
+  /// Obligated amount in integer cents (BigInt: awards routinely exceed $21M).
+  amountCents         BigInt?
+  /// Period of performance.
+  startDate           DateTime?   @db.Date
+  endDate             DateTime?   @db.Date
+  naics               String?
+  placeState          String?
+  url                 String
+  firstSeenAt         DateTime    @default(now())
+  lastSeenAt          DateTime    @default(now())
+
+  @@index([normalizedRecipient])
+  @@index([companyId, endDate])
 }

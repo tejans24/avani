@@ -10,10 +10,9 @@ import { BENEFITS, type BenefitKey } from "@/lib/jobs/benefits";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
-import { derivedFields, ingestPostings, refreshBoard } from "@/lib/jobs/refresh";
+import { ingestPostings, refreshBoard, rescorePosting } from "@/lib/jobs/refresh";
 import { INTERVIEW_QUESTIONS, type Lane } from "@/lib/jobs/scoring-config";
 import { sourceFetchCtx } from "@/lib/jobs/sources/http";
-import type { SourceName } from "@/lib/jobs/sources/types";
 
 export type ActionResult = { ok: true; id?: string; note?: string } | { ok: false; error: string };
 
@@ -143,17 +142,8 @@ export async function setJobLane(id: string, lane: Lane | null): Promise<ActionR
   try {
     await requireAuth();
     const laneOverride = lane === null ? null : z.enum(LANES).parse(lane);
-    const p = await db.jobPosting.findUniqueOrThrow({ where: { id }, include: { company: true } });
-    await db.jobPosting.update({
-      where: { id },
-      data: {
-        laneOverride,
-        ...derivedFields(
-          { ...p, companyName: p.company.name, source: p.source as SourceName, workModeHint: p.workMode === "UNKNOWN" ? null : p.workMode },
-          { isStaffingAgency: p.company.isStaffingAgency, laneOverride, now: new Date() }
-        ),
-      },
-    });
+    await db.jobPosting.update({ where: { id }, data: { laneOverride } });
+    await rescorePosting(id, new Date());
     revalidateJob(id);
     return { ok: true };
   } catch (e) {
@@ -246,17 +236,9 @@ export async function setCompanyBenefits(companyId: string, benefits: Record<str
 export async function setCompanyStaffingAgency(companyId: string, isStaffingAgency: boolean): Promise<ActionResult> {
   try {
     await requireAuth();
-    const company = await db.jobCompany.update({ where: { id: companyId }, data: { isStaffingAgency }, include: { postings: true } });
+    const company = await db.jobCompany.update({ where: { id: companyId }, data: { isStaffingAgency }, select: { postings: { select: { id: true } } } });
     const now = new Date();
-    for (const p of company.postings) {
-      await db.jobPosting.update({
-        where: { id: p.id },
-        data: derivedFields(
-          { ...p, companyName: company.name, source: p.source as SourceName, workModeHint: p.workMode === "UNKNOWN" ? null : p.workMode },
-          { isStaffingAgency, laneOverride: p.laneOverride, now }
-        ),
-      });
-    }
+    for (const p of company.postings) await rescorePosting(p.id, now);
     revalidateJob();
     return { ok: true };
   } catch (e) {
@@ -430,6 +412,37 @@ export async function refreshJobBoardNow(id: string): Promise<ActionResult> {
     if (!r.ok) return { ok: false, error: r.error ?? "Fetch failed" };
     const rep = r.report!;
     return { ok: true, note: `${rep.created.length} new, ${rep.refreshed} refreshed, ${rep.aliased} duplicates merged.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// --- Federal award queries ----------------------------------------------------
+
+export async function setAwardQueryEnabled(id: string, enabled: boolean): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    await db.awardQuery.update({ where: { id }, data: { enabled } });
+    revalidatePath("/jobs/awards");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function refreshAwardQueryNow(id: string): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    const { refreshAwardQuery } = await import("@/lib/jobs/awards-refresh");
+    const r = await refreshAwardQuery(id, sourceFetchCtx(new Date()));
+    const now = new Date();
+    for (const companyId of r.touchedCompanies) {
+      const postings = await db.jobPosting.findMany({ where: { companyId, closedAt: null }, select: { id: true } });
+      for (const p of postings) await rescorePosting(p.id, now);
+    }
+    revalidatePath("/jobs/awards");
+    if (!r.ok) return { ok: false, error: r.error ?? "Fetch failed" };
+    return { ok: true, note: `${r.found} awards, ${r.newAwards} new.` };
   } catch (e) {
     return fail(e);
   }

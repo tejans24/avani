@@ -39,12 +39,12 @@ const HINTS: Record<string, string> = {
   USAJOBS: "Search query, e.g. JobCategoryCode=2210&RemoteIndicator=True",
 };
 
-export function AddBoardForm() {
+export function AddBoardForm({ defaultCompany = "" }: { defaultCompany?: string }) {
   const { pending, error, note, run } = useAction();
   const [source, setSource] = useState("GREENHOUSE");
   const [slug, setSlug] = useState("");
   const [host, setHost] = useState("");
-  const [companyName, setCompanyName] = useState("");
+  const [companyName, setCompanyName] = useState(defaultCompany);
 
   return (
     <div className="form-card" style={{ display: "grid", gap: 14 }}>

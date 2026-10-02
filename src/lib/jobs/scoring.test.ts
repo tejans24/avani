@@ -126,6 +126,12 @@ describe("scorePosting: scoring", () => {
     expect(r.breakdown.find((b) => b.rule === "mission-lane")?.points).toBe(6);
   });
 
+  it("adds the current-award signal with its evidence", () => {
+    const r = scorePosting(posting({ currentAward: { summary: "EPA · $48.3M · through Aug 2031" } }), NOW);
+    expect(r.breakdown.find((b) => b.rule === "current-award")).toMatchObject({ category: "work", points: 4, evidence: "EPA · $48.3M · through Aug 2031" });
+    expect(r.score).toBe(scorePosting(posting(), NOW).score + 4);
+  });
+
   it("clamps to 0–100", () => {
     const awful = scorePosting(
       posting({

@@ -7,6 +7,7 @@ import { CompanyCallChecklist } from "@/components/platform/jobs/CompanyCallChec
 import { JobActivityPanel } from "@/components/platform/jobs/JobActivityPanel";
 import { JobPipelineCard } from "@/components/platform/jobs/JobPipelineCard";
 import { dateToIso } from "@/lib/dates";
+import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
 import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatComp, scoreTone } from "@/lib/jobs/display";
@@ -21,7 +22,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const posting = await db.jobPosting.findUnique({
     where: { id: params.id },
     include: {
-      company: true,
+      company: { include: { awards: { orderBy: { amountCents: { sort: "desc", nulls: "last" } }, take: 8 } } },
       aliases: { orderBy: { firstSeenAt: "asc" } },
       activity: { orderBy: { occurredAt: "desc" } },
       _count: { select: { tailored: true } },
@@ -161,6 +162,31 @@ export default async function JobDetailPage({ params }: { params: { id: string }
         archived={posting.archivedAt !== null}
         deletable={canDeletePosting(posting)}
       />
+
+      {posting.company.awards.length > 0 && (
+        <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
+          <Eyebrow index="$">Federal awards: {posting.company.name}</Eyebrow>
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+            From USAspending. Useful for &quot;awarded or contingent?&quot; and &quot;how many option years?&quot; on the call.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", display: "grid", gap: 6 }}>
+            {posting.company.awards.map((a) => (
+              <li key={a.id}>
+                <a href={a.url} target="_blank" rel="noreferrer">
+                  {formatAwardAmount(a.amountCents)}
+                </a>{" "}
+                {a.subAgency ?? a.agency}
+                {a.description ? ` · ${a.description.toLowerCase()}` : ""}
+                <span style={{ color: "var(--text-muted)" }}>
+                  {" "}
+                  · {a.piid} · {a.startDate ? dateToIso(a.startDate) : "?"} to {a.endDate ? dateToIso(a.endDate) : "?"}
+                  {isCurrentAward(a, new Date()) ? "" : " · ended"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <CompanyCallChecklist
         companyId={posting.companyId}

@@ -7,7 +7,7 @@ import { SOURCE_LABEL, ago } from "@/lib/jobs/display";
 export const metadata = { title: "Job boards — Avani" };
 export const dynamic = "force-dynamic";
 
-export default async function BoardsPage() {
+export default async function BoardsPage({ searchParams }: { searchParams: { company?: string } }) {
   const boards = await db.jobBoard.findMany({
     orderBy: [{ enabled: "desc" }, { companyName: "asc" }],
     include: { _count: { select: { postings: { where: { closedAt: null } } } } },
@@ -87,7 +87,7 @@ export default async function BoardsPage() {
 
       <Eyebrow index="+">Add a board</Eyebrow>
       <div style={{ marginTop: 12 }}>
-        <AddBoardForm />
+        <AddBoardForm defaultCompany={searchParams.company ?? ""} />
       </div>
     </>
   );

@@ -9,7 +9,7 @@
  * Patterns are matched case-insensitively against title + description.
  */
 
-export const SCORING_VERSION = 1;
+export const SCORING_VERSION = 2;
 
 /*
  * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
@@ -280,6 +280,12 @@ export const WORK_RULES: Rule[] = [
   { id: "period-of-performance", label: "Awarded work with period of performance / option years", points: 4,
     pattern: /\b(period of performance|option years?|base year plus)\b/i },
 ];
+
+/**
+ * The company holds a current federal contract award (USAspending, see
+ * awards.ts): awarded work, not "contingent upon award". Counts in "work".
+ */
+export const CURRENT_AWARD_POINTS = 4;
 
 /** Stack match: a light tiebreaker now; each distinct hit counts once. */
 export const STACK_RULES: Rule[] = [

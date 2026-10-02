@@ -37,7 +37,16 @@ export type NormalizedPosting = {
 export type FetchResult = { status: number; body: unknown };
 
 export type FetchCtx = {
-  fetchJson(url: string, init?: { method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> }): Promise<FetchResult>;
+  fetchJson(
+    url: string,
+    init?: {
+      method?: "GET" | "POST";
+      body?: unknown;
+      headers?: Record<string, string>;
+      /** Fake mode only: names the fixture when one URL serves many requests. */
+      fixtureKey?: string;
+    }
+  ): Promise<FetchResult>;
   now: Date;
 };
 

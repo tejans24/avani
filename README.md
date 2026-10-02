@@ -134,6 +134,15 @@ for you**: "Applied" is a status you set after applying yourself.
   PDFs reproduce your résumé layout (`src/lib/jobs/resume-layout.ts`) in
   Carlito, which is metric-compatible with Calibri. Preview, then download.
 
+- **Federal awards** (Jobs → Awards): USAspending.gov IT and research
+  contracts awarded in the last 90 days at EPA, NOAA, DOE, USGS, FEMA, NASA,
+  CMS and VA (one agency per tick, each about daily; agencies are editable in
+  `src/lib/jobs/awards.ts`). Winners show up as leads, with links to add their
+  job board; postings at companies holding a current award get an "awarded
+  work" boost, and each job page lists the company's awards (period of
+  performance for the call). The DOE national labs hire on their own career
+  sites, not USAJOBS.
+
 ### Adding a job source
 
 Most additions are just a board: Jobs → Boards → Add a board (Greenhouse,

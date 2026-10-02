@@ -16,9 +16,10 @@ import type { FetchCtx, FetchResult } from "./types";
 const PAUSE_MS = 400;
 const TIMEOUT_MS = 20_000;
 
-export function fixtureName(url: string, method = "GET"): string {
+export function fixtureName(url: string, method = "GET", fixtureKey?: string): string {
   const base = url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "_").replace(/_+$/, "");
-  return `${method === "POST" ? "POST_" : ""}${base}.json`;
+  const key = fixtureKey ? `__${fixtureKey.replace(/[^a-z0-9]+/gi, "_")}` : "";
+  return `${method === "POST" ? "POST_" : ""}${base}${key}.json`;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -63,7 +64,7 @@ export function fakeFetchCtx(now = new Date(), dir = process.env.JOBS_FIXTURES_D
     now,
     async fetchJson(url, init): Promise<FetchResult> {
       try {
-        const text = await readFile(path.join(dir, fixtureName(url, init?.method)), "utf8");
+        const text = await readFile(path.join(dir, fixtureName(url, init?.method, init?.fixtureKey)), "utf8");
         return { status: 200, body: JSON.parse(text) };
       } catch {
         return { status: 404, body: null };

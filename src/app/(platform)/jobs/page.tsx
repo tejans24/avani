@@ -75,6 +75,9 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
           <p className="sub">{VIEWS[view].blurb} Nothing here is ever submitted for you.</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          <Button href="/jobs/awards" variant="secondary" size="md">
+            Awards
+          </Button>
           <Button href="/jobs/resume" variant="secondary" size="md">
             Résumé
           </Button>

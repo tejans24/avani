@@ -150,6 +150,16 @@ on("jobs.new_matches", "notify-owner", async (p) => {
   });
 });
 
+on("jobs.awards_found", "notify-owner", async (p) => {
+  const best = p.top[0];
+  await notify({
+    eventType: "jobs.awards_found",
+    title: `${p.count} new federal award${p.count === 1 ? "" : "s"}${best ? `: ${best.recipient} won ${best.amount} at ${best.agency}` : ""}`,
+    body: p.top.map((t) => `${t.amount}  ${t.recipient} (${t.agency})`).join("\n"),
+    href: "/jobs/awards",
+  });
+});
+
 on("job.followup_due", "notify-owner", async (p) => {
   await notify({
     eventType: "job.followup_due",
