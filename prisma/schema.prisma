@@ -526,6 +526,9 @@ model JobCompany {
   /// Answers keyed by INTERVIEW_QUESTIONS keys (primeOrSub, awardedOrContingent,
   /// optionYears, architectureOwner, aiToolsApproved, outsideWorkPolicy, ipCarveOut).
   questions        Json         @default("{}")
+  /// Owner-entered benefits (from recruiters/offers), keyed by BENEFITS key:
+  /// { [key]: { value?: string, note?: string } }. Wins over extracted ones.
+  benefits         Json         @default("{}")
   notes            String?      @db.Text
   postings         JobPosting[]
   createdAt        DateTime     @default(now())
@@ -576,6 +579,9 @@ model JobPosting {
   scoreFlags       String[]    @default([])
   scoringVersion   Int?
   scoredAt         DateTime?
+  /// Benefits extracted from this posting's text (src/lib/jobs/benefits.ts):
+  /// [{ key, label, value?, evidence }]. Shown merged with the company's.
+  benefits         Json        @default("[]")
 
   // --- Owner pipeline ---
   status           JobStatus   @default(NEW)
