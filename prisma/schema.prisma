@@ -457,6 +457,8 @@ model Interaction {
 enum JobSource {
   GREENHOUSE
   LEVER
+  ASHBY
+  SMARTRECRUITERS
   WORKDAY
   USAJOBS
   CLIMATEBASE

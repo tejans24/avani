@@ -176,7 +176,8 @@ export const HARD_FILTERS = {
 // the kind of work (AI, modernization, team size), then stack and tempo.
 // ---------------------------------------------------------------------------
 
-export const BASE_SCORE = 45;
+/** Max possible ≈ 30 + 20 + 12 + 15 + 15 + 10 = 102, so great postings stay distinguishable. */
+export const BASE_SCORE = 30;
 
 export type Rule = {
   id: string;
