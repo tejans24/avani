@@ -138,6 +138,36 @@ on("client.going_cold", "notify-owner", async (p) => {
   });
 });
 
+// --- Job finder: new matches and follow-ups (the app never applies for you) ---
+
+on("jobs.new_matches", "notify-owner", async (p) => {
+  const best = p.top[0];
+  await notify({
+    eventType: "jobs.new_matches",
+    title: `${p.count} new job match${p.count === 1 ? "" : "es"}${best ? ` — top: ${best.title} at ${best.companyName} (${best.score})` : ""}`,
+    body: p.top.map((t) => `${t.score}  ${t.title}, ${t.companyName}`).join("\n"),
+    href: best ? `/jobs/${best.postingId}` : "/jobs",
+  });
+});
+
+on("job.followup_due", "notify-owner", async (p) => {
+  await notify({
+    eventType: "job.followup_due",
+    title: `${p.companyName}: ${p.note}`,
+    body: `${p.title} · due ${formatDateLong(p.dueDateIso)}`,
+    href: `/jobs/${p.postingId}`,
+  });
+});
+
+on("job.application_stale", "notify-owner", async (p) => {
+  await notify({
+    eventType: "job.application_stale",
+    title: `No word from ${p.companyName} in ${p.daysQuiet} days. Mark it closed?`,
+    body: p.title,
+    href: `/jobs/${p.postingId}`,
+  });
+});
+
 // --- Client-facing: overdue reminder email (BUILT but default OFF) ---
 
 const REMINDER_GAP_DAYS = 7;

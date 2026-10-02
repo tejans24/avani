@@ -46,6 +46,8 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
     mode: "ONSITE",
     patterns: [
       /\b(100% (on[- ]?site|in[- ]office)|fully on[- ]?site|on[- ]?site (position|role) (only)?|not (a )?remote|no remote)\b/i,
+      /\b(5|five) days (a|per|each) week (in|on)[- ]?(the )?(office|site)\b/i,
+      /\b(in[- ]office|on[- ]?site) (5|five) days\b/i,
     ],
   },
   {
@@ -71,6 +73,21 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
     patterns: [/\b(fully remote|100% remote|remote[- ]first|remote \(us\)|remote[- ]us|work from anywhere in the us)\b/i, /\bremote\b/i],
   },
 ];
+
+/**
+ * Title prefilter, applied before detail fetches and scoring so unrelated
+ * roles (sales, mechanical, interns) never enter the database. Kept broad on
+ * purpose: scoring does the real ranking.
+ */
+export const TITLE_PREFILTER = {
+  include: /\b(engineer|engineering|developer|architect|programmer|software|tech(nical)? lead|cto|full[- ]?stack|back[- ]?end|platform|data|ml|ai)\b/i,
+  exclude:
+    /\b(intern|internship|co-op|junior|jr\.?|entry[- ]level|apprentice|sales|account (executive|manager)|recruiter|mechanical|electrical|civil|structural|chemical|hardware|manufacturing|field (service )?engineer|test technician|help ?desk|desktop support|nurse|physician)\b/i,
+};
+
+export function passesTitlePrefilter(title: string): boolean {
+  return TITLE_PREFILTER.include.test(title) && !TITLE_PREFILTER.exclude.test(title);
+}
 
 export const HARD_FILTERS = {
   maxPostedAgeDays: 30,

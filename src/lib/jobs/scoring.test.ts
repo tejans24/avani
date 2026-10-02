@@ -148,6 +148,8 @@ describe("classifyWorkMode", () => {
     expect(classifyWorkMode("Remote", "Hybrid: 3 days a week in the office", null)).toBe("HYBRID");
     expect(classifyWorkMode("Remote", "No mention", null)).toBe("REMOTE");
     expect(classifyWorkMode("Baltimore, MD", "No mention", null)).toBe("UNKNOWN");
+    expect(classifyWorkMode("San Francisco, CA", "On-site 5 days a week in the office.", null)).toBe("ONSITE");
+    expect(classifyWorkMode("Baltimore, MD", "3 days a week in the office.", null)).toBe("HYBRID");
   });
 });
 

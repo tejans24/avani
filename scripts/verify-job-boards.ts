@@ -14,9 +14,11 @@
  * company's careers page), checks robots.txt for the jobs endpoint; if
  * robots.txt disallows it, the company stays capture-only.
  *
- * Prints a summary and writes the full report as JSON. Read-only: it never
- * writes to the database. Add the "feed" results as JobBoard rows afterwards.
+ * Prints a summary and writes the full report as JSON. Read-only unless
+ * --apply is passed, which upserts every "feed" result as an enabled
+ * JobBoard row (DATABASE_URL required).
  */
+import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { candidateSlugs, chooseBoard, countPostings, probeUrl, type BoardVerdict, type ProbeSource } from "../src/lib/jobs/board-probe";
 import { MISSION_EMPLOYERS } from "../src/lib/jobs/companies";
@@ -101,6 +103,26 @@ async function main() {
     console.log(`${c.name.padEnd(42)} ${v}`);
   }
   writeFileSync(out, JSON.stringify(report, null, 2) + "\n");
+
+  if (args.includes("--apply")) {
+    const { db } = await import("../src/lib/db");
+    let applied = 0;
+    for (const r of report) {
+      if (r.verdict.status !== "feed") continue;
+      const isWorkday = r.verdict.source === "WORKDAY";
+      // Workday slugs are stored as host + "tenant/site".
+      const [host, ...rest] = r.verdict.slug.split("/");
+      const slug = isWorkday ? rest.join("/") : r.verdict.slug;
+      await db.jobBoard.upsert({
+        where: { source_slug: { source: r.verdict.source, slug } },
+        create: { source: r.verdict.source, slug, host: isWorkday ? host : null, companyName: r.name },
+        update: { companyName: r.name, host: isWorkday ? host : null, enabled: true },
+      });
+      applied++;
+    }
+    console.log(`Applied ${applied} board(s) to the database.`);
+    await db.$disconnect();
+  }
   const feeds = report.filter((r) => r.verdict.status === "feed").length;
   console.log(`\n${feeds} feeds, ${report.length - feeds} capture-only. Report: ${out}`);
 }

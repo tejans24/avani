@@ -38,6 +38,7 @@ export default defineConfig({
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
       CLERK_SECRET_KEY: "sk_test_placeholder",
       MERCURY_MODE: "fake",
+      JOBS_SOURCE_MODE: "fake",
       SMS_MODE: "fake",
       TICK_SECRET: "test-tick-secret",
     },
