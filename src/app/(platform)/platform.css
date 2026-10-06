@@ -89,8 +89,8 @@
   color: var(--text-on-brand);
 }
 
-/* The same menu as tabs on Jobs pages; only shown where the sidebar is a top bar. */
-.jobs-tabs {
+/* Menu button: only where the sidebar is a top bar. */
+.nav-toggle {
   display: none;
 }
 
@@ -285,6 +285,7 @@
 
 .filter-tabs a {
   padding: 6px 14px;
+  white-space: nowrap;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
@@ -499,7 +500,7 @@ input[type="file"].file-input::file-selector-button:hover {
   .notif-panel {
     left: 16px;
     right: 16px;
-    top: 76px;
+    top: 64px;
     bottom: auto;
     width: auto;
     max-height: calc(100vh - 100px);
@@ -510,46 +511,70 @@ input[type="file"].file-input::file-selector-button:hover {
   .platform-shell {
     flex-direction: column;
   }
+  /* A slim top bar: brand, bell, menu button. The links open as a panel under it. */
   .platform-sidebar {
     width: 100%;
     height: auto;
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 30;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    order: 3;
+    width: 40px;
+    height: 40px;
+    margin-left: 4px;
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-on-brand);
+    cursor: pointer;
+  }
+  .platform-sidebar .sidebar-foot {
+    order: 2;
+    margin-left: auto;
   }
   .platform-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .platform-subnav {
     display: none;
   }
-  .jobs-tabs {
+  .platform-nav[data-open="true"] {
     display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    margin: -8px 0 20px;
-    padding-bottom: 4px;
-    font-family: var(--font-sans);
-    font-size: var(--text-sm);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 31;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px 16px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    background: var(--color-surface-brand);
+    border-top: 1px solid var(--border-on-dark);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
   }
-  .jobs-tabs a {
-    flex-shrink: 0;
-    padding: 6px 12px;
-    border: 1px solid var(--border-subtle);
-    border-radius: 999px;
-    color: var(--text-secondary);
-    text-decoration: none;
+  .platform-nav[data-open="true"] a {
+    padding: 12px;
   }
-  .jobs-tabs a[data-active="true"] {
-    background: var(--color-surface);
-    border-color: var(--border-default);
-    color: var(--text-primary);
-    font-weight: 600;
+  .platform-nav[data-open="true"] .platform-subnav a {
+    padding: 9px 10px;
+  }
+  .nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: rgba(0, 0, 0, 0.25);
   }
   .platform-sidebar .brand {
-    padding-bottom: 4px;
+    padding: 0;
+    font-size: var(--text-lg);
   }
   /* Keep the notification bell reachable on small screens; hide the
      footer text labels only. */
@@ -564,6 +589,57 @@ input[type="file"].file-input::file-selector-button:hover {
   }
   .platform-main {
     padding: 24px 20px 56px;
+  }
+  /* Filter tabs: one row that scrolls sideways. */
+  .filter-tabs {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .filter-tabs a {
+    flex-shrink: 0;
+  }
+  /* The job list as cards: score on the left, the rest stacked beside it. */
+  .table-scroll:has(.job-table) {
+    overflow: visible;
+  }
+  .table-scroll .job-table,
+  .job-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .job-table thead,
+  .job-table .c-lane {
+    display: none;
+  }
+  .job-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 6px;
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .job-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    grid-column: 2;
+  }
+  .job-table td.c-score {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+  }
+  .job-table td.c-pay,
+  .job-table td.c-posted,
+  .job-table td.c-status {
+    display: inline-block;
+  }
+  /* Two stat tiles per row in the app (site.css stacks the marketing site's to one). */
+  .platform-main .stat-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
   }
   .form-grid {
     grid-template-columns: 1fr;

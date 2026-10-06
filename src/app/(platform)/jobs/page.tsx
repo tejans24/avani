@@ -128,7 +128,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
         </div>
       ) : (
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table job-table">
             <thead>
               <tr>
                 <th className="num">Score</th>
@@ -148,10 +148,10 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                 const comp = formatComp(p.compMinCents, p.compMaxCents);
                 return (
                   <tr key={p.id} data-testid="job-row">
-                    <td className="num">
+                    <td className="num c-score">
                       <Badge tone={scoreTone(p.score, passed)}>{p.score ?? "—"}</Badge>
                     </td>
-                    <td>
+                    <td className="c-role">
                       <Link href={`/jobs/${p.id}`}>{p.title}</Link>
                       <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
                         {p.company.name} · {postingSiteLabel(p)}
@@ -167,15 +167,15 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                         </div>
                       )}
                     </td>
-                    <td style={{ fontSize: "var(--text-sm)" }}>{LANE_LABEL[p.lane as Lane]}</td>
-                    <td style={{ fontSize: "var(--text-sm)" }}>
+                    <td className="c-lane" style={{ fontSize: "var(--text-sm)" }}>{LANE_LABEL[p.lane as Lane]}</td>
+                    <td className="c-where" style={{ fontSize: "var(--text-sm)" }}>
                       {WORK_MODE_LABEL[p.workMode as WorkMode]}
                       <div style={{ color: "var(--text-muted)" }}>{p.location}</div>
                     </td>
-                    <td style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
+                    <td className="c-pay" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
                       {comp ?? <span style={{ color: "var(--text-muted)" }}>Not posted</span>}
                     </td>
-                    <td>
+                    <td className="c-benefits">
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 260 }}>
                         {benefits.length === 0 ? (
                           <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>—</span>
@@ -188,8 +188,8 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                         )}
                       </div>
                     </td>
-                    <td style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{ago(p.postedAt ?? p.firstSeenAt)}</td>
-                    <td>
+                    <td className="c-posted" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{ago(p.postedAt ?? p.firstSeenAt)}</td>
+                    <td className="c-status">
                       <Badge tone={STATUS_TONE[p.status as JobStatus]}>{JOB_STATUS_LABEL[p.status as JobStatus]}</Badge>
                     </td>
                   </tr>

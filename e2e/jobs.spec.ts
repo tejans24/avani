@@ -173,3 +173,19 @@ test("bookmarklet works on a Phenom-style careers site with no JSON-LD and a sev
   expect(saved).toMatchObject({ capturedVia: "bookmarklet", url: "https://careers.example.test/job/R1" });
   expect(saved.descriptionText).toBe("Design and build AWS platforms end-to-end for federal health programs.");
 });
+
+test("on a phone the menu folds behind a button and closes after navigating", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/jobs");
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("link", { name: "Dashboard" })).toBeHidden();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
+  await page.getByRole("link", { name: "Sources" }).click();
+  await page.waitForURL("**/jobs/boards");
+  await expect(page.getByRole("heading", { name: "Sources" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Dashboard" })).toBeHidden();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("link", { name: "Dashboard" })).toBeHidden();
+});

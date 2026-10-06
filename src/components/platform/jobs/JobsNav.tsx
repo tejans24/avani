@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
- * The Jobs section's own menu. In the sidebar it opens under "Jobs" while
- * you're anywhere in the section; on narrow screens (where the sidebar is a
- * top bar) the same links show as tabs at the top of every Jobs page.
+ * The Jobs section's own menu, opened under "Jobs" in the sidebar (and in the
+ * menu panel on narrow screens) while you're anywhere in the section.
  */
 export const JOBS_NAV = [
   { href: "/jobs", label: "Matches", match: (p: string, view: string | null) => p === "/jobs" && (!view || view === "matches" || view === "filtered") },
@@ -37,26 +35,5 @@ export function JobsSubNav() {
         </Link>
       ))}
     </div>
-  );
-}
-
-/** Tabs at the top of Jobs pages, for narrow screens. */
-export function JobsTabs() {
-  const isActive = useActive();
-  const strip = useRef<HTMLElement>(null);
-  const activeHref = JOBS_NAV.find(isActive)?.href;
-  // Bring the current tab into view by scrolling the strip sideways, never the page.
-  useEffect(() => {
-    const el = strip.current?.querySelector<HTMLElement>('[data-active="true"]');
-    if (strip.current && el) strip.current.scrollLeft = el.offsetLeft - strip.current.offsetLeft - 16;
-  }, [activeHref]);
-  return (
-    <nav ref={strip} className="jobs-tabs" aria-label="Jobs">
-      {JOBS_NAV.map((item) => (
-        <Link key={item.href} href={item.href} data-active={isActive(item) || undefined}>
-          {item.label}
-        </Link>
-      ))}
-    </nav>
   );
 }

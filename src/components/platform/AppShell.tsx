@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { JobsSubNav } from "./jobs/JobsNav";
+import { NavDrawer } from "./NavDrawer";
 import { NavLink } from "./NavLink";
 import { NotificationBell } from "./NotificationBell";
 
@@ -27,18 +28,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <img src="/brand/mark-sun.svg" alt="" width={26} height={26} />
           Avani
         </Link>
-        <nav className="platform-nav">
-          {NAV.map((item) => (
-            <div key={item.href} style={{ display: "contents" }}>
-              <NavLink href={item.href}>{item.label}</NavLink>
-              {item.href === "/jobs" && (
-                <Suspense>
-                  <JobsSubNav />
-                </Suspense>
-              )}
-            </div>
-          ))}
-        </nav>
+        <Suspense>
+          <NavDrawer>
+            {NAV.map((item) => (
+              <div key={item.href} style={{ display: "contents" }}>
+                <NavLink href={item.href}>{item.label}</NavLink>
+                {item.href === "/jobs" && (
+                  <Suspense>
+                    <JobsSubNav />
+                  </Suspense>
+                )}
+              </div>
+            ))}
+          </NavDrawer>
+        </Suspense>
         <div className="sidebar-foot">
           {testMode ? <span>Test mode</span> : <UserButton afterSignOutUrl="/" />}
           <span>Avani Platform</span>
