@@ -11,7 +11,8 @@ import { checkStyle } from "@/lib/jobs/resume-style";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { checkDocStyle, checkTruth, hasBlocking, masterDoc, quickTailor, reuseDoc, type TailorEdit, type TailoredDoc } from "@/lib/jobs/tailor";
 import { chatAboutResumeWithClaude, tailorWithClaude, type ChatTurn } from "@/lib/jobs/tailor-ai";
-import type { Lane } from "@/lib/jobs/scoring-config";
+import { maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
+import { fitDocToPages } from "@/pdf/resume-render";
 
 export type TailorResult = { ok: true; id?: string; version?: number; note?: string } | { ok: false; error: string };
 
@@ -58,6 +59,28 @@ async function nextVersion(postingId: string): Promise<number> {
   return (last?.version ?? 0) + 1;
 }
 
+
+/**
+ * Hold a generated version to the page limit: trims in code (older roles
+ * first; cut bullets marked rejected so they can come back) and says what it
+ * did in the version's rationale.
+ */
+async function fitToLimit(master: Resume, doc: TailoredDoc, lane: Lane): Promise<TailoredDoc> {
+  const maxPages = maxResumePages(lane);
+  const r = await fitDocToPages(master, doc, maxPages);
+  if (!r.bulletsCut && !r.skillLinesHidden) return doc;
+  const what = [
+    r.bulletsCut ? `${r.bulletsCut} bullet${r.bulletsCut === 1 ? "" : "s"} (marked Rejected; bring any back in the editor)` : "",
+    r.skillLinesHidden ? `${r.skillLinesHidden} least relevant skill line${r.skillLinesHidden === 1 ? "" : "s"}` : "",
+  ]
+    .filter(Boolean)
+    .join(" and ");
+  const note = r.fits
+    ? `Trimmed ${what} to fit ${maxPages} page${maxPages === 1 ? "" : "s"}.`
+    : `Trimmed ${what}, and it's still ${r.pages} pages: leave out an old role or shorten bullets.`;
+  return { ...r.doc, rationale: [doc.rationale, note].filter(Boolean).join(" ") };
+}
+
 /** Generate a new tailored version with Claude, or with the no-AI quick tailor. */
 export async function generateTailored(postingId: string, mode: "claude" | "quick"): Promise<TailorResult> {
   try {
@@ -81,9 +104,10 @@ export async function generateTailored(postingId: string, mode: "claude" | "quic
             tailoringNotes: posting.tailoringNotes,
             fitPlan: (posting.fitAnalysis as unknown as FitAnalysis | null)?.tailoring ?? null,
           });
+    const fitted = await fitToLimit(master.data, doc, posting.lane as Lane);
     const version = await nextVersion(postingId);
     const created = await db.tailoredResume.create({
-      data: { postingId, masterId: master.id, version, data: doc as unknown as Prisma.InputJsonValue, coverNote: doc.coverNote || null },
+      data: { postingId, masterId: master.id, version, data: fitted as unknown as Prisma.InputJsonValue, coverNote: fitted.coverNote || null },
     });
     revalidatePath(`/jobs/${postingId}/tailor`);
     return { ok: true, id: created.id, version };
@@ -103,6 +127,7 @@ const docSchema = z.object({
     })
   ),
   skillGroupOrder: z.array(z.string()),
+  skillGroupsShown: z.number().int().min(1).max(100).optional(),
   coverNote: z.string().max(5000),
   rationale: z.string().max(2000),
   generatedBy: z.enum(["claude", "quick", "master", "reuse"]),
@@ -204,7 +229,12 @@ export async function reuseTailoredVersion(postingId: string, fromId: string): P
       include: { posting: { select: { title: true, company: { select: { name: true } } } } },
     });
     const master = await latestMaster();
-    const doc = reuseDoc(master.data, from.data as unknown as TailoredDoc, `v${from.version} for ${from.posting.title} at ${from.posting.company.name}`);
+    const target = await db.jobPosting.findUniqueOrThrow({ where: { id: postingId }, select: { lane: true } });
+    const doc = await fitToLimit(
+      master.data,
+      reuseDoc(master.data, from.data as unknown as TailoredDoc, `v${from.version} for ${from.posting.title} at ${from.posting.company.name}`),
+      target.lane as Lane
+    );
     const version = await nextVersion(postingId);
     const created = await db.tailoredResume.create({
       data: { postingId, masterId: master.id, version, data: doc as unknown as Prisma.InputJsonValue },

@@ -303,6 +303,16 @@ export function TailorEditor(props: {
               <summary>Master summary</summary>
               {props.master.summary}
             </details>
+            {doc.skillGroupsShown !== undefined && doc.skillGroupsShown < props.master.skills.length && (
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                Showing the {doc.skillGroupsShown} most relevant of {props.master.skills.length} skill lines, to fit the page limit.
+                {!isSent && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => update((d) => ({ ...d, skillGroupsShown: undefined }))}>
+                    Show all
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {props.master.experience.map((role) => {

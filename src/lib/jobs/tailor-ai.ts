@@ -42,7 +42,8 @@ Truthfulness is the hard rule:
 - The headline must be exactly the master headline or one of headlineOptions.
 
 Selection:
-- For each role, choose the bullets that best fit this posting, most relevant first, by bullet id. Recent roles: usually 3 to 6 bullets. Older roles: 1 or 2. Reserve bullets (reserve: true) are true and may be used when the posting asks for that skill.
+- For each role, choose the bullets that best fit this posting, most relevant first, by bullet id. Reserve bullets (reserve: true) are true and may be used when the posting asks for that skill.
+- Length is a hard limit (stated with the posting). As a budget: the three most recent roles up to 4 bullets each, the next three up to 2, older roles 0 or 1 (a role with no bullets still shows its title line). Fewer, stronger bullets beat more. The app trims anything over the page limit, cutting from older roles first.
 - Order skill groups by relevance to the posting, using the exact group names.
 
 Summary: 2 to 4 sentences, using only master facts, in the posting's vocabulary where it is honest to do so.

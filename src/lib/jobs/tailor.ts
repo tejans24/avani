@@ -56,6 +56,8 @@ export type TailoredDoc = {
   skillGroupOrder: string[];
   coverNote: string;
   rationale: string;
+  /** Show only this many skill lines (most relevant first); all when unset. Set when trimming to fit the page limit. */
+  skillGroupsShown?: number;
   /** How the version started: Claude, the quick tailor, master as is, or copied from another job. */
   generatedBy: "claude" | "quick" | "master" | "reuse";
 };
@@ -202,7 +204,7 @@ export function renderResume(master: Resume, doc: TailoredDoc): Resume {
     ...master,
     headline: doc.headline,
     summary: doc.summary,
-    skills,
+    skills: doc.skillGroupsShown ? skills.slice(0, doc.skillGroupsShown) : skills,
     experience: master.experience
       .filter((e) => !byRole.get(e.id)?.omitted)
       .map((e) => {
@@ -234,7 +236,7 @@ export function quickTailor(master: Resume, posting: { title: string; descriptio
     headline: master.headline,
     summary: master.summary,
     experience: master.experience.map((e, i) => {
-      const limit = i < 3 ? 5 : i < 6 ? 3 : 1;
+      const limit = i < 3 ? 4 : i < 6 ? 2 : 1;
       const ranked = [...e.bullets]
         .map((b, idx) => ({ b, idx, s: score(b) - (b.reserve ? 2 : 0) }))
         .filter((x) => !x.b.reserve || x.s > 2)
@@ -528,4 +530,49 @@ export function docForChat(master: Resume, doc: TailoredDoc) {
     }),
     coverNote: doc.coverNote,
   };
+}
+
+// --- Fitting the page limit -------------------------------------------------------
+
+export type TrimOp = { kind: "bullet"; roleId: string; bulletId: string } | { kind: "skills"; shown: number };
+
+const MIN_SKILL_LINES = 8;
+
+/**
+ * What to cut, in order, when a version runs over the page limit: older
+ * roles' extra bullets (keeping one each), then recent roles' bullets beyond
+ * three, then the least relevant skill lines (down to eight), then older
+ * roles to their header line. Roles are in master order, newest first; the
+ * first three count as recent. Bullets go from the end of each role's list,
+ * where the least relevant sit.
+ */
+export function trimPlan(master: Resume, doc: TailoredDoc): TrimOp[] {
+  const byRole = new Map(doc.experience.map((r) => [r.id, r]));
+  const kept = (roleId: string) => (byRole.get(roleId)?.omitted ? [] : (byRole.get(roleId)?.bullets ?? []).filter((b) => b.status !== "rejected"));
+  const roles = master.experience.map((e) => e.id);
+  const ops: TrimOp[] = [];
+  const cut = (roleId: string, keep: number) =>
+    kept(roleId)
+      .slice(keep)
+      .reverse()
+      .forEach((b) => ops.push({ kind: "bullet", roleId, bulletId: b.id }));
+
+  for (let i = roles.length - 1; i >= 3; i--) cut(roles[i], 1);
+  for (let i = Math.min(2, roles.length - 1); i >= 0; i--) cut(roles[i], 3);
+  for (let n = (doc.skillGroupsShown ?? master.skills.length) - 2; n >= MIN_SKILL_LINES; n -= 2) ops.push({ kind: "skills", shown: n });
+  for (let i = roles.length - 1; i >= 3; i--) cut(roles[i], 0);
+  return ops;
+}
+
+/** The document with the first ops applied: cut bullets become "rejected" (restorable in the editor). */
+export function applyTrims(doc: TailoredDoc, ops: TrimOp[]): TailoredDoc {
+  const next: TailoredDoc = structuredClone(doc);
+  for (const op of ops) {
+    if (op.kind === "skills") next.skillGroupsShown = Math.min(next.skillGroupsShown ?? Infinity, op.shown);
+    else {
+      const b = next.experience.find((r) => r.id === op.roleId)?.bullets.find((x) => x.id === op.bulletId);
+      if (b) b.status = "rejected";
+    }
+  }
+  return next;
 }
