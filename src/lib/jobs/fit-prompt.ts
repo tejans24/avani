@@ -1,4 +1,4 @@
-import { PAY, payK } from "@/lib/jobs/scoring-config";
+import { PAY, RESUME_PAGES, payK } from "@/lib/jobs/scoring-config";
 
 /**
  * The job posting evaluator's instructions (owner-written, Oct 2026). Edit
@@ -62,7 +62,7 @@ Step 5. Tailoring plan (only for APPLY verdicts)
 * Header line: equals the posting's title. Role titles in experience stay as actually held.
 * Summary variant: choose engineer / architect / developer-AI / whole-product from the profile and say why; summary is pronoun-free; include the candidate's two strongest proof points for this posting.
 * Skills block: list the lines to lead with, the posting keywords to add (only those with a bullet behind them), and the lines to cut. Never add a tool that lacks a role where it was used.
-* Bullets: which roles move up, which bullets lead each role, which bullets get the posting's vocabulary (quote the posting's phrase and the profile bullet it maps to), which bullets get cut to fit two pages. Numbers are never cut.
+* Bullets: which roles move up, which bullets lead each role, which bullets get the posting's vocabulary (quote the posting's phrase and the profile bullet it maps to), which bullets get cut to fit ${RESUME_PAGES.default} pages. Numbers are never cut.
 * Cover letter: needed or not; if yes, the three facts to lead with and the one sentence that answers the obvious objection (overqualified, no cert, founder flight risk, career change).
 * Honesty flags: every claim in the tailored version that would need confirmation from the candidate before sending (where a tool was used, team sizes, whether a number is from the candidate's tenure).
 

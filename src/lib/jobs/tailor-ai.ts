@@ -5,7 +5,7 @@ import { assertNoPersonalData, buildTailoringPayload, scrubPersonal, serializeFo
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import type { Resume } from "@/lib/jobs/resume-schema";
 import { styleRulesForPrompt } from "@/lib/jobs/resume-style";
-import { FEDERAL_VOCABULARY_LANES, type Lane } from "@/lib/jobs/scoring-config";
+import { FEDERAL_VOCABULARY_LANES, maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
 import {
   docForChat,
   docFromOutput,
@@ -108,7 +108,7 @@ export async function tailorWithClaude(input: {
         content: [
           // Identical for every posting: cached after the first tailoring run.
           { type: "text", text: `Master résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
-          { type: "text", text: `${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
+          { type: "text", text: `Length: the finished résumé must fit ${maxResumePages(input.posting.lane)} pages; choose fewer bullets in older roles to get there.\n\n${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
         ],
       },
     ],

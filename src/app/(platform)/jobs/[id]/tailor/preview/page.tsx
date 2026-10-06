@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { Badge, Button } from "@/components/platform/ds";
 import { CopyText } from "@/components/platform/jobs/CopyText";
+import { maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
 import { ResumeExportBlockedError, renderTailoredPdf } from "@/pdf/resume-render";
 
 export const metadata = { title: "Résumé preview — Avani" };
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 /** Preview first, download second: the iframe shows exactly the file you'd save. */
 export default async function PreviewPage({ params, searchParams }: { params: { id: string }; searchParams: { v?: string } }) {
   const t = searchParams.v
-    ? await db.tailoredResume.findUnique({ where: { id: searchParams.v }, include: { posting: { select: { id: true, title: true } } } })
+    ? await db.tailoredResume.findUnique({ where: { id: searchParams.v }, include: { posting: { select: { id: true, title: true, lane: true } } } })
     : null;
   if (!t || t.posting.id !== params.id) notFound();
 
@@ -25,6 +26,7 @@ export default async function PreviewPage({ params, searchParams }: { params: { 
     else throw e;
   }
   const back = `/jobs/${params.id}/tailor?v=${t.id}`;
+  const maxPages = maxResumePages(t.posting.lane as Lane);
 
   return (
     <>
@@ -37,10 +39,14 @@ export default async function PreviewPage({ params, searchParams }: { params: { 
           {rendered && (
             <p className="sub" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {rendered.filename}
-              <Badge tone={rendered.pages <= 2 ? "positive" : "caution"}>
+              <Badge tone={rendered.pages <= maxPages ? "positive" : "caution"}>
                 {rendered.pages} page{rendered.pages === 1 ? "" : "s"}
               </Badge>
-              {rendered.pages > 2 && <span>Over two pages: reject a few bullets in older roles, then save a new version.</span>}
+              {rendered.pages > maxPages && (
+                <span>
+                  Over your {maxPages}-page limit: reject a few bullets in older roles, or leave an old role out, then save a new version.
+                </span>
+              )}
             </p>
           )}
         </div>

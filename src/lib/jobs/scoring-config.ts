@@ -35,6 +35,18 @@ export const PAY = {
   targetMaxCents: 215_000_00,
 };
 
+/**
+ * Résumé length, in pages. Two is the norm at 15+ years, and USAJOBS caps
+ * federal résumés at two. Raise it for one lane if that market expects more
+ * (e.g. GOV_CONTRACTOR: 3); the preview warns over the limit and tailoring
+ * aims for it.
+ */
+export const RESUME_PAGES: { default: number; byLane: Partial<Record<Lane, number>> } = {
+  default: 2,
+  byLane: {},
+};
+export const maxResumePages = (lane?: Lane | null) => (lane && RESUME_PAGES.byLane[lane]) || RESUME_PAGES.default;
+
 /** $185K */
 export const payK = (cents: number) => `$${Math.round(cents / 100_000)}K`;
 
