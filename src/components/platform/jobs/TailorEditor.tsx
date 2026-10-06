@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateTailored, markAppliedWithVersion, reuseTailoredVersion, saveTailoredVersion, startFromMaster } from "@/actions/tailor";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
@@ -47,6 +47,10 @@ export function TailorEditor(props: {
   /** Versions made for other jobs, most similar posting first. */
   reusable: ReusableVersion[];
   chat: ChatTurnView[];
+  /** Arrived from "Make my résumé": start one right away when this job has none. */
+  autoStart: boolean;
+  /** The evaluation's call on a cover letter, when the job has been evaluated. */
+  coverLetter: { needed: boolean; why: string } | null;
 }) {
   const router = useRouter();
   const { pending, error, note, run } = useAction();
@@ -55,6 +59,7 @@ export function TailorEditor(props: {
   const [editing, setEditing] = useState<string | null>(null);
   const [focusReq, setFocusReq] = useState<number | null>(null);
   const [reuseId, setReuseId] = useState(props.reusable[0]?.id ?? "");
+  const [lineOpen, setLineOpen] = useState(false);
   const isSent = props.versionId !== null && props.versionId === props.appliedVersionId;
 
   const masterText = useMemo(() => {
@@ -66,6 +71,10 @@ export function TailorEditor(props: {
   const truth = useMemo(() => (doc ? checkTruth(props.master, doc) : []), [doc, props.master]);
   const style = useMemo(() => (doc ? checkDocStyle(props.master, doc) : []), [doc, props.master]);
   const blocking = doc ? hasBlocking(truth, style) : false;
+  // Must-fix issues open the line-by-line editor; fixing them leaves it open.
+  useEffect(() => {
+    if (blocking) setLineOpen(true);
+  }, [blocking]);
   const issuesFor = (where: string) => [
     ...truth.filter((t) => t.where === where).map((t) => ({ severity: t.severity, message: t.message })),
     ...style.filter((s) => s.where === where).flatMap((s) => s.issues.map((i) => ({ severity: i.severity, message: i.message }))),
@@ -120,6 +129,15 @@ export function TailorEditor(props: {
 
   const open = (r: { id?: string }) => router.push(`/jobs/${props.postingId}/tailor?v=${r.id}`);
   const generate = (mode: "claude" | "quick") => run(() => generateTailored(props.postingId, mode), open);
+  const makeBest = () => generate(props.hasApiKey ? "claude" : "quick");
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!props.autoStart || doc || autoStarted.current) return;
+    autoStarted.current = true;
+    makeBest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Requirement ↔ bullet links, from the evaluation's fit table.
   const reqsByBullet = useMemo(() => {
@@ -131,11 +149,59 @@ export function TailorEditor(props: {
   const focusRequirement = (i: number) => {
     const next = focusReq === i ? null : i;
     setFocusReq(next);
+    if (next !== null) setLineOpen(true);
     const first = next !== null ? props.requirements[next]?.bulletIds[0] : undefined;
-    if (first) document.getElementById(`bullet-${first}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // After the editor has opened.
+    if (first) setTimeout(() => document.getElementById(`bullet-${first}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
   };
 
   const small = { fontSize: "var(--text-sm)" } as const;
+
+  /** The less common starts, folded: master as is, reuse another job's version, or the no-AI quick tailor. */
+  const StartOptions = ({ open: shown = false }: { open?: boolean }) => {
+    const body = (
+      <div style={{ display: "grid", gap: 10, marginTop: shown ? 0 : 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => startFromMaster(props.postingId), open)}>
+            Use master as is
+          </Button>
+          <span style={{ ...small, color: "var(--text-muted)" }}>No changes. Fine when the posting fits your résumé already.</span>
+        </div>
+        {props.reusable.length > 0 && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <select aria-label="Version to reuse" value={reuseId} onChange={(e) => setReuseId(e.target.value)} style={{ ...box, width: "auto", maxWidth: "100%" }}>
+              {props.reusable.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                  {v.sent ? " (sent)" : ""} · {Math.round(v.similarity * 100)}% similar
+                </option>
+              ))}
+            </select>
+            <Button type="button" variant="secondary" size="sm" disabled={pending || !reuseId} onClick={() => run(() => reuseTailoredVersion(props.postingId, reuseId), open)}>
+              Reuse this version
+            </Button>
+          </div>
+        )}
+        {props.hasApiKey && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => generate("quick")}>
+              Quick tailor (no AI)
+            </Button>
+            <span style={{ ...small, color: "var(--text-muted)" }}>Keyword match only, in a second.</span>
+          </div>
+        )}
+        <span style={{ ...small, color: "var(--text-muted)" }}>Each start makes a new version; earlier ones are kept. Your contact details never leave the app.</span>
+      </div>
+    );
+    return shown ? (
+      body
+    ) : (
+      <details>
+        <summary style={{ ...small, cursor: "pointer", color: "var(--text-secondary)" }}>Other ways to start</summary>
+        {body}
+      </details>
+    );
+  };
 
   return (
     <div className="tailor-workspace wide-page">
@@ -195,51 +261,26 @@ export function TailorEditor(props: {
       </aside>
 
       <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
-      <details className="form-card" open={!doc} style={doc ? { padding: "12px 20px" } : undefined} data-testid="tailor-start">
-        {/* Once a version exists this folds to one line; the first time it's the page's starting point. */}
-        <summary style={{ cursor: "pointer", ...(doc ? small : { listStyle: "none" }) }}>
-          {doc ? "Start another version: master as is, reuse one from another job, or tailor" : <Eyebrow index="00">Start this job&apos;s résumé</Eyebrow>}
-        </summary>
-        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-        <div style={{ display: "grid", gap: 10 }}>
+      {!doc ? (
+        <div className="form-card" style={{ display: "grid", gap: 12 }} data-testid="tailor-start">
+          <Eyebrow index="00">Make this job&apos;s résumé</Eyebrow>
+          <p style={{ ...small, margin: 0, color: "var(--text-secondary)" }}>
+            {props.hasApiKey
+              ? "Claude picks your strongest bullets for this posting, uses its words where your experience backs them, and trims to your page limit. Nothing is invented: every line traces back to your master résumé."
+              : "Picks your bullets that match the posting's words and trims to your page limit. Set ANTHROPIC_API_KEY to have Claude tailor it."}
+          </p>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => startFromMaster(props.postingId), open)}>
-              Use master as is
+            <Button type="button" variant="primary" size="md" disabled={pending} onClick={makeBest}>
+              {pending ? (props.hasApiKey ? "Claude is tailoring… about a minute" : "Working…") : "Make my résumé"}
             </Button>
-            <span style={{ ...small, color: "var(--text-muted)" }}>No changes. Fine when the posting fits your résumé already.</span>
           </div>
-          {props.reusable.length > 0 && (
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <select aria-label="Version to reuse" value={reuseId} onChange={(e) => setReuseId(e.target.value)} style={{ ...box, width: "auto", maxWidth: "100%" }}>
-                {props.reusable.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                    {v.sent ? " (sent)" : ""} · {Math.round(v.similarity * 100)}% similar
-                  </option>
-                ))}
-              </select>
-              <Button type="button" variant="secondary" size="sm" disabled={pending || !reuseId} onClick={() => run(() => reuseTailoredVersion(props.postingId, reuseId), open)}>
-                Reuse this version
-              </Button>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Button type="button" variant="primary" size="sm" disabled={pending || !props.hasApiKey} title={props.hasApiKey ? "" : "Set ANTHROPIC_API_KEY to enable"} onClick={() => generate("claude")}>
-              {pending ? "Working…" : "Tailor with Claude"}
-            </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => generate("quick")}>
-              Quick tailor (no AI)
-            </Button>
-            <span style={{ ...small, color: "var(--text-muted)" }}>Uses the evaluation&apos;s tailoring plan when there is one.</span>
-          </div>
+          <StartOptions />
         </div>
-        <span style={{ ...small, color: "var(--text-muted)" }}>Each start makes a new version; earlier ones are kept. Your contact details never leave the app.</span>
-        </div>
-      </details>
+      ) : null}
       <ActionMessage error={error} note={note} />
 
       {!doc ? (
-        <div className="empty-state">No version for this job yet. Pick a starting point above.</div>
+        <div className="empty-state">{pending ? "Working on it. The résumé appears here when it's ready." : "No version for this job yet."}</div>
       ) : (
         <>
           <div
@@ -253,11 +294,12 @@ export function TailorEditor(props: {
               {dirty ? " · unsaved changes" : ""}
             </span>
             <span style={{ flex: 1 }} />
+            {dirty && !isSent && (
             <Button
               type="button"
               variant="primary"
               size="sm"
-              disabled={pending || !dirty || isSent}
+              disabled={pending}
               onClick={() =>
                 run(() => saveTailoredVersion(props.postingId, props.versionId!, doc), (r) => {
                   setDirty(false);
@@ -267,7 +309,8 @@ export function TailorEditor(props: {
             >
               Save as new version
             </Button>
-            {props.versionId && <PdfPreviewDialog versionId={props.versionId} version={props.version ?? 0} unsaved={dirty} blocking={blocking} />}
+            )}
+            {props.versionId && <PdfPreviewDialog versionId={props.versionId} version={props.version ?? 0} unsaved={dirty} blocking={blocking} primary={!dirty} />}
             {!isSent && (
               <Button
                 type="button"
@@ -284,6 +327,13 @@ export function TailorEditor(props: {
 
           {doc.rationale && <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{doc.rationale}</p>}
 
+          <details className="line-editor" open={lineOpen} onToggle={(e) => setLineOpen(e.currentTarget.open)} data-testid="line-editor">
+            <summary className="form-card" style={{ cursor: "pointer", ...small, padding: "12px 20px" }}>
+              Edit line by line: headline, summary, roles and bullets
+              {blocking ? <span style={{ color: "var(--critical)" }}> · has must-fix issues</span> : null}
+              <span style={{ color: "var(--text-muted)" }}> · or ask Claude for changes</span>
+            </summary>
+            <div style={{ display: "grid", gap: 20, marginTop: 12 }}>
           <div className="form-card" style={{ display: "grid", gap: 12 }}>
             <Eyebrow index="01">Headline & summary</Eyebrow>
             <select
@@ -429,11 +479,35 @@ export function TailorEditor(props: {
             );
           })}
 
-          <div className="form-card" style={{ display: "grid", gap: 10 }}>
-            <Eyebrow index="03">Cover note</Eyebrow>
-            <textarea aria-label="Cover note" rows={6} value={doc.coverNote} disabled={isSent} onChange={(e) => update((d) => ({ ...d, coverNote: e.target.value }))} style={box} />
-            <Issues where="coverNote" />
+            </div>
+          </details>
+
+          <details className="form-card" id="cover-letter" open={props.coverLetter?.needed || undefined} data-testid="cover-letter">
+            <summary style={{ cursor: "pointer", ...small }}>
+              <strong>Cover letter</strong>
+              {props.coverLetter
+                ? props.coverLetter.needed
+                  ? `: worth writing. ${props.coverLetter.why}`
+                  : `: not needed. ${props.coverLetter.why} Open to write one anyway.`
+                : ": only if the form asks for one."}
+            </summary>
+            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+              <textarea aria-label="Cover note" rows={8} value={doc.coverNote} disabled={isSent} onChange={(e) => update((d) => ({ ...d, coverNote: e.target.value }))} style={box} />
+              <Issues where="coverNote" />
+            </div>
+          </details>
+
+          <details className="form-card" style={{ padding: "12px 20px" }} data-testid="start-over">
+          <summary style={{ cursor: "pointer", ...small }}>Start over: a fresh tailor, your master as is, or a version from another job</summary>
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={makeBest}>
+                {pending ? "Working…" : props.hasApiKey ? "Tailor again with Claude" : "Tailor again"}
+              </Button>
+            </div>
+            <StartOptions open />
           </div>
+        </details>
         </>
       )}
       </div>

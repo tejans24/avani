@@ -35,6 +35,14 @@ export const SCREEN_ODDS_LABEL: Record<(typeof SCREEN_ODDS)[number], string> = {
   NA: "n/a",
 };
 
+/** How intense the day to day is: the owner wants calm and well paid. */
+export const PACES = ["CALM", "STEADY", "INTENSE", "UNKNOWN"] as const;
+export type Pace = (typeof PACES)[number];
+export const PACE_LABEL: Record<Pace, string> = { CALM: "Calm", STEADY: "Steady", INTENSE: "Intense", UNKNOWN: "Pace unclear" };
+
+/** Verdicts that mean "put time into this one". */
+export const APPLYING_VERDICTS: readonly FitVerdict[] = ["APPLY", "APPLY_LOW_EFFORT"];
+
 export const fitOutputSchema = z.object({
   verdict: z.enum(FIT_VERDICTS),
   reason: z.string(),
@@ -90,10 +98,16 @@ export const fitOutputSchema = z.object({
     .nullable(),
   formFields: z.array(z.object({ field: z.string(), answer: z.string() })),
   next: z.array(z.string()),
+  /** Day-to-day intensity, from the posting's tempo signals. */
+  pace: z.object({ rating: z.enum(PACES), why: z.string() }),
+  /** Whether this application needs a cover letter at all. */
+  coverLetter: z.object({ needed: z.boolean(), why: z.string() }),
 });
 export type FitOutput = z.infer<typeof fitOutputSchema>;
 
-export type FitAnalysis = FitOutput & {
+/** Analyses saved before pace and coverLetter existed lack them. */
+export type FitAnalysis = Omit<FitOutput, "pace" | "coverLetter"> &
+  Partial<Pick<FitOutput, "pace" | "coverLetter">> & {
   /** Quotes in realJob.quotes not found in the posting text, by index. */
   unverifiedQuotes: number[];
   /** The app's own location and pay checks, shown beside the verdict. */
@@ -329,5 +343,21 @@ export function fakeFitOutput(p: FitPostingFacts, breakdown: BreakdownEntry[], b
       : null,
     formFields: [],
     next: ["Submit."],
+    pace: paceFromBreakdown(breakdown),
+    coverLetter: { needed: false, why: "Fake evaluation: the posting doesn't ask for one." },
   };
+}
+
+/** Score rules that signal an intense pace (scoring-config.ts red flags). */
+const INTENSE_RULES = new Set(["pager-tempo", "fast-paced-startup", "founding", "series-a-c"]);
+
+/** The pace the code score can see: intense when a tempo red flag fired, otherwise unknown. */
+export function paceFromBreakdown(breakdown: BreakdownEntry[]): { rating: Pace; why: string } {
+  const hit = breakdown.find((b) => INTENSE_RULES.has(b.rule));
+  return hit ? { rating: "INTENSE", why: hit.label } : { rating: "UNKNOWN", why: "No tempo signals in the posting." };
+}
+
+/** The pace to show: Claude's rating when the job was evaluated, else what the score saw. */
+export function paceOf(fit: FitAnalysis | null, breakdown: BreakdownEntry[]): { rating: Pace; why: string } {
+  return fit?.pace ?? paceFromBreakdown(breakdown);
 }

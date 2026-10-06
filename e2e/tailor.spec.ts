@@ -27,9 +27,11 @@ test("tailor, guard, version, preview, download, and record the version sent", a
 
   const [{ id }] = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`);
   await page.goto(`/jobs/${id}/tailor`);
+  await page.getByText("Other ways to start").click();
   await page.getByRole("button", { name: "Quick tailor (no AI)" }).click();
   await page.waitForURL(/tailor\?v=/);
   await expect(page.getByText("v1 · quick tailor")).toBeVisible();
+  await page.getByText("Edit line by line").click();
 
   // The most relevant bullet leads, unchanged.
   const firm = page.getByTestId("role-firm");
@@ -40,7 +42,7 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   await firm.getByLabel("Edit firm-1").fill("Built event-driven eligibility services — on AWS Lambda for 40 states.");
   await expect(firm.getByText(/Must fix: Adds 40/)).toBeVisible();
   await expect(firm.getByText(/Must fix: No em dashes/)).toBeVisible();
-  await expect(page.getByText("Has must-fix issues")).toBeVisible();
+  await expect(page.getByText("Has must-fix issues", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "I applied with this version" })).toBeDisabled();
 
   // Back to the original wording, reject the mentoring bullet, save as v2.
@@ -102,8 +104,9 @@ test("the evaluator runs on its own the first time a matching job is opened, and
   await expect(panel.getByText("Test evaluation")).toBeVisible();
   await expect(panel.getByText("Fake evaluation of Senior Software Engineer, Medicaid Modernization at Chesapeake Civic Digital.")).toBeVisible();
   await expect(panel.getByText(/App checks: location/)).toContainText("Remote");
-  await expect(panel.getByText("GATES")).toBeVisible();
-  await panel.getByText("FIT TABLE").click();
+  await panel.getByText(/^Full evaluation/).click();
+  await expect(panel.getByText("GATES", { exact: true })).toBeVisible();
+  await panel.getByText("FIT TABLE", { exact: true }).click();
   await expect(panel.getByText(/↳/).first()).toBeVisible(); // cited résumé bullets shown as text
   await expect(page.getByText("From Greenhouse")).toBeVisible();
 
@@ -111,7 +114,7 @@ test("the evaluator runs on its own the first time a matching job is opened, and
   expect(row.fitAnalyzedAt).not.toBeNull();
 
   await page.goto("/jobs");
-  await expect(page.getByTestId("job-row").first()).toContainText("Fit: Apply");
+  await expect(page.getByTestId("job-row").first()).toContainText(/^Apply\s*score 100/);
 });
 
 test("start from master, reuse it on another job, and change it by chatting with Claude", async ({ page }) => {
@@ -121,9 +124,10 @@ test("start from master, reuse it on another job, and change it by chatting with
   // The evaluation feeds the posting panel: requirements matched to bullets.
   await page.goto(`/jobs/${id}`);
   await expect(page.getByTestId("fit-panel").getByText("Test evaluation")).toBeVisible();
-  await page.getByRole("link", { name: /Résumé for this job/ }).click();
+  await page.goto(`/jobs/${id}/tailor`);
   await page.waitForLoadState("networkidle");
 
+  await page.getByText("Other ways to start").click();
   await page.getByRole("button", { name: "Use master as is" }).click();
   await page.waitForURL(/tailor\?v=/);
   await expect(page.getByText(/^v1 · master as is/)).toBeVisible();
@@ -165,11 +169,13 @@ test("start from master, reuse it on another job, and change it by chatting with
   const [{ id: other }] = await queryRows(`SELECT id FROM "JobPosting" WHERE id <> $1 LIMIT 1`, [id]);
   await page.goto(`/jobs/${other}/tailor`);
   await page.waitForLoadState("networkidle");
+  await page.getByText("Other ways to start").click();
   await expect(page.getByLabel("Version to reuse")).toContainText("Chesapeake Civic Digital: Senior Software Engineer, Medicaid Modernization v2");
   await page.getByRole("button", { name: "Reuse this version" }).click();
   await page.waitForURL(/tailor\?v=/);
   await expect(page.getByText(/^v1 · reused/)).toBeVisible();
   await expect(page.getByText(/Copied from v2 for Senior Software Engineer, Medicaid Modernization/)).toBeVisible();
+  await page.getByText("Edit line by line").click();
   await expect(page.getByTestId("role-agency").getByText("Left out of this version.")).toBeVisible();
 });
 
@@ -257,4 +263,32 @@ test("a job page with its application form: the questions land in the job's answ
   await qa.getByRole("button", { name: "Draft the other 1 with Claude" }).click();
   await expect(qa.getByLabel("Answer: Why do you want to work on climate risk?")).toHaveValue("Fake draft for: Why do you want to work on climate risk?");
   await expect(qa.getByText("Not drafted yet")).toHaveCount(0);
+});
+
+test("one click from the job page makes the résumé, and the cover letter only opens when it's needed", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const [{ id }] = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`);
+  await page.goto(`/jobs/${id}`);
+  const steps = page.getByTestId("job-steps");
+  await expect(steps.getByText("Not needed.")).toBeVisible(); // the evaluation's cover letter call
+  await steps.getByRole("link", { name: "Make my résumé" }).click();
+  await page.waitForURL(/tailor\?v=/, { timeout: 60_000 });
+  await expect(page.getByText(/^v1 · /)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview PDF" })).toBeVisible();
+  await expect(page.getByTestId("cover-letter")).not.toHaveAttribute("open", "");
+
+  await page.goto(`/jobs/${id}`);
+  await expect(steps.getByText("Version 1 ready")).toBeVisible();
+  await expect(steps.getByRole("link", { name: "Open résumé" })).toBeVisible();
+});
+
+test("Have Claude read the next few: verdicts land on the list without opening each job", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  await page.goto("/jobs");
+  await expect(page.getByTestId("job-row").first()).toContainText("not read yet");
+  await page.getByRole("button", { name: /Have Claude read the next/ }).click();
+  await expect(page.getByText(/Evaluated \d jobs?/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("job-row").first()).toContainText(/^Apply/);
+  const [{ n }] = await queryRows(`SELECT count(*)::int AS n FROM "JobPosting" WHERE "fitAnalyzedAt" IS NULL AND "filterFailures" = '{}'`);
+  expect(n).toBe(0);
 });

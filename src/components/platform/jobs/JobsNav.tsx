@@ -8,8 +8,8 @@ import { usePathname, useSearchParams } from "next/navigation";
  * menu panel on narrow screens) while you're anywhere in the section.
  */
 export const JOBS_NAV = [
-  { href: "/jobs", label: "Matches", match: (p: string, view: string | null) => p === "/jobs" && (!view || view === "matches" || view === "filtered") },
-  { href: "/jobs?view=pipeline", label: "Applications", match: (p: string, view: string | null) => p === "/jobs" && view === "pipeline" },
+  { href: "/jobs", label: "To apply", match: (p: string, view: string | null) => p === "/jobs" && view !== "applied" && view !== "pipeline" },
+  { href: "/jobs?view=applied", label: "Applied", match: (p: string, view: string | null) => p === "/jobs" && (view === "applied" || view === "pipeline") },
   { href: "/jobs/capture", label: "Add a job", match: (p: string) => p.startsWith("/jobs/capture") },
   { href: "/jobs/resume", label: "Résumé", match: (p: string) => p.startsWith("/jobs/resume") },
   { href: "/jobs/boards", label: "Sources", match: (p: string) => p.startsWith("/jobs/boards") },

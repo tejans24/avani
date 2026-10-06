@@ -48,7 +48,9 @@ test("awards link to companies, boost their postings, and surface hiring leads",
 
   // The job page shows the company's awards for the call.
   await page.goto(`/jobs/${posting.id}`);
-  await expect(page.getByText("Federal awards: Chesapeake Civic Digital")).toBeVisible();
+  const awardsFold = page.locator("summary", { hasText: "Federal awards" });
+  await expect(awardsFold).toContainText("for Chesapeake Civic Digital");
+  await awardsFold.click();
   // Listed in the awards panel and cited as the score evidence.
   await expect(page.getByText(/75FCMC26C0011/)).toHaveCount(2);
 });

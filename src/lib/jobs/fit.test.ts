@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { postingSiteLabel, postingSourceText } from "@/lib/jobs/display";
-import { candidateFacts, codeChecks, codeChecksForPrompt, finalizeFit, personalGates, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
+import { candidateFacts, codeChecks, paceFromBreakdown, paceOf, codeChecksForPrompt, finalizeFit, personalGates, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
 import { resumeSchema } from "@/lib/jobs/resume-schema";
 import { COMP_BANDS, PAY } from "@/lib/jobs/scoring-config";
@@ -38,6 +38,8 @@ const output = (over: Partial<FitOutput> = {}): FitOutput => ({
   tailoring: { header: "Senior Engineer", summary: "", skillsLead: [], skillsAdd: [], skillsCut: [], bullets: [], coverLetter: "", honestyFlags: [] },
   formFields: [],
   next: [],
+  pace: { rating: "CALM", why: "Mature program." },
+  coverLetter: { needed: false, why: "Not asked for." },
   ...over,
 });
 
@@ -151,5 +153,27 @@ describe("citizenship and clearance gates, checked in the app", () => {
     const text = codeChecksForPrompt(codeChecks(posting({ descriptionText: "U.S. Citizenship required. Public Trust." }), cleared));
     expect(text).toContain("CITIZENSHIP_CHECK: PASS");
     expect(text).toContain("CLEARANCE_CHECK: PASS");
+  });
+});
+
+describe("pace", () => {
+  const entry = (rule: string, label = rule) => ({ category: "redFlags" as const, rule, label, points: -8, evidence: "" });
+
+  it("is intense when a tempo red flag fired, and unknown otherwise", () => {
+    expect(paceFromBreakdown([entry("pager-tempo", "Pager-driven tempo")])).toEqual({ rating: "INTENSE", why: "Pager-driven tempo" });
+    expect(paceFromBreakdown([entry("weekly-status-reporting")]).rating).toBe("UNKNOWN");
+  });
+
+  it("prefers Claude's rating, and falls back for analyses saved before pace existed", () => {
+    const fit = finalizeFit(output(), ctx());
+    expect(paceOf(fit, [entry("pager-tempo")]).rating).toBe("CALM");
+    const { pace: _old, ...legacy } = fit;
+    expect(paceOf(legacy, [entry("pager-tempo")]).rating).toBe("INTENSE");
+  });
+
+  it("the evaluator is asked for pace and whether a cover letter is needed", () => {
+    const prompt = fitSystemPrompt();
+    expect(prompt).toMatch(/calm, predictable pace that pays well/);
+    expect(prompt).toMatch(/coverLetter\.needed/);
   });
 });

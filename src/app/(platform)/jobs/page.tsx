@@ -1,25 +1,18 @@
 import Link from "next/link";
-import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { Badge, Button } from "@/components/platform/ds";
-import { StatTile } from "@/components/platform/StatTile";
-import type { ExtractedBenefit } from "@/lib/jobs/benefits";
+import { EvaluateMatchesButton } from "@/components/platform/jobs/EvaluateMatchesButton";
 import { LANE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, scoreTone } from "@/lib/jobs/display";
-import { FIT_VERDICT_LABEL, type FitAnalysis } from "@/lib/jobs/fit";
+import { APPLYING_VERDICTS, FIT_VERDICT_LABEL, PACE_LABEL, paceOf, type FitAnalysis, type Pace } from "@/lib/jobs/fit";
 import { JOB_STATUS_LABEL, type JobStatus } from "@/lib/jobs/pipeline";
+import type { BreakdownEntry } from "@/lib/jobs/scoring";
 import type { Lane, WorkMode } from "@/lib/jobs/scoring-config";
+import { UNEVALUATED_MATCH, VIEWS, parseView, triageKey, verdictBucket, viewWhere, type View } from "@/lib/jobs/views";
 
 export const metadata = { title: "Jobs — Avani" };
 export const dynamic = "force-dynamic";
-
-const VIEWS = {
-  matches: { label: "Matches", blurb: "Open postings that pass your filters, best first." },
-  pipeline: { label: "Applications", blurb: "Shortlisted, applied, interviewing and offers." },
-  filtered: { label: "Filtered out", blurb: "Postings that failed a must-have. Each shows why." },
-  skipped: { label: "Skipped", blurb: "Postings you passed on." },
-  archived: { label: "Archived", blurb: "Hidden but kept, with their history." },
-} as const;
-type View = keyof typeof VIEWS;
+// "Have Claude read the next few" runs as a server action on this page.
+export const maxDuration = 300;
 
 const STATUS_TONE: Record<JobStatus, string> = {
   NEW: "neutral",
@@ -30,6 +23,7 @@ const STATUS_TONE: Record<JobStatus, string> = {
   CLOSED: "neutral",
   SKIPPED: "neutral",
 };
+const PACE_TONE: Record<Pace, string> = { CALM: "positive", STEADY: "neutral", INTENSE: "critical", UNKNOWN: "neutral" };
 
 /** Work-mode filter for the list ("Remote" includes remote jobs with occasional travel, which are flagged). */
 const MODES = {
@@ -41,67 +35,59 @@ const MODES = {
 } as const satisfies Record<string, { label: string; modes: WorkMode[] }>;
 type Mode = keyof typeof MODES;
 
-function whereFor(view: View, lane: Lane | null, mode: Mode | null): Prisma.JobPostingWhereInput {
-  const base: Prisma.JobPostingWhereInput = { ...(lane ? { lane } : {}), ...(mode ? { workMode: { in: [...MODES[mode].modes] } } : {}) };
-  switch (view) {
-    case "matches":
-      return { ...base, archivedAt: null, closedAt: null, filterFailures: { isEmpty: true }, status: { in: ["NEW", "SHORTLISTED"] } };
-    case "pipeline":
-      return { ...base, archivedAt: null, status: { in: ["SHORTLISTED", "APPLIED", "INTERVIEWING", "OFFER"] } };
-    case "filtered":
-      return { ...base, archivedAt: null, NOT: { filterFailures: { isEmpty: true } }, status: "NEW" };
-    case "skipped":
-      return { ...base, archivedAt: null, status: "SKIPPED" };
-    case "archived":
-      return { ...base, archivedAt: { not: null } };
-  }
-}
-
 export default async function JobsPage({ searchParams }: { searchParams: { view?: string; lane?: string; mode?: string } }) {
-  const view: View = (Object.keys(VIEWS) as View[]).includes(searchParams.view as View) ? (searchParams.view as View) : "matches";
+  const view: View = parseView(searchParams.view);
   const lane = (Object.keys(LANE_LABEL) as Lane[]).includes(searchParams.lane as Lane) ? (searchParams.lane as Lane) : null;
   const mode = (Object.keys(MODES) as Mode[]).includes(searchParams.mode as Mode) ? (searchParams.mode as Mode) : null;
-  const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+  const narrow = { ...(lane ? { lane } : {}), ...(mode ? { workMode: { in: [...MODES[mode].modes] } } : {}) };
 
-  const [postings, counts, newThisWeek, failingBoards, boardCount] = await Promise.all([
+  const [rows, unevaluated, failingBoards, boardCount, hasMaster] = await Promise.all([
     db.jobPosting.findMany({
-      where: whereFor(view, lane, mode),
-      orderBy: view === "pipeline" ? [{ statusChangedAt: "desc" }] : [{ score: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
+      where: { AND: [viewWhere(view), narrow] },
+      orderBy: view === "applied" ? [{ statusChangedAt: "desc" }] : [{ score: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
       take: 300,
-      include: { company: { select: { name: true } }, _count: { select: { aliases: true } } },
+      include: { company: { select: { name: true } } },
     }),
-    db.jobPosting.groupBy({ by: ["status"], where: { archivedAt: null }, _count: true }),
-    db.jobPosting.count({ where: { firstSeenAt: { gte: weekAgo }, filterFailures: { isEmpty: true }, archivedAt: null } }),
+    db.jobPosting.count({ where: UNEVALUATED_MATCH }),
     db.jobBoard.count({ where: { enabled: true, lastError: { not: null } } }),
     db.jobBoard.count({ where: { enabled: true } }),
+    db.resumeMaster.count(),
   ]);
-  const countOf = (s: JobStatus) => counts.find((c) => c.status === s)?._count ?? 0;
+
+  // "To apply" and "Not for me" share the open matches; Claude's verdict decides which side each lands on.
+  const postings =
+    view === "todo"
+      ? rows.filter((p) => verdictBucket(p).bucket === "todo").sort((a, b) => triageKey(a) - triageKey(b))
+      : view === "notforme"
+        ? rows.filter((p) => verdictBucket(p).bucket === "notforme")
+        : rows;
+  const aiEnabled = Boolean(process.env.ANTHROPIC_API_KEY) || process.env.TAILOR_MODE === "fake";
 
   const href = (v: View, l: Lane | null = lane, m: Mode | null = mode) => `/jobs?view=${v}${l ? `&lane=${l}` : ""}${m ? `&mode=${m}` : ""}`;
+  const muted = { fontSize: "var(--text-sm)", color: "var(--text-muted)" } as const;
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Jobs</h1>
-          <p className="sub">{VIEWS[view].blurb} Nothing here is ever submitted for you.</p>
+          <p className="sub">
+            {VIEWS[view].blurb} Nothing is ever submitted for you.
+          </p>
         </div>
-        <Button href="/jobs/capture" variant="primary" size="md">
-          Add a job
-        </Button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {view === "todo" && aiEnabled && hasMaster > 0 && <EvaluateMatchesButton remaining={unevaluated} />}
+          <Button href="/jobs/capture" variant="primary" size="md">
+            Add a job
+          </Button>
+        </div>
       </div>
 
-      <div className="stat-row">
-        <StatTile label="New matches" value={String(newThisWeek)} sublabel="Passing filters, last 7 days" />
-        <StatTile label="Applied" value={String(countOf("APPLIED"))} sublabel="Waiting to hear back" />
-        <StatTile label="Interviewing" value={String(countOf("INTERVIEWING"))} tone={countOf("INTERVIEWING") ? "positive" : "default"} />
-        <StatTile
-          label="Sources"
-          value={`${boardCount - failingBoards}/${boardCount}`}
-          sublabel={failingBoards ? `${failingBoards} failing` : "All fetching"}
-          tone={failingBoards ? "critical" : "default"}
-        />
-      </div>
+      {failingBoards > 0 && (
+        <p style={{ ...muted, color: "var(--critical)", marginTop: -8 }}>
+          {failingBoards} of {boardCount} sources failed to refresh. <Link href="/jobs/boards">See sources</Link>
+        </p>
+      )}
 
       <div className="filter-tabs">
         {(Object.keys(VIEWS) as View[]).map((v) => (
@@ -110,40 +96,57 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
           </Link>
         ))}
       </div>
-      <div className="filter-tabs" style={{ marginTop: -8 }} aria-label="Lane">
-        <Link href={href(view, null)} data-active={!lane || undefined}>
-          All lanes
+      <div className="quick-filters" aria-label="Quick filters">
+        <Link href={href(view, lane, mode === "remote" ? null : "remote")} data-active={mode === "remote" || undefined} aria-pressed={mode === "remote"}>
+          Remote only
         </Link>
-        {(Object.keys(LANE_LABEL) as Lane[])
-          .filter((l) => l !== "UNCLASSIFIED")
-          .map((l) => (
-            <Link key={l} href={href(view, l)} data-active={lane === l || undefined}>
-              {LANE_LABEL[l]}
+        <Link
+          href={href(view, lane === "GOV_CONTRACTOR" ? null : "GOV_CONTRACTOR", mode)}
+          data-active={lane === "GOV_CONTRACTOR" || undefined}
+          aria-pressed={lane === "GOV_CONTRACTOR"}
+        >
+          Gov contracting only
+        </Link>
+        <details className="more-filters" open={Boolean((lane && lane !== "GOV_CONTRACTOR") || (mode && mode !== "remote")) || undefined}>
+          <summary>More filters</summary>
+          <div className="filter-tabs" aria-label="Lane">
+            <Link href={href(view, null)} data-active={!lane || undefined}>
+              All lanes
             </Link>
-          ))}
-      </div>
-      <div className="filter-tabs" style={{ marginTop: -8 }} aria-label="Work mode">
-        <Link href={href(view, lane, null)} data-active={!mode || undefined}>
-          All work modes
-        </Link>
-        {(Object.keys(MODES) as Mode[]).map((m) => (
-          <Link key={m} href={href(view, lane, m)} data-active={mode === m || undefined}>
-            {MODES[m].label}
-          </Link>
-        ))}
+            {(Object.keys(LANE_LABEL) as Lane[])
+              .filter((l) => l !== "UNCLASSIFIED")
+              .map((l) => (
+                <Link key={l} href={href(view, l)} data-active={lane === l || undefined}>
+                  {LANE_LABEL[l]}
+                </Link>
+              ))}
+          </div>
+          <div className="filter-tabs" aria-label="Work mode">
+            <Link href={href(view, lane, null)} data-active={!mode || undefined}>
+              All work modes
+            </Link>
+            {(Object.keys(MODES) as Mode[]).map((m) => (
+              <Link key={m} href={href(view, lane, m)} data-active={mode === m || undefined}>
+                {MODES[m].label}
+              </Link>
+            ))}
+          </div>
+        </details>
       </div>
 
       {postings.length === 0 ? (
         <div className="empty-state">
-          <p className="empty-title">Nothing here yet</p>
+          <p className="empty-title">{view === "todo" ? "Nothing worth applying to right now" : "Nothing here"}</p>
           <p>
             {boardCount === 0
-              ? "Add job boards to start pulling postings, or add a job you found yourself."
-              : "New postings arrive as boards refresh through the day."}
+              ? "Add sources to start pulling postings, or add a job you found yourself."
+              : view === "todo"
+                ? "New postings arrive as sources refresh. Anything ruled out is under Not for me."
+                : "Postings land here as you work through them."}
           </p>
           <div className="empty-actions">
             <Button href={boardCount === 0 ? "/jobs/boards" : "/jobs/capture"} variant="primary" size="sm">
-              {boardCount === 0 ? "Add boards" : "Add a job"}
+              {boardCount === 0 ? "Add sources" : "Add a job"}
             </Button>
           </div>
         </div>
@@ -152,67 +155,68 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
           <table className="data-table job-table">
             <thead>
               <tr>
-                <th className="num">Score</th>
+                <th>Verdict</th>
                 <th>Role</th>
-                <th>Lane</th>
-                <th>Where</th>
                 <th>Pay</th>
-                <th>Benefits</th>
-                <th>Posted</th>
-                <th>Status</th>
+                <th>Pace</th>
+                <th>Where</th>
+                {view === "applied" ? <th>Status</th> : <th>Posted</th>}
               </tr>
             </thead>
             <tbody>
               {postings.map((p) => {
+                const fit = p.fitAnalysis as unknown as FitAnalysis | null;
                 const passed = p.filterFailures.length === 0;
-                const benefits = (p.benefits as unknown as ExtractedBenefit[]).slice(0, 4);
+                const pace = paceOf(fit, p.scoreBreakdown as unknown as BreakdownEntry[]);
                 const comp = formatComp(p.compMinCents, p.compMaxCents);
+                const why = view === "notforme" ? verdictBucket(p).why : null;
+                const applying = fit && APPLYING_VERDICTS.includes(fit.verdict);
                 return (
                   <tr key={p.id} data-testid="job-row">
-                    <td className="num c-score">
-                      <Badge tone={scoreTone(p.score, passed)}>{p.score ?? "—"}</Badge>
+                    <td className="c-score">
+                      {fit ? (
+                        <Badge tone={applying ? (fit.verdict === "APPLY" ? "positive" : "caution") : "neutral"}>{FIT_VERDICT_LABEL[fit.verdict]}</Badge>
+                      ) : (
+                        <Badge tone={scoreTone(p.score, passed)} title="Score from the app's rules; Claude hasn't read it yet">
+                          {p.score ?? "—"}
+                        </Badge>
+                      )}
+                      <div style={{ ...muted, marginTop: 4, whiteSpace: "nowrap" }}>{fit ? `score ${p.score ?? "—"}` : "not read yet"}</div>
                     </td>
                     <td className="c-role">
                       <Link href={`/jobs/${p.id}`}>{p.title}</Link>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                      <div style={muted}>
                         {p.company.name} · {postingSiteLabel(p)}
-                        {p._count.aliases ? ` · also on ${p._count.aliases} other board${p._count.aliases === 1 ? "" : "s"}` : ""}
                         {p.closedAt ? " · no longer listed" : ""}
                       </div>
-                      {!passed && (
-                        <div style={{ fontSize: "var(--text-sm)", color: "var(--critical)" }}>{p.filterFailures[0]}</div>
-                      )}
-                      {p.fitAnalysis && (
-                        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-                          Fit: {FIT_VERDICT_LABEL[(p.fitAnalysis as unknown as FitAnalysis).verdict]}
-                        </div>
-                      )}
-                    </td>
-                    <td className="c-lane" style={{ fontSize: "var(--text-sm)" }}>{LANE_LABEL[p.lane as Lane]}</td>
-                    <td className="c-where" style={{ fontSize: "var(--text-sm)" }}>
-                      {WORK_MODE_LABEL[p.workMode as WorkMode]}
-                      <div style={{ color: "var(--text-muted)" }}>{p.location}</div>
+                      {why && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{why}</div>}
+                      {fit && applying && view === "todo" && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{fit.reason}</div>}
                     </td>
                     <td className="c-pay" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
                       {comp ?? <span style={{ color: "var(--text-muted)" }}>Not posted</span>}
                     </td>
-                    <td className="c-benefits">
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 260 }}>
-                        {benefits.length === 0 ? (
-                          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>—</span>
-                        ) : (
-                          benefits.map((b) => (
-                            <Badge key={b.key} tone="neutral" title={b.evidence}>
-                              {b.value ? `${b.label} · ${b.value}` : b.label}
-                            </Badge>
-                          ))
-                        )}
-                      </div>
+                    <td className="c-pace" style={{ fontSize: "var(--text-sm)" }} data-empty={pace.rating === "UNKNOWN" || undefined}>
+                      {pace.rating === "UNKNOWN" ? (
+                        <span style={{ color: "var(--text-muted)" }}>—</span>
+                      ) : (
+                        <Badge tone={PACE_TONE[pace.rating]} title={pace.why}>
+                          {PACE_LABEL[pace.rating]}
+                        </Badge>
+                      )}
                     </td>
-                    <td className="c-posted" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{ago(p.postedAt ?? p.firstSeenAt)}</td>
-                    <td className="c-status">
-                      <Badge tone={STATUS_TONE[p.status as JobStatus]}>{JOB_STATUS_LABEL[p.status as JobStatus]}</Badge>
+                    <td className="c-where" style={{ fontSize: "var(--text-sm)" }}>
+                      {WORK_MODE_LABEL[p.workMode as WorkMode]}
+                      <div style={{ color: "var(--text-muted)" }}>{p.location}</div>
                     </td>
+                    {view === "applied" ? (
+                      <td className="c-status">
+                        <Badge tone={STATUS_TONE[p.status as JobStatus]}>{JOB_STATUS_LABEL[p.status as JobStatus]}</Badge>
+                      </td>
+                    ) : (
+                      <td className="c-posted" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
+                        {ago(p.postedAt ?? p.firstSeenAt)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

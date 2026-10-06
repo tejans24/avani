@@ -8,12 +8,12 @@ import type { ChatTurnView } from "@/components/platform/jobs/TailorChat";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { postingSimilarity, type TailoredDoc } from "@/lib/jobs/tailor";
 
-export const metadata = { title: "Tailor résumé — Avani" };
+export const metadata = { title: "Résumé for this job — Avani" };
 export const dynamic = "force-dynamic";
 // Tailoring with Claude runs inside this page's server action.
 export const maxDuration = 300;
 
-export default async function TailorPage({ params, searchParams }: { params: { id: string }; searchParams: { v?: string } }) {
+export default async function TailorPage({ params, searchParams }: { params: { id: string }; searchParams: { v?: string; auto?: string } }) {
   const posting = await db.jobPosting.findUnique({
     where: { id: params.id },
     include: {
@@ -51,11 +51,12 @@ export default async function TailorPage({ params, searchParams }: { params: { i
       <div className="page-head">
         <div>
           <p className="sub" style={{ marginBottom: 6 }}>
-            <Link href="/jobs">Jobs</Link> / <Link href={`/jobs/${posting.id}`}>{posting.title}</Link> / Tailor
+            <Link href="/jobs">Jobs</Link> / <Link href={`/jobs/${posting.id}`}>{posting.title}</Link> / Résumé
           </p>
-          <h1>Tailor résumé</h1>
+          <h1>Your résumé for this job</h1>
           <p className="sub">
-            {posting.title} at {posting.company.name}. Selects and rewords only what&apos;s in your master résumé; anything it can&apos;t trace back is flagged.
+            {posting.title} at {posting.company.name}. Built only from your master résumé; anything that can&apos;t be traced back is flagged.{" "}
+            <Link href={`/jobs/${posting.id}`}>Back to the job&apos;s steps</Link>
           </p>
         </div>
         {posting.tailored.length > 0 && (
@@ -93,6 +94,8 @@ export default async function TailorPage({ params, searchParams }: { params: { i
           requirements={fit?.fitTable ?? []}
           reusable={reusable}
           chat={(posting.tailorChat ?? []) as unknown as ChatTurnView[]}
+          autoStart={searchParams.auto === "1" && posting.tailored.length === 0}
+          coverLetter={fit?.coverLetter ?? null}
         />
       )}
     </>

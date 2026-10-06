@@ -306,6 +306,70 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Job list quick filters: two toggles, the rest folded under "More filters". */
+.quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: -8px 0 20px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.quick-filters > a {
+  padding: 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.quick-filters > a[data-active="true"] {
+  background: var(--forest, #26352b);
+  border-color: transparent;
+  color: var(--cream, #f3efe4);
+}
+.more-filters > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 5px 4px;
+}
+.more-filters[open] {
+  flex-basis: 100%;
+}
+.more-filters .filter-tabs {
+  margin: 8px 8px 0 0;
+}
+
+/* Folded side cards on the job page: a one-line summary, the card's own content inside. */
+.fold {
+  margin-bottom: 16px;
+  padding: 14px 20px;
+}
+.fold > summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fold > summary .fold-meta {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.fold[open] > summary {
+  margin-bottom: 12px;
+}
+.fold > .form-card {
+  border: 0;
+  padding: 0;
+  margin: 0 !important;
+  background: none;
+  box-shadow: none;
+}
+
 /* --- CSV file input (import wizard) --- */
 input[type="file"].file-input {
   font-family: var(--font-sans);
@@ -627,11 +691,16 @@ input[type="file"].file-input::file-selector-button:hover {
     text-align: left;
     grid-column: 2;
   }
+  .job-table td[data-empty="true"] {
+    display: none;
+  }
   .job-table td.c-score {
     grid-column: 1;
     grid-row: 1 / span 6;
+    min-width: 72px;
   }
   .job-table td.c-pay,
+  .job-table td.c-pace,
   .job-table td.c-posted,
   .job-table td.c-status {
     display: inline-block;
@@ -718,10 +787,12 @@ input[type="file"].file-input::file-selector-button:hover {
 .platform-main:has(.wide-page) {
   max-width: 1560px;
 }
+/* Job page: on a phone the next-step card comes first; on a wide screen it sits top right. */
 .job-layout {
   display: grid;
-  gap: 24px;
+  gap: 0 24px;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "steps" "main" "side";
   align-items: start;
 }
 .job-main,
@@ -730,8 +801,62 @@ input[type="file"].file-input::file-selector-button:hover {
   align-content: start;
   min-width: 0;
 }
+.job-main {
+  grid-area: main;
+}
+.job-side {
+  grid-area: side;
+}
+.job-layout > .job-steps {
+  grid-area: steps;
+}
 @media (min-width: 1200px) {
   .job-layout {
     grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "main steps" "main side";
   }
+}
+.job-steps {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+  border: 2px solid var(--forest);
+}
+.job-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.job-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.job-step-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.job-step[data-done="true"] .job-step-mark {
+  background: var(--positive);
+  border-color: var(--positive);
+  color: #fff;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

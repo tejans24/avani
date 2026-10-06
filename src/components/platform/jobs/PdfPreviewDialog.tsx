@@ -11,7 +11,7 @@ const small = { fontSize: "var(--text-sm)" } as const;
  * The exact PDF you'd download, over the editor: close it and keep editing.
  * Shows the saved version (unsaved edits aren't in it, and it says so).
  */
-export function PdfPreviewDialog({ versionId, version, unsaved, blocking }: { versionId: string; version: number; unsaved: boolean; blocking: boolean }) {
+export function PdfPreviewDialog({ versionId, version, unsaved, blocking, primary = false }: { versionId: string; version: number; unsaved: boolean; blocking: boolean; primary?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<Info | null>(null);
@@ -39,7 +39,7 @@ export function PdfPreviewDialog({ versionId, version, unsaved, blocking }: { ve
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" disabled={blocking} title={blocking ? "Fix the must-fix issues first" : undefined} onClick={show}>
+      <Button type="button" variant={primary ? "primary" : "secondary"} size="sm" disabled={blocking} title={blocking ? "Fix the must-fix issues first" : undefined} onClick={show}>
         Preview PDF
       </Button>
       <dialog ref={dialog} className="pdf-dialog" onClose={() => setOpen(false)} aria-label={`Preview of version ${version}`}>

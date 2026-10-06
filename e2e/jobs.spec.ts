@@ -19,6 +19,11 @@ async function insertBoards() {
   );
 }
 
+/** The job page's side cards are folded; open one by its summary. */
+async function openFold(page: import("@playwright/test").Page, name: string) {
+  await page.locator("summary", { hasText: name }).click();
+}
+
 async function postingId(title: string): Promise<string> {
   const rows = await queryRows(`SELECT id FROM "JobPosting" WHERE title = $1`, [title]);
   return rows[0].id as string;
@@ -47,11 +52,12 @@ test("refresh pulls postings, rejects the cross-posted duplicate, and filters wi
   await page.goto("/jobs");
   const rows = page.getByTestId("job-row");
   await expect(rows.first()).toContainText("Senior Software Engineer, Medicaid Modernization");
-  await expect(rows.first()).toContainText("also on 1 other board");
-  await expect(rows.first()).toContainText("401(k) · 5% match");
+  await expect(rows.first()).toContainText("$190K–$220K");
+  await expect(rows.first()).toContainText("not read yet");
   await expect(page.getByText("Platform Engineer")).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Filtered out" }).click();
+  // Ruled-out jobs aren't in the way; each says why under Not for me.
+  await page.getByRole("link", { name: "Not for me" }).click();
   await expect(page.getByText("Regular hybrid (set in-office days)")).toBeVisible();
   await expect(page.getByText("On-site role")).toBeVisible();
 });
@@ -62,11 +68,14 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
   // The breakdown is folded under its heading; the evaluation leads the page.
   await page.getByText(/Why it scored/).click();
   await expect(page.getByText("End-to-end ownership of a system or product")).toBeVisible();
+  await openFold(page, "Benefits");
   await expect(page.getByText("Parental leave · 12 weeks")).toBeVisible();
 
+  await openFold(page, "Tracking and notes");
   await page.getByLabel("Status", { exact: true }).selectOption("APPLIED");
   await page.getByLabel("Note (optional)").fill("Applied through the careers site");
-  await page.getByRole("button", { name: "Mark applied" }).click();
+  await page.getByRole("button", { name: "Mark applied" }).last().click();
+  await openFold(page, "Activity");
   await expect(page.getByText("New → Applied: Applied through the careers site")).toBeVisible();
 
   const [p] = await queryRows(`SELECT status, "appliedAt", "nextActionNote", "nextActionDue" FROM "JobPosting" WHERE id = $1`, [id]);
@@ -74,6 +83,7 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
   expect(p.appliedAt).not.toBeNull();
   expect(p.nextActionNote).toMatch(/follow up/i);
 
+  await expect(page.getByTestId("job-steps")).toContainText(/Applied \d{4}-\d{2}-\d{2}/);
   await expect(page.getByRole("button", { name: "Delete" })).toBeDisabled();
   await page.getByRole("button", { name: "Archive" }).click();
   await expect(page.getByRole("button", { name: "Restore" })).toBeVisible();
@@ -84,6 +94,7 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
 test("a deleted posting stays deleted when its board refreshes", async ({ page }) => {
   const id = await postingId("Founding Engineer");
   await page.goto(`/jobs/${id}`);
+  await openFold(page, "Tracking and notes");
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete" }).click();
   await page.waitForURL("**/jobs");
@@ -190,11 +201,12 @@ test("on a phone the menu folds behind a button and closes after navigating", as
   await expect(page.getByRole("link", { name: "Dashboard" })).toBeHidden();
 });
 
-test("a filtered-out job is saved, and correcting its work mode rescores it into Matches", async ({ page }) => {
+test("a filtered-out job is saved, and correcting its work mode rescores it into To apply", async ({ page }) => {
   const [hybrid] = await queryRows(`SELECT id, title FROM "JobPosting" WHERE 'Regular hybrid (set in-office days)' = ANY("filterFailures")`);
   await page.goto(`/jobs/${hybrid.id}`);
   await expect(page.getByText("Saved, but filtered out.")).toBeVisible();
   await page.waitForLoadState("networkidle");
+  await openFold(page, "Tracking and notes");
   await page.getByLabel("Work mode").selectOption("REMOTE");
   await expect(page.getByText("Saved, but filtered out.")).toBeHidden();
   const [after] = await queryRows(`SELECT "workMode", "workModeOverride", "filterFailures" FROM "JobPosting" WHERE id = $1`, [hybrid.id]);
@@ -205,6 +217,7 @@ test("a filtered-out job is saved, and correcting its work mode rescores it into
 
 test("the job list filters by work mode, alongside the other filters", async ({ page }) => {
   await page.goto("/jobs");
+  await page.getByText("More filters").click();
   const workMode = page.getByLabel("Work mode");
   await workMode.getByRole("link", { name: "Remote", exact: true }).click();
   await page.waitForURL(/mode=remote/);
@@ -217,8 +230,30 @@ test("the job list filters by work mode, alongside the other filters", async ({ 
   expect(shown).toBe(n);
 
   // The filter stays on when switching views.
-  await page.getByRole("link", { name: "Filtered out" }).click();
-  await expect(page).toHaveURL(/view=filtered.*mode=remote/);
+  await expect(page.getByRole("link", { name: "Remote only" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("link", { name: "Not for me" }).click();
+  await expect(page).toHaveURL(/view=notforme.*mode=remote/);
+  // "More filters" stays as you left it when switching views.
+  const hybrid = page.getByLabel("Work mode").getByRole("link", { name: "Hybrid", exact: true });
+  if (!(await hybrid.isVisible())) await page.getByText("More filters").click();
   await page.getByLabel("Work mode").getByRole("link", { name: "Hybrid", exact: true }).click();
   await expect(page.getByTestId("job-row").first()).toContainText("Regular hybrid (set in-office days)");
+});
+
+test("the job page walks through the steps: skip sends a job to Not for me, and undo brings it back", async ({ page }) => {
+  const id = await postingId("Senior Software Engineer, Medicaid Modernization");
+  await page.goto(`/jobs/${id}`);
+  const steps = page.getByTestId("job-steps");
+  await expect(steps.getByRole("link", { name: "Make my résumé" })).toHaveAttribute("href", `/jobs/${id}/tailor?auto=1`);
+  await steps.getByRole("button", { name: "Not for me: skip it" }).click();
+  await expect(steps.getByText("You skipped this job.")).toBeVisible();
+
+  await page.goto("/jobs?view=notforme");
+  await expect(page.getByTestId("job-row").filter({ hasText: "Medicaid Modernization" })).toContainText("You skipped it");
+  await page.goto("/jobs");
+  await expect(page.getByText("Senior Software Engineer, Medicaid Modernization")).toHaveCount(0);
+
+  await page.goto(`/jobs/${id}`);
+  await steps.getByRole("button", { name: "Undo" }).click();
+  await expect(steps.getByRole("button", { name: "Not for me: skip it" })).toBeVisible();
 });

@@ -143,6 +143,59 @@ export function JobAssistant(props: { postingId: string; enabled: boolean; hasMa
 
   return (
     <>
+      <div className="form-card" style={{ display: "grid", gap: 12, marginBottom: 20 }} data-testid="application-answers" id="answers">
+        <Eyebrow index="Q&A">Application answers</Eyebrow>
+        <p style={{ ...small, margin: 0, color: "var(--text-muted)" }}>
+          Paste the application form&apos;s questions, one per line. Name, contact, location, citizenship, work authorization, clearance and pay are filled in by the app from your résumé and never sent to Claude. Self-identification questions are left to you. Claude drafts the rest.
+        </p>
+        <textarea aria-label="Application questions" rows={4} value={questions} onChange={(e) => setQuestions(e.target.value)} placeholder={"First name\nAre you authorized to work in the US?\nWhy do you want to work here?"} style={input} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <Button type="button" variant="primary" size="sm" disabled={fillPending || !questions.trim() || !props.hasMaster} onClick={fill}>
+            {fillPending ? "Filling…" : "Fill answers"}
+          </Button>
+          {note && (
+            <span role="status" style={{ ...small, color: "var(--positive)" }}>
+              {note}
+            </span>
+          )}
+          {error && (
+            <span role="alert" style={{ ...small, color: "var(--critical)" }}>
+              {error}
+            </span>
+          )}
+        </div>
+        {answers.some((a) => a.source === "todo") && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={fillPending || !props.hasMaster}
+              onClick={() => {
+                setError(null);
+                setNote(null);
+                startFill(async () => {
+                  const todo = answers.filter((a) => a.source === "todo").map((a) => a.question);
+                  const r = await fillApplicationAnswers(props.postingId, todo.join("\n"));
+                  if ("error" in r) return setError(r.error);
+                  setAnswers(r.answers);
+                  setNote(r.note ?? null);
+                });
+              }}
+            >
+              {fillPending ? "Drafting…" : `Draft the other ${answers.filter((a) => a.source === "todo").length} with Claude`}
+            </Button>
+            <span style={{ ...small, color: "var(--text-muted)" }}>Collected from the application form when you added this job.</span>
+          </div>
+        )}
+        {answers.length > 0 && (
+          <div style={{ display: "grid", gap: 8 }}>
+            {answers.map((a) => (
+              <AnswerRow key={a.id} a={a} postingId={props.postingId} onChange={setAnswers} />
+            ))}
+          </div>
+        )}
+      </div>
       <div className="form-card" style={{ display: "grid", gap: 10, marginBottom: 20 }} data-testid="job-chat">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <Eyebrow index="AI">Ask Claude about this job</Eyebrow>
@@ -235,59 +288,6 @@ export function JobAssistant(props: { postingId: string; enabled: boolean; hasMa
         )}
       </div>
 
-      <div className="form-card" style={{ display: "grid", gap: 12, marginBottom: 20 }} data-testid="application-answers">
-        <Eyebrow index="Q&A">Application answers</Eyebrow>
-        <p style={{ ...small, margin: 0, color: "var(--text-muted)" }}>
-          Paste the application form&apos;s questions, one per line. Name, contact, location, citizenship, work authorization, clearance and pay are filled in by the app from your résumé and never sent to Claude. Self-identification questions are left to you. Claude drafts the rest.
-        </p>
-        <textarea aria-label="Application questions" rows={4} value={questions} onChange={(e) => setQuestions(e.target.value)} placeholder={"First name\nAre you authorized to work in the US?\nWhy do you want to work here?"} style={input} />
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <Button type="button" variant="primary" size="sm" disabled={fillPending || !questions.trim() || !props.hasMaster} onClick={fill}>
-            {fillPending ? "Filling…" : "Fill answers"}
-          </Button>
-          {note && (
-            <span role="status" style={{ ...small, color: "var(--positive)" }}>
-              {note}
-            </span>
-          )}
-          {error && (
-            <span role="alert" style={{ ...small, color: "var(--critical)" }}>
-              {error}
-            </span>
-          )}
-        </div>
-        {answers.some((a) => a.source === "todo") && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={fillPending || !props.hasMaster}
-              onClick={() => {
-                setError(null);
-                setNote(null);
-                startFill(async () => {
-                  const todo = answers.filter((a) => a.source === "todo").map((a) => a.question);
-                  const r = await fillApplicationAnswers(props.postingId, todo.join("\n"));
-                  if ("error" in r) return setError(r.error);
-                  setAnswers(r.answers);
-                  setNote(r.note ?? null);
-                });
-              }}
-            >
-              {fillPending ? "Drafting…" : `Draft the other ${answers.filter((a) => a.source === "todo").length} with Claude`}
-            </Button>
-            <span style={{ ...small, color: "var(--text-muted)" }}>Collected from the application form when you added this job.</span>
-          </div>
-        )}
-        {answers.length > 0 && (
-          <div style={{ display: "grid", gap: 8 }}>
-            {answers.map((a) => (
-              <AnswerRow key={a.id} a={a} postingId={props.postingId} onChange={setAnswers} />
-            ))}
-          </div>
-        )}
-      </div>
     </>
   );
 }

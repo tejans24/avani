@@ -11,6 +11,7 @@ import { addDetectedQuestions } from "@/actions/answers";
 import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
+import { UNEVALUATED_MATCH } from "@/lib/jobs/views";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
 import { ingestPostings, refreshBoard, rescorePosting } from "@/lib/jobs/refresh";
 import { INTERVIEW_QUESTIONS, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
@@ -508,39 +509,70 @@ export async function fillCaptureWithClaude(input: { pageTitle?: string; text: s
 export async function analyzeJobFit(postingId: string): Promise<ActionResult> {
   try {
     await requireAuth();
-    const posting = await db.jobPosting.findUnique({ where: { id: postingId }, include: { company: { select: { name: true } } } });
-    if (!posting) return { ok: false, error: "Job not found" };
-    const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
-    if (!master) return { ok: false, error: "Import your master résumé first (Jobs → Résumé) so the analysis can compare it." };
-    const { resumeSchema } = await import("@/lib/jobs/resume-schema");
-    const { analyzeFitWithClaude } = await import("@/lib/jobs/fit-ai");
-    const now = new Date();
-    const analysis = await analyzeFitWithClaude({
-      master: resumeSchema.parse(master.data),
-      posting: {
-        title: posting.title,
-        companyName: posting.company.name,
-        location: posting.location,
-        workMode: posting.workMode as WorkMode,
-        compMinCents: posting.compMinCents,
-        compMaxCents: posting.compMaxCents,
-        postedAt: posting.postedAt,
-        url: posting.url,
-        filterFailures: posting.filterFailures,
-        descriptionText: posting.descriptionText,
-        lane: posting.lane as Lane,
-        tailoringNotes: posting.tailoringNotes,
-      },
-      breakdown: posting.scoreBreakdown as unknown as BreakdownEntry[],
-      now,
-    });
-    await db.jobPosting.update({
-      where: { id: postingId },
-      data: { fitAnalysis: analysis as unknown as Prisma.InputJsonValue, fitAnalyzedAt: now },
-    });
+    await evaluatePosting(postingId);
     revalidateJob(postingId);
     return { ok: true, id: postingId };
   } catch (e) {
     return fail(e);
   }
+}
+
+
+/**
+ * Evaluate the next few unevaluated matches at once, so the list shows
+ * verdicts without opening each job. A few at a time keeps it inside one
+ * request; they run side by side.
+ */
+export async function evaluateNextMatches(limit = 4): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    const next = await db.jobPosting.findMany({
+      where: UNEVALUATED_MATCH,
+      orderBy: [{ score: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
+      take: Math.min(Math.max(limit, 1), 6),
+      select: { id: true },
+    });
+    if (!next.length) return { ok: true, note: "Every match is evaluated." };
+    const results = await Promise.allSettled(next.map((p) => evaluatePosting(p.id)));
+    revalidateJob();
+    const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    if (failed.length === results.length) return fail(failed[0].reason);
+    const done = results.length - failed.length;
+    return { ok: true, note: `Evaluated ${done} job${done === 1 ? "" : "s"}${failed.length ? `; ${failed.length} failed, try again` : ""}.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function evaluatePosting(postingId: string): Promise<void> {
+  const posting = await db.jobPosting.findUnique({ where: { id: postingId }, include: { company: { select: { name: true } } } });
+  if (!posting) throw new Error("Job not found");
+  const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
+  if (!master) throw new Error("Import your master résumé first (Jobs → Résumé) so the analysis can compare it.");
+  const { resumeSchema } = await import("@/lib/jobs/resume-schema");
+  const { analyzeFitWithClaude } = await import("@/lib/jobs/fit-ai");
+  const now = new Date();
+  const analysis = await analyzeFitWithClaude({
+    master: resumeSchema.parse(master.data),
+    posting: {
+      title: posting.title,
+      companyName: posting.company.name,
+      location: posting.location,
+      workMode: posting.workMode as WorkMode,
+      compMinCents: posting.compMinCents,
+      compMaxCents: posting.compMaxCents,
+      postedAt: posting.postedAt,
+      url: posting.url,
+      filterFailures: posting.filterFailures,
+      descriptionText: posting.descriptionText,
+      lane: posting.lane as Lane,
+      tailoringNotes: posting.tailoringNotes,
+    },
+    breakdown: posting.scoreBreakdown as unknown as BreakdownEntry[],
+    now,
+  });
+  await db.jobPosting.update({
+    where: { id: postingId },
+    data: { fitAnalysis: analysis as unknown as Prisma.InputJsonValue, fitAnalyzedAt: now },
+  });
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { analyzeJobFit } from "@/actions/jobs";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
-import { FIT_VERDICT_LABEL, SCREEN_ODDS_LABEL, type FitAnalysis, type FitVerdict } from "@/lib/jobs/fit";
+import { FIT_VERDICT_LABEL, PACE_LABEL, SCREEN_ODDS_LABEL, type FitAnalysis, type FitVerdict, type Pace } from "@/lib/jobs/fit";
 import { ActionMessage, useAction } from "./useAction";
 
 const VERDICT_TONE: Record<FitVerdict, "positive" | "caution" | "neutral" | "critical"> = {
@@ -38,6 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
   STRETCH: "Stretch",
   UNDER_TARGET: "Under target",
 };
+const PACE_COLOR: Record<Pace, string> = { CALM: "var(--positive)", STEADY: "var(--text-secondary)", INTENSE: "var(--critical)", UNKNOWN: "var(--text-muted)" };
 const KIND_LABEL = { MUST_HAVE: "Must-have", PREFERRED: "Preferred", DEALBREAKER: "Dealbreaker" } as const;
 
 const small = { fontSize: "var(--text-sm)" } as const;
@@ -103,7 +104,7 @@ export function FitPanel({
   return (
     <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 16 }} data-testid="fit-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <Eyebrow index="AI">Should you apply?</Eyebrow>
+        <Eyebrow index="AI">Is it worth it?</Eyebrow>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {a && (
             <span style={muted}>
@@ -138,7 +139,15 @@ export function FitPanel({
               </Badge>
               <span style={{ fontWeight: 600 }}>{a.reason}</span>
             </div>
-            <span style={muted}>Screen odds: {SCREEN_ODDS_LABEL[a.screenOdds]}</span>
+            <span style={muted}>
+              Screen odds: {SCREEN_ODDS_LABEL[a.screenOdds]}
+              {a.pace && (
+                <>
+                  {" "}
+                  · pace: <strong style={{ color: PACE_COLOR[a.pace.rating] }}>{PACE_LABEL[a.pace.rating]}</strong> ({a.pace.why})
+                </>
+              )}
+            </span>
             {a.verdictDetail && <p style={{ ...small, margin: 0 }}>{a.verdictDetail}</p>}
             {a.watchTerms.length > 0 && <p style={{ ...small, margin: 0 }}>Alert on: {a.watchTerms.join(", ")}</p>}
             {a.certToGet && <p style={{ ...small, margin: 0 }}>Cert to get: {a.certToGet}</p>}
@@ -168,6 +177,24 @@ export function FitPanel({
             </ul>
           )}
 
+          {a.gates.some((g) => g.status === "FAIL") && (
+            <ul style={{ ...small, margin: 0, paddingLeft: 18, color: "var(--critical)" }} aria-label="Failed gates">
+              {a.gates
+                .filter((g) => g.status === "FAIL")
+                .map((g) => (
+                  <li key={g.requirement}>
+                    {g.requirement}: {g.evidence}
+                    {g.likelyKnockout ? " (likely knockout)" : ""}
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          <details className="fit-full">
+            <summary style={{ ...small, cursor: "pointer", color: "var(--text-secondary)" }}>
+              Full evaluation: gates, the real job, criteria, pay, fit table{a.tailoring ? ", tailoring plan" : ""}
+            </summary>
+            <div style={{ display: "grid", gap: 16, marginTop: 14 }}>
           <Section title="GATES">
             <table className="data-table">
               <tbody>
@@ -314,6 +341,8 @@ export function FitPanel({
               <List items={a.next} ordered />
             </Section>
           )}
+            </div>
+          </details>
         </>
       )}
     </div>

@@ -30,7 +30,7 @@ Purpose of a job right now: a stable cushion under the candidate's own firm. The
 
 Must-haves: whole-problem scope (owns a system or product end to end, or is its architect-engineer); hands-on with design authority; mission the candidate would explain to their kids (public benefit, health, infrastructure, environment, civic); remote, or within an hour of the candidate's home (see LOCATION_CHECK); base pay target roughly ${payK(PAY.targetMinCents)}–${payK(PAY.targetMaxCents)} (above is welcome; acceptable down to ${payK(PAY.floorCents)} for now, below ${payK(PAY.floorCents)} it does not work); a competent decision-maker above the candidate.
 
-Strongly preferred: AI as part of the work; legacy modernization or integration-heavy problems; small enough team that breadth matters; reasonable operational tempo; room for the firm to exist.
+Strongly preferred: a calm, predictable pace that pays well (the sweet spot: steady hours, no pager identity, no crunch, pay at or above target; awarded government contract work often fits, but any sector can); AI as part of the work; legacy modernization or integration-heavy problems; small enough team that breadth matters; room for the firm to exist.
 
 Dealbreakers: daily status reporting as a core duty; narrow ticket work regardless of pay; domain requirements the candidate cannot honestly meet; must-have certifications with no path around them (until held); programs whose main tool is tracking other vendors; in-office four or more days; fifty percent travel; growth-stage startup intensity (equity-for-hours bargains) unless the exception is met.
 
@@ -44,6 +44,7 @@ Read pay carefully. A wide corporate band and a narrower "program budget" or "pr
 Step 2. Identify the real job
 Ignore the title and read the responsibilities. Classify the shape: platform/DevOps engineer; cloud or solutions architect (building) vs. enterprise architecture (governance, design review boards, standards); software developer / modernization; AI engineer; team lead / project manager with an architect label; sales or growth role with an architect label; embedded or specialist discipline (robotics, networking, data science) outside the candidate's history. State which, and name the two or three sentences in the posting that told you.
 Flag tempo signals: "no downtime / zero outages," on-call language, "fast-paced," "thrive on ambiguity," "perseverance," equity mentions, headcount growth language, four-day in-office.
+Rate the pace: CALM (steady hours, predictable work, mature program or awarded contract, no on-call or a light rotation, nothing urgent in the language), STEADY (ordinary professional tempo, some deadlines), INTENSE (pager or uptime identity, startup speed, crunch, "wear many hats" at a growth company, heavy travel), or UNKNOWN (no signals either way). One line on why, from the posting's words.
 
 Step 3. Score fit against the posting
 Build a table: each named skill, tool, standard, or experience in the posting → COVERED (name the profile bullet that proves it, not just the skills list), SKILLS-LIST-ONLY (claimed but no bullet behind it), GAP (not in profile), or STRETCH (adjacent but not the same thing). Numbers and named systems count as proof; adjectives do not.
@@ -63,7 +64,7 @@ Step 5. Tailoring plan (only for APPLY verdicts)
 * Summary variant: choose engineer / architect / developer-AI / whole-product from the profile and say why; summary is pronoun-free; include the candidate's two strongest proof points for this posting.
 * Skills block: list the lines to lead with, the posting keywords to add (only those with a bullet behind them), and the lines to cut. Never add a tool that lacks a role where it was used.
 * Bullets: which roles move up, which bullets lead each role, which bullets get the posting's vocabulary (quote the posting's phrase and the profile bullet it maps to), which bullets get cut to fit ${RESUME_PAGES.default} pages. Numbers are never cut.
-* Cover letter: needed or not; if yes, the three facts to lead with and the one sentence that answers the obvious objection (overqualified, no cert, founder flight risk, career change).
+* Cover letter: needed or not (also returned as coverLetter.needed for every verdict: needed only when the posting or form asks for one, or when it is the only place to answer an obvious objection; most applications don't need one); if yes, the three facts to lead with and the one sentence that answers the obvious objection (overqualified, no cert, founder flight risk, career change).
 * Honesty flags: every claim in the tailored version that would need confirmation from the candidate before sending (where a tool was used, team sizes, whether a number is from the candidate's tenure).
 
 Step 6. Application form guidance
@@ -83,7 +84,7 @@ Rules
 * Distinguish what gets a screen (gates, keywords, referral) from what gets an offer (the conversation, the person above the candidate, level fit).
 
 Output
-Return the required JSON. Its fields follow this layout, in this order: VERDICT and one-line reason, screen odds, GATES, REAL JOB, FIT TABLE, CRITERIA, PAY, TAILORING (null unless the verdict is APPLY or APPLY, LOW EFFORT), FORM FIELDS, NEXT.
+Return the required JSON. Its fields follow this layout, in this order: VERDICT and one-line reason, screen odds, GATES, REAL JOB, FIT TABLE, CRITERIA, PAY, TAILORING (null unless the verdict is APPLY or APPLY, LOW EFFORT), FORM FIELDS, NEXT, PACE, COVER LETTER (needed or not, one line why).
 * Quotes from the posting (real job quotes, gate and criteria evidence when quoting) are copied exactly; the app checks them against the posting text.
 * In the fit table, cite résumé bullets by their id in bulletIds; COVERED needs at least one.
 * For a dealbreaker in the criteria table, MET means the dealbreaker is absent.

@@ -8,6 +8,7 @@ import { CompanyCallChecklist } from "@/components/platform/jobs/CompanyCallChec
 import { JobAssistant } from "@/components/platform/jobs/JobAssistant";
 import { JobActivityPanel } from "@/components/platform/jobs/JobActivityPanel";
 import { JobPipelineCard } from "@/components/platform/jobs/JobPipelineCard";
+import { JobSteps } from "@/components/platform/jobs/JobSteps";
 import { dateToIso } from "@/lib/dates";
 import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
@@ -16,7 +17,7 @@ import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatC
 import type { ApplicationAnswer } from "@/lib/jobs/answers";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { resumeSchema } from "@/lib/jobs/resume-schema";
-import type { JobStatus } from "@/lib/jobs/pipeline";
+import { JOB_STATUS_LABEL, type JobStatus } from "@/lib/jobs/pipeline";
 import { CATEGORY_CAPS, type Category, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
 import type { BreakdownEntry } from "@/lib/jobs/scoring";
 
@@ -32,7 +33,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       company: { include: { awards: { orderBy: { amountCents: { sort: "desc", nulls: "last" } }, take: 8 } } },
       aliases: { orderBy: { firstSeenAt: "asc" } },
       activity: { orderBy: { occurredAt: "desc" } },
-      _count: { select: { tailored: true } },
+      tailored: { orderBy: { version: "desc" }, select: { id: true, version: true } },
     },
   });
   if (!posting) notFound();
@@ -64,6 +65,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
     }
   }
   const aiEnabled = Boolean(process.env.ANTHROPIC_API_KEY) || process.env.TAILOR_MODE === "fake";
+  const answers = (posting.applicationAnswers ?? []) as unknown as ApplicationAnswer[];
+  const sent = posting.tailored.find((t) => t.id === posting.appliedResumeId);
 
   return (
     <>
@@ -84,14 +87,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Badge tone={scoreTone(posting.score, passed)} style={{ fontSize: "var(--text-lg)", padding: "6px 12px" }}>
-            {posting.score ?? "—"}
-          </Badge>
           <Button href={posting.url} target="_blank" rel="noreferrer" variant="secondary" size="md">
             Open posting
-          </Button>
-          <Button href={`/jobs/${posting.id}/tailor`} variant="primary" size="md">
-            Résumé for this job{posting._count.tailored ? ` (${posting._count.tailored})` : ""}
           </Button>
         </div>
       </div>
@@ -110,13 +107,13 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             }}
           >
             <strong>Saved, but filtered out.</strong> It failed {posting.filterFailures.length === 1 ? "a must-have" : "must-haves"}, so it&apos;s listed
-            under Filtered out instead of Matches:
+            under Not for me instead of To apply:
             <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
               {posting.filterFailures.map((f) => (
                 <li key={f}>{f}</li>
               ))}
             </ul>
-            <div style={{ marginTop: 6 }}>Wrong? Set the work mode (or lane) under Your pipeline and it&apos;s rescored.</div>
+            <div style={{ marginTop: 6 }}>Wrong? Set the work mode (or lane) under Tracking and notes and it&apos;s rescored.</div>
           </div>
         </div>
       )}
@@ -131,6 +128,17 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       )}
 
       <div className="job-layout wide-page">
+        <JobSteps
+          postingId={posting.id}
+          postingUrl={posting.url}
+          status={posting.status as JobStatus}
+          appliedOnIso={posting.appliedAt ? dateToIso(posting.appliedAt) : null}
+          verdict={fit?.verdict ?? null}
+          filteredOut={!passed}
+          resume={{ versions: posting.tailored.length, latest: posting.tailored[0]?.version ?? null, sent: sent?.version ?? null }}
+          coverLetter={fit?.coverLetter ?? null}
+          answers={{ total: answers.length, ready: answers.filter((a) => a.source !== "todo" && a.answer.trim()).length }}
+        />
         <div className="job-main">
           <FitPanel
             postingId={posting.id}
@@ -144,7 +152,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             enabled={aiEnabled}
             hasMaster={Boolean(parsedMaster?.success)}
             initialChat={(posting.jobChat ?? []) as unknown as { role: "user" | "assistant"; text: string; at: string }[]}
-            initialAnswers={(posting.applicationAnswers ?? []) as unknown as ApplicationAnswer[]}
+            initialAnswers={answers}
           />
           <details className="form-card" style={{ marginBottom: 28 }}>
             <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -194,6 +202,10 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           </details>
         </div>
         <aside className="job-side">
+          <details className="form-card fold">
+            <summary>
+              Tracking and notes <span className="fold-meta">{JOB_STATUS_LABEL[posting.status as JobStatus]}</span>
+            </summary>
           <JobPipelineCard
             postingId={posting.id}
             status={posting.status as JobStatus}
@@ -209,13 +221,26 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             archived={posting.archivedAt !== null}
             deletable={canDeletePosting(posting)}
           />
-          <BenefitsPanel companyId={posting.companyId} postingId={posting.id} merged={merged} owner={ownerBenefits} />
+          </details>
+          <details className="form-card fold">
+            <summary>
+              Benefits <span className="fold-meta">{merged.length ? `${merged.length} found` : "none listed"}</span>
+            </summary>
+            <BenefitsPanel companyId={posting.companyId} postingId={posting.id} merged={merged} owner={ownerBenefits} />
+          </details>
+          <details className="form-card fold">
+            <summary>Questions for the recruiter call</summary>
           <CompanyCallChecklist
             companyId={posting.companyId}
             companyName={posting.company.name}
             postingId={posting.id}
             answers={(posting.company.questions ?? {}) as Record<string, string>}
           />
+          </details>
+          <details className="form-card fold">
+            <summary>
+              Activity <span className="fold-meta">{posting.activity.length ? `${posting.activity.length} logged` : ""}</span>
+            </summary>
           <JobActivityPanel
             postingId={posting.id}
             items={posting.activity.map((a) => ({
@@ -227,9 +252,13 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               toStatus: a.toStatus as JobStatus | null,
             }))}
           />
+          </details>
           {posting.company.awards.length > 0 && (
-            <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
-              <Eyebrow index="$">Federal awards: {posting.company.name}</Eyebrow>
+            <details className="form-card fold">
+              <summary>
+                Federal awards <span className="fold-meta">{posting.company.awards.length} for {posting.company.name}</span>
+              </summary>
+              <div style={{ display: "grid", gap: 10 }}>
               <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
                 From USAspending. Useful for &quot;awarded or contingent?&quot; and &quot;how many option years?&quot; on the call.
               </p>
@@ -249,10 +278,13 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                   </li>
                 ))}
               </ul>
-            </div>
+              </div>
+            </details>
           )}
-          <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
-            <Eyebrow index="05">Where it&apos;s posted</Eyebrow>
+          <details className="form-card fold">
+            <summary>
+              Where it&apos;s posted <span className="fold-meta">{postingSiteLabel(posting)}</span>
+            </summary>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)" }}>
               <li>
                 <a href={posting.url} target="_blank" rel="noreferrer">
@@ -269,7 +301,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
                 </li>
               ))}
             </ul>
-          </div>
+          </details>
         </aside>
       </div>
     </>
