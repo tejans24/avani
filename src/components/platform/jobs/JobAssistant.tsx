@@ -28,6 +28,7 @@ const SOURCE: Record<AnswerSource, { label: string; tone: "neutral" | "brand" | 
   app: { label: "Filled by the app", tone: "neutral" },
   claude: { label: "Drafted by Claude", tone: "brand" },
   you: { label: "Yours", tone: "positive" },
+  todo: { label: "Not drafted yet", tone: "neutral" },
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -255,6 +256,30 @@ export function JobAssistant(props: { postingId: string; enabled: boolean; hasMa
             </span>
           )}
         </div>
+        {answers.some((a) => a.source === "todo") && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={fillPending || !props.hasMaster}
+              onClick={() => {
+                setError(null);
+                setNote(null);
+                startFill(async () => {
+                  const todo = answers.filter((a) => a.source === "todo").map((a) => a.question);
+                  const r = await fillApplicationAnswers(props.postingId, todo.join("\n"));
+                  if ("error" in r) return setError(r.error);
+                  setAnswers(r.answers);
+                  setNote(r.note ?? null);
+                });
+              }}
+            >
+              {fillPending ? "Drafting…" : `Draft the other ${answers.filter((a) => a.source === "todo").length} with Claude`}
+            </Button>
+            <span style={{ ...small, color: "var(--text-muted)" }}>Collected from the application form when you added this job.</span>
+          </div>
+        )}
         {answers.length > 0 && (
           <div style={{ display: "grid", gap: 8 }}>
             {answers.map((a) => (

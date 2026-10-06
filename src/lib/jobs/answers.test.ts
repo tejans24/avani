@@ -45,6 +45,15 @@ describe("classifyQuestion", () => {
       ["What are your salary expectations?", "salary"],
       ["Gender", "selfId"],
       ["Are you a protected veteran?", "selfId"],
+      ["Country", "country"],
+      ["State", "state"],
+      ["Location (City)", "location"],
+      ["Are you at least 18 years of age?", "yours"],
+      ["Have you entered into a non-disclosure or non-compete agreement or understanding of any kind?", "yours"],
+      ["Do you have any family members or people you have close relationships with who work for Accenture Federal Services?", "yours"],
+      ["Affirmation", "yours"],
+      ["Degree", "pickOnForm"],
+      ["How did you hear about us?", "pickOnForm"],
     ];
     for (const [q, kind] of cases) expect(classifyQuestion(q), q).toBe(kind);
   });
@@ -80,6 +89,8 @@ describe("localAnswer", () => {
     expect(a("Security clearance").answer).toBe("Public Trust (active)");
     expect(a("Desired salary").answer).toBe("$185K to $215K");
     expect(a("Desired salary", { payFormEntry: "$190,000" }).answer).toBe("$190,000");
+    expect(a("Country").answer).toBe("United States");
+    expect(a("State").answer).toBe("MD");
   });
 
   it("never answers self-identification, and says what's missing", () => {

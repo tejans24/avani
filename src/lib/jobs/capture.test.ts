@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { canonicalJobUrl, companyFromHost, companyFromPlatformPath, findJobPosting, htmlToText, parseCapture } from "@/lib/jobs/capture";
+import { canonicalJobUrl, companyFromHost, companyFromPlatformPath, companyInText, splitApplicationForm, findJobPosting, htmlToText, parseCapture } from "@/lib/jobs/capture";
 
 describe("canonicalJobUrl", () => {
   it("strips tracking params and fragments", () => {
@@ -194,5 +196,56 @@ describe("companyFromHost", () => {
     expect(companyFromHost("https://leidos.wd5.myworkdayjobs.com/External/job/1")).toBe("Leidos");
     expect(companyFromHost("https://boards.greenhouse.io/acme/jobs/1")).toBeUndefined();
     expect(companyFromHost("https://www.linkedin.com/jobs/view/1/")).toBeUndefined();
+  });
+});
+
+describe("a Greenhouse page with its application form (Accenture Federal Services)", () => {
+  const text = readFileSync(join(__dirname, "__fixtures__", "greenhouse-afs.txt"), "utf8");
+  const url = "https://job-boards.greenhouse.io/accenturefederalservices/jobs/4712014006?gh_jid=4712014006";
+
+  it("reads title, company, location and pay, and keeps the form out of the description", () => {
+    const draft = parseCapture({ url, meta: { h1: "Enterprise Architect" }, text });
+    expect(draft).toMatchObject({
+      title: "Enterprise Architect",
+      companyName: "Accenture Federal Services",
+      location: "Washington, DC",
+      compMinCents: 73_900_00,
+      compMaxCents: 213_600_00,
+    });
+    expect(draft.descriptionText).toContain("Define target-state architectures");
+    expect(draft.descriptionText).not.toMatch(/First Name|Select\.\.\.|Submit application/);
+  });
+
+  it("collects the form's questions", () => {
+    const { questions } = parseCapture({ url, text });
+    expect(questions).toEqual([
+      "First Name",
+      "Last Name",
+      "Email",
+      "Country",
+      "Phone",
+      "Location (City)",
+      "Are you legally authorized to work in the United States?",
+      "Will you now or in the future require sponsorship for employment visa status (for example, H-1B visa status)?",
+      "Do you hold a security clearance?",
+      "Gender",
+    ]);
+  });
+
+  it("uses Greenhouse's page title when there is one", () => {
+    const draft = parseCapture({ url, pageTitle: "Job Application for Enterprise Architect at Accenture Federal Services", text: "Short page." });
+    expect(draft).toMatchObject({ title: "Enterprise Architect", companyName: "Accenture Federal Services" });
+  });
+});
+
+describe("splitApplicationForm / companyInText", () => {
+  it("leaves pages without a form alone, and ignores an early Apply button", () => {
+    const text = "Apply for this job\n" + "x".repeat(300);
+    expect(splitApplicationForm(text)).toEqual({ body: text, form: "" });
+  });
+
+  it("finds a run-together slug as the page writes it", () => {
+    expect(companyInText("Chesapeakecivic", "Join Chesapeake Civic Digital today")).toBe("Chesapeake Civic");
+    expect(companyInText("Nobodyhere", "Nothing matches")).toBeUndefined();
   });
 });

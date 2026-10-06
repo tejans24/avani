@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { isoToUtcDate } from "@/lib/dates";
 import { BENEFITS, type BenefitKey } from "@/lib/jobs/benefits";
+import { addDetectedQuestions } from "@/actions/answers";
 import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
@@ -301,6 +302,8 @@ const captureSchema = z.object({
   compMax: z.number().int().positive().optional(),
   capturedVia: z.enum(["bookmarklet", "share", "shortcut", "paste"]),
   jsonLd: z.unknown().optional(),
+  /** The application form's questions, when the page had the form. */
+  questions: z.array(z.string().max(600)).max(40).optional(),
 });
 
 /**
@@ -336,6 +339,12 @@ export async function captureJob(input: z.input<typeof captureSchema>): Promise<
       { now }
     );
     revalidateJob();
+    const savedId = report.created[0]?.id ?? [...report.seenPostingIds][0];
+    // The form's questions go to the job's application answers (no model call; needs a master résumé).
+    if (savedId && c.questions?.length) {
+      const hasMaster = await db.resumeMaster.count();
+      if (hasMaster) await addDetectedQuestions(savedId, c.questions);
+    }
     if (report.created[0]) return { ok: true, id: report.created[0].id };
     const existing = [...report.seenPostingIds][0];
     if (existing) return { ok: true, id: existing, note: "You already have this job, so it opened the existing one." };

@@ -17,7 +17,8 @@ import { PAY, payK } from "@/lib/jobs/scoring-config";
  *   drafted by Claude from the résumé content and the posting.
  */
 
-export type AnswerSource = "app" | "claude" | "you";
+/** "todo": a question collected from the page that Claude hasn't drafted yet. */
+export type AnswerSource = "app" | "claude" | "you" | "todo";
 
 export type ApplicationAnswer = {
   id: string;
@@ -44,9 +45,21 @@ export type QuestionKind =
   | "clearance"
   | "salary"
   | "selfId"
+  | "country"
+  | "state"
+  | "pickOnForm"
+  | "yours"
   | "open";
 
 const KINDS: { kind: Exclude<QuestionKind, "open">; re: RegExp }[] = [
+  // Facts only the owner knows or should state themselves: never drafted.
+  {
+    kind: "yours",
+    re: /\b(at least 18|years of age|date of birth|family members?|relatives?|close relationships?|non-disclosure|non-compete|worked (at|for) [A-Z]|employee of the u\.?s\.?|government employee|reserves|national guard|working on a project with|affirmation|i agree|i certify|consent)\b|^\s*(affirmation|signature)\b/i,
+  },
+  { kind: "pickOnForm", re: /^\s*(school|degree|discipline|major|education|gpa|how did you hear( about us)?)\b|\bhow did you hear\b/i },
+  { kind: "country", re: /^\s*country( of residence)?\s*[:?*]*\s*$/i },
+  { kind: "state", re: /^\s*state( or province)?\s*[:?*]*\s*$/i },
   { kind: "selfId", re: /\b(gender|sex|race|ethnicit|hispanic|latino|veteran|disabilit|pronoun|sexual orientation|self[- ]identif)/i },
   { kind: "sponsorship", re: /\b(sponsor|visa|h-?1b)/i },
   { kind: "workAuthorization", re: /\b(authori[sz]ed to work|work authori[sz]ation|eligible to work|legally (?:able|permitted) to work|right to work)/i },
@@ -138,6 +151,16 @@ export function localAnswer(master: Resume, question: string, kind: QuestionKind
       };
     case "selfId":
       return { answer: "", note: "Voluntary self-identification. Not filled in for you; it has no effect on hiring." };
+    case "country":
+      return usCitizen(master) ? { answer: "United States", note: "" } : { answer: "", note: "Answer this one yourself." };
+    case "state": {
+      const st = c.location?.split(",")[1]?.trim();
+      return st ? { answer: st, note: "" } : missing("location (City, ST)");
+    }
+    case "pickOnForm":
+      return { answer: "", note: "Pick from the form's list." };
+    case "yours":
+      return { answer: "", note: "Answer this one yourself; it isn't something the app or Claude can know." };
     default:
       return { answer: "", note: "" };
   }

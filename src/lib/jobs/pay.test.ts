@@ -21,4 +21,9 @@ describe("parsePayRange", () => {
     expect(parsePayRange("A $1,000 - $1,500 learning budget.")).toBeNull();
     expect(parsePayRange("No pay info here.")).toBeNull();
   });
+
+  it("reads a range far from the word pay when it states its currency", () => {
+    const states = "California, Colorado, Connecticut, Hawaii, Illinois, Maine, Maryland, Massachusetts, Minnesota, New Jersey, New York, Ohio, Vermont, Virginia, Washington, and the District of Columbia";
+    expect(parsePayRange(`The pay range for the states of ${states}, and also ${states}, is:\n\n$73,900 - $213,600 USD`)).toEqual({ minCents: 73_900_00, maxCents: 213_600_00 });
+  });
 });

@@ -161,3 +161,30 @@ export async function clearJobChat(postingId: string): Promise<{ ok: true } | { 
     return fail(e);
   }
 }
+
+/**
+ * Questions collected from an application form when the job was added.
+ * Answered in the app where possible; the rest wait for "Draft with Claude".
+ * No model is called here.
+ */
+export async function addDetectedQuestions(postingId: string, questions: string[]): Promise<AnswersResult> {
+  try {
+    await requireAuth();
+    const qs = parseQuestions(z.array(z.string().max(600)).max(40).parse(questions).join("\n"));
+    if (!qs.length) return { ok: true, answers: [] };
+    const { master, fit, answers } = await load(postingId);
+    const now = new Date().toISOString();
+    const incoming: ApplicationAnswer[] = qs.map((q) => {
+      const kind = classifyQuestion(q);
+      if (!isLocalKind(kind)) return { id: randomUUID(), question: q, answer: "", note: "", source: "todo", updatedAt: now };
+      const a = localAnswer(master, q, kind, { payFormEntry: fit?.pay.formEntry });
+      return { id: randomUUID(), question: q, answer: a.answer, note: a.note, source: "app", updatedAt: now };
+    });
+    // Never replace an answer that already has text.
+    const merged = mergeAnswers(answers, incoming.filter((a) => !answers.some((x) => x.question.toLowerCase() === a.question.toLowerCase() && x.answer)));
+    await store(postingId, merged);
+    return { ok: true, answers: merged };
+  } catch (e) {
+    return fail(e);
+  }
+}

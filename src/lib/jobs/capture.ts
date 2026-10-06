@@ -45,6 +45,8 @@ export type CaptureDraft = {
   missing: (Essential | "descriptionText")[];
   /** Fields filled from page signals rather than structured data: worth a check. */
   guessed: Essential[];
+  /** The application form's questions, when the page includes the form (Greenhouse, Lever, Ashby do). */
+  questions: string[];
 };
 
 const TRACKING_PARAMS = /^(utm_.*|gclid|fbclid|msclkid|mc_[ce]id|ref|refid|trk|trackingid|src|source|lipi|from|ccuid|gh_src)$/i;
@@ -146,7 +148,10 @@ function locationText(jobLocation: unknown): string | undefined {
   return parts.length ? [...new Set(parts)].join("; ") : undefined;
 }
 
-export function parseCapture(payload: CapturePayload): CaptureDraft {
+export function parseCapture(input: CapturePayload): CaptureDraft {
+  // Job pages often end with the application form: keep it out of the description and the guesses.
+  const { body, form } = splitApplicationForm(input.text ?? "");
+  const payload: CapturePayload = { ...input, text: input.text === undefined ? undefined : body };
   const url = canonicalJobUrl(payload.url);
   const job = findJobPosting(payload.jsonLd ?? []);
 
@@ -176,6 +181,7 @@ export function parseCapture(payload: CapturePayload): CaptureDraft {
     compMaxCents: max,
     missing: [],
     guessed: [],
+    questions: extractFormQuestions(form),
   };
   fillFromPageSignals(draft, payload);
   // No structured pay: most US postings state a range in the text.
@@ -240,6 +246,57 @@ export function companyFromPlatformPath(url: string): string | undefined {
   return slug.split(/[-_]/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 }
 
+/** "Washington, DC", "Austin, Texas", "Remote", "Hybrid - Reston, VA", "Remote, United States". */
+const PLACE = /^(?:(?:remote|hybrid|on-?site)\b.{0,40}|[A-Z][A-Za-z.' -]{1,40},\s*(?:[A-Z]{2}\b|[A-Z][a-z]+(?: [A-Z][a-z]+)*)(?:,\s*[A-Za-z ]+)?)$/;
+const FORM_LABEL = /[*]|^\(|select\.\.\.|locate me/i;
+
+/** Find a board slug in the page as written: "accenturefederalservices" → "Accenture Federal Services". */
+export function companyInText(slugName: string | undefined, text: string): string | undefined {
+  const target = slugName?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!target || target.length < 4) return undefined;
+  for (const m of text.matchAll(/\b[A-Z][\w&.'-]*(?:\s+(?:[A-Z&][\w&.'-]*|of|and|for|the))*/g)) {
+    // "Join Accenture Federal Services": try every run of words, not just from the first.
+    const words = m[0].split(/\s+/);
+    for (let i = 0; i < words.length; i++) {
+      for (let n = words.length; n > i; n--) {
+        const candidate = words.slice(i, n).join(" ");
+        if (candidate.toLowerCase().replace(/[^a-z0-9]/g, "") === target) return candidate;
+      }
+    }
+  }
+  return undefined;
+}
+
+// ---- The application form at the bottom of a job page ----------------------
+
+const FORM_START = [/^\s*apply for this job\s*$/im, /^\s*\*?\s*indicates a required field\s*$/im, /^\s*first name\s*\*\s*$/im];
+
+/** The job text above the application form, and the form below it. */
+export function splitApplicationForm(text: string): { body: string; form: string } {
+  const starts = FORM_START.map((re) => text.search(re)).filter((i) => i > 200);
+  if (!starts.length) return { body: text, form: "" };
+  const at = Math.min(...starts);
+  return { body: text.slice(0, at).trim(), form: text.slice(at) };
+}
+
+const FORM_NOISE = /^(\*|select\.\.\.|attach|dropbox|google drive|enter manually|locate me|add another|submit application|powered by|apply for this job|indicates a required field|accepted file types.*)$/i;
+const UPLOAD_FIELD = /^(resume|cv|resume\/cv|cover letter|attachments?)\b/i;
+
+/** The form's questions: required fields (*), questions (?) and dropdowns (followed by "Select..."). */
+export function extractFormQuestions(form: string): string[] {
+  const lines = form.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out: string[] = [];
+  lines.forEach((line, i) => {
+    if (FORM_NOISE.test(line) || line.length > 250) return;
+    const dropdown = /^select\.\.\.$/i.test(lines[i + 1] ?? "");
+    if (!/[*?]\s*$/.test(line) && !dropdown) return;
+    const q = line.replace(/\s*\*+\s*$/, "").trim();
+    if (q.length < 2 || UPLOAD_FIELD.test(q) || out.some((o) => o.toLowerCase() === q.toLowerCase())) return;
+    out.push(q);
+  });
+  return out.slice(0, 40);
+}
+
 const LOCATION_LINE = /^\s*(?:job\s+|work\s+)?locations?\s*[:\-]?\s*(?:\n\s*)?([^\n]{2,80})$/im;
 const REMOTE_IN_TEXT = /\b(fully|100%)\s+remote\b|\bremote\s*[(,\-]?\s*(us|usa|united states)\b|\b(work\s+)?location\s*:\s*remote\b|\bthis (role|position) is (fully )?remote\b/i;
 
@@ -282,7 +339,16 @@ function fillFromPageSignals(draft: CaptureDraft, payload: CapturePayload) {
   // "Senior Cloud Architect (Remote)": the work mode belongs in location, not the title.
   const rawTitle = [draft.title, embStr(emb, "title", "jobTitle"), h1, payload.pageTitle].join(" ");
   const tidy = (t: string | undefined) => t?.replace(/\s*(\((remote|hybrid)[^)]*\)|-\s*(remote|hybrid))\s*$/i, "").trim() || undefined;
+  // Greenhouse: "Job Application for Enterprise Architect at Accenture Federal Services".
+  const gh = clean(payload.pageTitle).match(/^job application for (.+?) at (.+)$/i);
   guess("title", tidy(embStr(emb, "title", "jobTitle")));
+  guess("title", gh ? tidy(gh[1]) : undefined);
+  // Pasted text has no page title or heading: its first line is the title when it reads like one.
+  const firstLine = (payload.text ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+  if (!payload.pageTitle && !h1 && firstLine && firstLine.length <= 100 && !PLACE.test(firstLine) && !/[.!?:]$/.test(firstLine)) {
+    guess("title", tidy(usable(firstLine)));
+  }
+  guess("companyName", gh ? gh[2].trim() : undefined);
   guess("title", h1.length <= 150 && !isCompany(h1) ? tidy(usable(h1)) : undefined);
   guess("title", tidy(ogParts.find((p) => usable(p) && !isCompany(p))));
   guess("title", tidy(parts.find((p) => usable(p) && !isCompany(p))));
@@ -292,6 +358,8 @@ function fillFromPageSignals(draft: CaptureDraft, payload: CapturePayload) {
   guess("companyName", companyFromSiteName(allParts.find(isCompany)));
   const title = draft.title?.toLowerCase() ?? "";
   guess("companyName", allParts.map((p) => (title.startsWith(p.toLowerCase().slice(0, 20)) ? undefined : companyFromSiteName(usable(p)))).find(Boolean));
+  // A board slug ("accenturefederalservices") as the page spells it ("Accenture Federal Services").
+  guess("companyName", companyInText(known[2], payload.text ?? ""));
   guess("companyName", known[2]);
 
   const embRemote = /remote/i.test(embStr(emb, "workplaceType", "remote", "type", "location") ?? "");
@@ -300,12 +368,19 @@ function fillFromPageSignals(draft: CaptureDraft, payload: CapturePayload) {
     ([embStr(emb, "city"), embStr(emb, "state")].filter(Boolean).join(", ") || undefined);
   const titleSaysRemote = /\bremote\b/i.test(rawTitle);
   const text = payload.text ?? "";
-  const line = text.match(LOCATION_LINE)?.[1]?.trim();
+  // The line under the title is usually the location ("Enterprise Architect / Washington, DC / Apply").
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const titleAt = draft.title ? lines.slice(0, 15).findIndex((l) => l.toLowerCase() === draft.title!.toLowerCase()) : -1;
+  // No known title (pasted text): a place-shaped line near the top.
+  const underTitle = (titleAt >= 0 ? lines.slice(titleAt + 1, titleAt + 4) : lines.slice(0, 6)).find((l) => PLACE.test(l));
+  // "Location: Baltimore, MD", but never a form label ("Location (City)*").
+  const line = [...text.matchAll(new RegExp(LOCATION_LINE.source, "gim"))].map((m) => m[1].trim()).find((v) => !FORM_LABEL.test(v));
   if (titleSaysRemote || embRemote || REMOTE_IN_TEXT.test(text)) {
     draft.remote = true;
     guess("location", embLocation && /remote/i.test(embLocation) ? embLocation : "Remote");
   }
   guess("location", embLocation);
+  guess("location", underTitle);
   guess("location", line);
 
   if (!draft.descriptionText || draft.descriptionText === text.trim()) {

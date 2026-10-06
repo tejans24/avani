@@ -22,7 +22,8 @@ export type PayRange = { minCents: number; maxCents: number };
 
 export function parsePayRange(text: string): PayRange | null {
   for (const m of text.matchAll(RANGE)) {
-    const window = text.slice(Math.max(0, (m.index ?? 0) - 120), (m.index ?? 0) + m[0].length + 40);
+    // Wide enough for "the pay range for the states of California, Colorado, … and the District of Columbia is:".
+    const window = text.slice(Math.max(0, (m.index ?? 0) - 400), (m.index ?? 0) + m[0].length + 40);
     let lo = toDollars(m[1], m[2]);
     let hi = toDollars(m[3], m[4]);
     const unit = (m[5] ?? "").toLowerCase();
@@ -34,7 +35,8 @@ export function parsePayRange(text: string): PayRange | null {
     } else if (lo < 30_000 || hi > 1_500_000) {
       continue;
     }
-    if (!PAY_CONTEXT.test(window) && !unit) continue;
+    // "$73,900 - $213,600 USD": a stated currency is as good as the word "salary".
+    if (!PAY_CONTEXT.test(window) && !unit && !/usd/i.test(m[0])) continue;
     if (hi < lo) [lo, hi] = [hi, lo];
     return { minCents: Math.round(lo * 100), maxCents: Math.round(hi * 100) };
   }

@@ -68,7 +68,8 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   // Preview opens over the editor and shows the exact file; download is a separate step.
   await page.getByRole("button", { name: "Preview PDF" }).click();
   const preview = page.getByRole("dialog");
-  await expect(preview.getByText("Quill_Jordan_Chesapeake-Civic-Digital_Senior-Software-Engineer-Medicaid-Modernization.pdf")).toBeVisible();
+  // The first render after a dev-server start compiles the PDF route: allow for it.
+  await expect(preview.getByText("Quill_Jordan_Chesapeake-Civic-Digital_Senior-Software-Engineer-Medicaid-Modernization.pdf")).toBeVisible({ timeout: 30_000 });
   await expect(preview.getByText(/^1 page$/)).toBeVisible();
   // The preview iframe may show it: the PDF allows framing by the app (and only the app).
   const inline = await page.request.get((await preview.locator("iframe").getAttribute("src"))!);
@@ -210,4 +211,50 @@ test("application answers: the app fills personal ones, Claude drafts the rest, 
   const [row] = await queryRows(`SELECT "applicationAnswers", "jobChat" FROM "JobPosting" WHERE id = $1`, [id]);
   expect(row.applicationAnswers).toHaveLength(6);
   expect(row.jobChat).toHaveLength(2);
+});
+
+test("a job page with its application form: the questions land in the job's answers", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const text = [
+    "Climate Data Engineer",
+    "Annapolis, MD",
+    "Apply",
+    "Join Tidewater Climate, a nonprofit building flood-risk tools for coastal towns. You will own our data platform end to end.",
+    "The pay range for this role is:",
+    "$150,000 - $190,000 USD",
+    "Apply for this job",
+    "*",
+    "indicates a required field",
+    "First Name*",
+    "Email*",
+    "Country*",
+    "Are you legally authorized to work in the United States?*",
+    "Select...",
+    "Why do you want to work on climate risk?*",
+    "Gender*",
+    "Select...",
+    "Submit application",
+  ].join("\n");
+
+  await page.goto("/jobs/capture");
+  await page.getByLabel("Link to the posting").fill("https://job-boards.greenhouse.io/tidewaterclimate/jobs/77");
+  await page.getByLabel("Job text").fill(text);
+  await page.getByRole("button", { name: "Use this text" }).click();
+  await expect(page.getByLabel("Company")).toHaveValue("Tidewater Climate");
+  await expect(page.getByLabel("Location")).toHaveValue("Annapolis, MD");
+  await expect(page.getByLabel("Pay max ($/yr)")).toHaveValue("190000");
+  await expect(page.getByTestId("form-questions")).toContainText("Found 6 application questions");
+  await expect(page.getByLabel("Description")).not.toHaveValue(/First Name/);
+  await page.getByRole("button", { name: "Save job" }).click();
+  await page.waitForURL(/\/jobs\/[a-z0-9]+$/);
+
+  const qa = page.getByTestId("application-answers");
+  await expect(qa.getByLabel("Answer: First Name")).toHaveValue("Jordan");
+  await expect(qa.getByLabel("Answer: Country")).toHaveValue("United States");
+  await expect(qa.getByLabel("Answer: Are you legally authorized to work in the United States?")).toHaveValue("Yes");
+  await expect(qa.getByText("Not drafted yet")).toHaveCount(1);
+  await page.waitForLoadState("networkidle");
+  await qa.getByRole("button", { name: "Draft the other 1 with Claude" }).click();
+  await expect(qa.getByLabel("Answer: Why do you want to work on climate risk?")).toHaveValue("Fake draft for: Why do you want to work on climate risk?");
+  await expect(qa.getByText("Not drafted yet")).toHaveCount(0);
 });

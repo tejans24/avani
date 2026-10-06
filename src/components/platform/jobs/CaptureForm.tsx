@@ -172,15 +172,18 @@ export function CaptureForm({
         <div className="form-card" style={{ display: "grid", gap: 14 }}>
           <Eyebrow index="02">Check, then save</Eyebrow>
           {status && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{status}</span>}
-          {draft.missing.length > 0 && (
+          {(draft.missing.length > 0 || (aiEnabled && pageRef.current.text.trim().length >= 40)) && (
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
-                The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}.
-                {aiEnabled ? " Claude reads the page to fill them; check the result." : " Fill those in, or set ANTHROPIC_API_KEY to have Claude read the page."}
-              </p>
+              {draft.missing.length > 0 && (
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--caution)" }}>
+                  The page didn&apos;t say: {draft.missing.map((m) => ({ title: "title", companyName: "company", location: "location", descriptionText: "description" })[m]).join(", ")}.
+                  {aiEnabled ? " Claude reads the page to fill them; check the result." : " Fill those in, or set ANTHROPIC_API_KEY to have Claude read the page."}
+                </p>
+              )}
+              {/* Always on offer: the app's own reading is free and instant but can guess wrong on an odd page. */}
               {aiEnabled && pageRef.current.text.trim().length >= 40 && (
                 <Button type="button" variant="secondary" size="sm" disabled={aiBusy} onClick={fillWithClaude}>
-                  {aiBusy ? "Reading…" : "Read again with Claude"}
+                  {aiBusy ? "Reading…" : draft.missing.length > 0 ? "Read again with Claude" : "Read with Claude instead"}
                 </Button>
               )}
             </div>
@@ -190,6 +193,12 @@ export function CaptureForm({
               No job data on the page, so {draft.guessed.map((m) => ({ title: "title", companyName: "company", location: "location" })[m]).join(", ")}{" "}
               {draft.guessed.length === 1 ? "was" : "were"} taken from the page heading, title and address. Check{" "}
               {draft.guessed.length === 1 ? "it" : "them"}.
+            </p>
+          )}
+          {draft.questions.length > 0 && (
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }} data-testid="form-questions">
+              Found {draft.questions.length} application question{draft.questions.length === 1 ? "" : "s"} on the page. They&apos;ll be saved to this
+              job&apos;s Application answers, with your contact details filled in by the app.
             </p>
           )}
           {aiWarnings.length > 0 && (
@@ -242,6 +251,7 @@ export function CaptureForm({
                       compMax: form.compMax ? Number(form.compMax.replace(/[^\d]/g, "")) || undefined : undefined,
                       capturedVia: via,
                       jsonLd: jsonLdRef.current,
+                      questions: draft.questions,
                     }),
                   (r) => router.push(`/jobs/${r.id}${r.note ? "?existing=1" : ""}`)
                 )

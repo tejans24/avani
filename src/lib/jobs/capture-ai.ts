@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { scrubPersonal, type Contact } from "@/lib/jobs/ai-payload";
+import { splitApplicationForm } from "@/lib/jobs/capture";
 
 /**
  * Claude-assisted capture: when a job page has no structured job data
@@ -88,7 +89,9 @@ function heuristic(pageTitle: string | undefined, text: string): CaptureExtract 
 }
 
 export async function extractJobWithClaude(input: { pageTitle?: string; text: string; contact: Contact | null }): Promise<ExtractResult> {
-  const text = input.contact ? scrubPersonal(input.text, input.contact) : input.text;
+  // Only the job part: the application form below it is neither the job nor Claude's business.
+  const body = splitApplicationForm(input.text).body;
+  const text = input.contact ? scrubPersonal(body, input.contact) : body;
   const pageTitle = input.contact && input.pageTitle ? scrubPersonal(input.pageTitle, input.contact) : input.pageTitle;
 
   let fields: CaptureExtract;
