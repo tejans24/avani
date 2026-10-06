@@ -61,4 +61,15 @@ describe("extractJobWithClaude (fake mode)", () => {
     expect(r.fields.descriptionText).not.toContain("Jordan");
     expect(r.fields).toMatchObject({ title: "Senior Cloud Architect", companyName: "Example Federal", workMode: "REMOTE" });
   });
+
+  it("puts the owner's city back into a local job's location, after the model", async () => {
+    process.env.TAILOR_MODE = "fake";
+    const r = await extractJobWithClaude({
+      pageTitle: "Data Engineer | Example Health",
+      text: "Data Engineer\nExample Health\nTowson, MD (hybrid)\nBuild pipelines for hospital data, end to end.",
+      contact: { firstName: "Jordan", lastName: "Quill", email: "j@example.com", location: "Towson, MD", links: [] },
+    });
+    expect(r.fields.descriptionText).not.toContain("Towson");
+    expect(r.fields.location).not.toContain("[redacted]");
+  });
 });

@@ -114,5 +114,8 @@ export async function extractJobWithClaude(input: { pageTitle?: string; text: st
   const warnings = checkExtract(fields, text);
   // An ungrounded description is never trusted: fall back to the page's own text.
   if (fields.descriptionText && groundedShare(fields.descriptionText, text) < 0.9) fields = { ...fields, descriptionText: text.trim() };
+  // A job in the owner's own city came back as "[redacted], MD": put the city back here, in the app.
+  const city = input.contact?.location?.split(",")[0]?.trim();
+  if (city && fields.location.includes("[redacted]")) fields = { ...fields, location: fields.location.replace(/\[redacted\]/g, city) };
   return { fields, warnings };
 }

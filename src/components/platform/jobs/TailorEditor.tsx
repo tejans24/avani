@@ -137,7 +137,7 @@ export function TailorEditor(props: {
   const small = { fontSize: "var(--text-sm)" } as const;
 
   return (
-    <div className="tailor-workspace">
+    <div className="tailor-workspace wide-page">
       <aside className="tailor-aside">
         <TailorChat
           postingId={props.postingId}
@@ -194,8 +194,12 @@ export function TailorEditor(props: {
       </aside>
 
       <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
-      <div className="form-card" style={{ display: "grid", gap: 12 }} data-testid="tailor-start">
-        <Eyebrow index="00">{doc ? "Start another version" : "Start this job's résumé"}</Eyebrow>
+      <details className="form-card" open={!doc} style={doc ? { padding: "12px 20px" } : undefined} data-testid="tailor-start">
+        {/* Once a version exists this folds to one line; the first time it's the page's starting point. */}
+        <summary style={{ cursor: "pointer", ...(doc ? small : { listStyle: "none" }) }}>
+          {doc ? "Start another version: master as is, reuse one from another job, or tailor" : <Eyebrow index="00">Start this job&apos;s résumé</Eyebrow>}
+        </summary>
+        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
         <div style={{ display: "grid", gap: 10 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => run(() => startFromMaster(props.postingId), open)}>
@@ -229,8 +233,9 @@ export function TailorEditor(props: {
           </div>
         </div>
         <span style={{ ...small, color: "var(--text-muted)" }}>Each start makes a new version; earlier ones are kept. Your contact details never leave the app.</span>
-        <ActionMessage error={error} note={note} />
-      </div>
+        </div>
+      </details>
+      <ActionMessage error={error} note={note} />
 
       {!doc ? (
         <div className="empty-state">No version for this job yet. Pick a starting point above.</div>

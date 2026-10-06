@@ -5,6 +5,7 @@ import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import { BenefitsPanel } from "@/components/platform/jobs/BenefitsPanel";
 import { FitPanel } from "@/components/platform/jobs/FitPanel";
 import { CompanyCallChecklist } from "@/components/platform/jobs/CompanyCallChecklist";
+import { JobAssistant } from "@/components/platform/jobs/JobAssistant";
 import { JobActivityPanel } from "@/components/platform/jobs/JobActivityPanel";
 import { JobPipelineCard } from "@/components/platform/jobs/JobPipelineCard";
 import { dateToIso } from "@/lib/dates";
@@ -12,6 +13,7 @@ import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
 import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, postingSourceText, scoreTone } from "@/lib/jobs/display";
+import type { ApplicationAnswer } from "@/lib/jobs/answers";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { resumeSchema } from "@/lib/jobs/resume-schema";
 import type { JobStatus } from "@/lib/jobs/pipeline";
@@ -126,139 +128,146 @@ export default async function JobDetailPage({ params }: { params: { id: string }
         </div>
       )}
 
-      <FitPanel
-        postingId={posting.id}
-        analysis={fit}
-        bulletText={bulletText}
-        aiEnabled={aiEnabled}
-        autoRun={aiEnabled && passed && !posting.archivedAt && Boolean(parsedMaster?.success)}
-      />
-
-      <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <Eyebrow index="00">Why it scored {posting.score ?? "—"}</Eyebrow>
-          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-            Lane: {LANE_LABEL[posting.lane as Lane]}
-            {posting.laneOverride ? " (set by you)" : ""}
-          </span>
+      <div className="job-layout wide-page">
+        <div className="job-main">
+          <FitPanel
+            postingId={posting.id}
+            analysis={fit}
+            bulletText={bulletText}
+            aiEnabled={aiEnabled}
+            autoRun={aiEnabled && passed && !posting.archivedAt && Boolean(parsedMaster?.success)}
+          />
+          <JobAssistant
+            postingId={posting.id}
+            enabled={aiEnabled}
+            hasMaster={Boolean(parsedMaster?.success)}
+            initialChat={(posting.jobChat ?? []) as unknown as { role: "user" | "assistant"; text: string; at: string }[]}
+            initialAnswers={(posting.applicationAnswers ?? []) as unknown as ApplicationAnswer[]}
+          />
+          <details className="form-card" style={{ marginBottom: 28 }}>
+            <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <Eyebrow index="00">Why it scored {posting.score ?? "—"}</Eyebrow>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                Lane: {LANE_LABEL[posting.lane as Lane]}
+                {posting.laneOverride ? " (set by you)" : ""}
+              </span>
+            </summary>
+            <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Rule</th>
+                    <th className="num">Points</th>
+                    <th>Because the posting says</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.flatMap((cat) =>
+                    breakdown
+                      .filter((b) => b.category === cat)
+                      .map((b, i) => (
+                        <tr key={`${cat}-${b.rule}`}>
+                          <td style={{ fontSize: "var(--text-sm)" }}>{i === 0 ? CATEGORY_LABEL[cat] : ""}</td>
+                          <td style={{ fontSize: "var(--text-sm)" }}>{b.label}</td>
+                          <td className="num" style={{ color: b.points < 0 ? "var(--critical)" : "var(--positive)" }}>
+                            {b.points > 0 ? `+${b.points}` : b.points}
+                          </td>
+                          <td style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{b.evidence}</td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+              Starts at 30. Each category is capped, so stacking keywords can&apos;t run away with the score.
+            </p>
+            </div>
+          </details>
+          <details className="form-card" style={{ marginBottom: 28 }}>
+            <summary style={{ cursor: "pointer", fontFamily: "var(--font-sans)" }}>Full posting text</summary>
+            <div style={{ whiteSpace: "pre-wrap", fontSize: "var(--text-sm)", lineHeight: 1.6, marginTop: 12 }}>{posting.descriptionText}</div>
+          </details>
         </div>
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Rule</th>
-                <th className="num">Points</th>
-                <th>Because the posting says</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.flatMap((cat) =>
-                breakdown
-                  .filter((b) => b.category === cat)
-                  .map((b, i) => (
-                    <tr key={`${cat}-${b.rule}`}>
-                      <td style={{ fontSize: "var(--text-sm)" }}>{i === 0 ? CATEGORY_LABEL[cat] : ""}</td>
-                      <td style={{ fontSize: "var(--text-sm)" }}>{b.label}</td>
-                      <td className="num" style={{ color: b.points < 0 ? "var(--critical)" : "var(--positive)" }}>
-                        {b.points > 0 ? `+${b.points}` : b.points}
-                      </td>
-                      <td style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{b.evidence}</td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-          Starts at 30. Each category is capped, so stacking keywords can&apos;t run away with the score.
-        </p>
-      </div>
-
-      <BenefitsPanel companyId={posting.companyId} postingId={posting.id} merged={merged} owner={ownerBenefits} />
-
-      <JobPipelineCard
-        postingId={posting.id}
-        status={posting.status as JobStatus}
-        appliedOnIso={posting.appliedAt ? dateToIso(posting.appliedAt) : null}
-        nextActionNote={posting.nextActionNote}
-        nextActionDueIso={posting.nextActionDue ? dateToIso(posting.nextActionDue) : null}
-        notes={posting.notes}
-        tailoringNotes={posting.tailoringNotes}
-        lane={posting.lane as Lane}
-        laneOverride={posting.laneOverride as Lane | null}
-        archived={posting.archivedAt !== null}
-        deletable={canDeletePosting(posting)}
-      />
-
-      {posting.company.awards.length > 0 && (
-        <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
-          <Eyebrow index="$">Federal awards: {posting.company.name}</Eyebrow>
-          <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-            From USAspending. Useful for &quot;awarded or contingent?&quot; and &quot;how many option years?&quot; on the call.
-          </p>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", display: "grid", gap: 6 }}>
-            {posting.company.awards.map((a) => (
-              <li key={a.id}>
-                <a href={a.url} target="_blank" rel="noreferrer">
-                  {formatAwardAmount(a.amountCents)}
+        <aside className="job-side">
+          <JobPipelineCard
+            postingId={posting.id}
+            status={posting.status as JobStatus}
+            appliedOnIso={posting.appliedAt ? dateToIso(posting.appliedAt) : null}
+            nextActionNote={posting.nextActionNote}
+            nextActionDueIso={posting.nextActionDue ? dateToIso(posting.nextActionDue) : null}
+            notes={posting.notes}
+            tailoringNotes={posting.tailoringNotes}
+            lane={posting.lane as Lane}
+            laneOverride={posting.laneOverride as Lane | null}
+            archived={posting.archivedAt !== null}
+            deletable={canDeletePosting(posting)}
+          />
+          <BenefitsPanel companyId={posting.companyId} postingId={posting.id} merged={merged} owner={ownerBenefits} />
+          <CompanyCallChecklist
+            companyId={posting.companyId}
+            companyName={posting.company.name}
+            postingId={posting.id}
+            answers={(posting.company.questions ?? {}) as Record<string, string>}
+          />
+          <JobActivityPanel
+            postingId={posting.id}
+            items={posting.activity.map((a) => ({
+              id: a.id,
+              kind: a.kind,
+              occurredOnIso: dateToIso(a.occurredAt),
+              note: a.note,
+              fromStatus: a.fromStatus as JobStatus | null,
+              toStatus: a.toStatus as JobStatus | null,
+            }))}
+          />
+          {posting.company.awards.length > 0 && (
+            <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
+              <Eyebrow index="$">Federal awards: {posting.company.name}</Eyebrow>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                From USAspending. Useful for &quot;awarded or contingent?&quot; and &quot;how many option years?&quot; on the call.
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", display: "grid", gap: 6 }}>
+                {posting.company.awards.map((a) => (
+                  <li key={a.id}>
+                    <a href={a.url} target="_blank" rel="noreferrer">
+                      {formatAwardAmount(a.amountCents)}
+                    </a>{" "}
+                    {a.subAgency ?? a.agency}
+                    {a.description ? ` · ${a.description.toLowerCase()}` : ""}
+                    <span style={{ color: "var(--text-muted)" }}>
+                      {" "}
+                      · {a.piid} · {a.startDate ? dateToIso(a.startDate) : "?"} to {a.endDate ? dateToIso(a.endDate) : "?"}
+                      {isCurrentAward(a, new Date()) ? "" : " · ended"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
+            <Eyebrow index="05">Where it&apos;s posted</Eyebrow>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)" }}>
+              <li>
+                <a href={posting.url} target="_blank" rel="noreferrer">
+                  {postingSiteLabel(posting)}
                 </a>{" "}
-                {a.subAgency ?? a.agency}
-                {a.description ? ` · ${a.description.toLowerCase()}` : ""}
-                <span style={{ color: "var(--text-muted)" }}>
-                  {" "}
-                  · {a.piid} · {a.startDate ? dateToIso(a.startDate) : "?"} to {a.endDate ? dateToIso(a.endDate) : "?"}
-                  {isCurrentAward(a, new Date()) ? "" : " · ended"}
-                </span>
+                ({posting.source === "MANUAL" ? "added" : "first seen"} {dateToIso(posting.firstSeenAt)})
               </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <CompanyCallChecklist
-        companyId={posting.companyId}
-        companyName={posting.company.name}
-        postingId={posting.id}
-        answers={(posting.company.questions ?? {}) as Record<string, string>}
-      />
-
-      <JobActivityPanel
-        postingId={posting.id}
-        items={posting.activity.map((a) => ({
-          id: a.id,
-          kind: a.kind,
-          occurredOnIso: dateToIso(a.occurredAt),
-          note: a.note,
-          fromStatus: a.fromStatus as JobStatus | null,
-          toStatus: a.toStatus as JobStatus | null,
-        }))}
-      />
-
-      <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 10 }}>
-        <Eyebrow index="05">Where it&apos;s posted</Eyebrow>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)" }}>
-          <li>
-            <a href={posting.url} target="_blank" rel="noreferrer">
-              {postingSiteLabel(posting)}
-            </a>{" "}
-            ({posting.source === "MANUAL" ? "added" : "first seen"} {dateToIso(posting.firstSeenAt)})
-          </li>
-          {posting.aliases.map((a) => (
-            <li key={a.id}>
-              <a href={a.url} target="_blank" rel="noreferrer">
-                {postingSiteLabel(a)}
-              </a>{" "}
-              (duplicate merged {dateToIso(a.firstSeenAt)})
-            </li>
-          ))}
-        </ul>
+              {posting.aliases.map((a) => (
+                <li key={a.id}>
+                  <a href={a.url} target="_blank" rel="noreferrer">
+                    {postingSiteLabel(a)}
+                  </a>{" "}
+                  (duplicate merged {dateToIso(a.firstSeenAt)})
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
       </div>
-
-      <details className="form-card" style={{ marginBottom: 28 }}>
-        <summary style={{ cursor: "pointer", fontFamily: "var(--font-sans)" }}>Full posting text</summary>
-        <div style={{ whiteSpace: "pre-wrap", fontSize: "var(--text-sm)", lineHeight: 1.6, marginTop: 12 }}>{posting.descriptionText}</div>
-      </details>
     </>
   );
 }

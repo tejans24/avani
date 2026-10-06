@@ -59,7 +59,8 @@ test("refresh pulls postings, rejects the cross-posted duplicate, and filters wi
 test("detail explains the score; marking applied logs it, sets a follow-up, and blocks delete", async ({ page }) => {
   const id = await postingId("Senior Software Engineer, Medicaid Modernization");
   await page.goto(`/jobs/${id}`);
-  await expect(page.getByText(/Why it scored/)).toBeVisible();
+  // The breakdown is folded under its heading; the evaluation leads the page.
+  await page.getByText(/Why it scored/).click();
   await expect(page.getByText("End-to-end ownership of a system or product")).toBeVisible();
   await expect(page.getByText("Parental leave · 12 weeks")).toBeVisible();
 

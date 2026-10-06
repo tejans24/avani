@@ -22,103 +22,103 @@ enum NetDaysMode {
 
 /// Singleton (id = 1): the "From" block, payment instructions, and defaults.
 model CompanySettings {
-  id                     Int      @id @default(1)
+  id                     Int         @id @default(1)
   companyName            String
   addressLine1           String
   addressLine2           String?
   city                   String
   state                  String
   postalCode             String
-  country                String   @default("USA")
+  country                String      @default("USA")
   email                  String
   phone                  String?
-  payViaLabel            String   @default("Manual transfer (ACH/Wire)")
-  paymentInstructions    String   @db.Text
-  defaultTerms           String?  @db.Text
+  payViaLabel            String      @default("Manual transfer (ACH/Wire)")
+  paymentInstructions    String      @db.Text
+  defaultTerms           String?     @db.Text
   /// Company default payment terms: due date = issue date + this many days,
   /// counted per defaultNetDaysMode. Clients may override both.
   defaultNetBusinessDays Int         @default(15)
   defaultNetDaysMode     NetDaysMode @default(BUSINESS)
-  defaultTaxRateBps      Int      @default(0)
-  nextInvoiceNumber      Int      @default(1)
+  defaultTaxRateBps      Int         @default(0)
+  nextInvoiceNumber      Int         @default(1)
   /// Per-reaction toggles keyed by settingKey, e.g. {"overdueEmails": false}
-  reactionSettings       Json     @default("{}")
+  reactionSettings       Json        @default("{}")
   /// Watchdog: set by every /api/events/tick run; stale > 2h → in-app warning
   lastTickAt             DateTime?
-  updatedAt              DateTime @updatedAt
+  updatedAt              DateTime    @updatedAt
 }
 
 /// A client company ("Clients" in the UI).
 model Client {
-  id           String    @id @default(cuid())
-  name         String
+  id                      String        @id @default(cuid())
+  name                    String
   /// Invoice number prefix, e.g. "ACME" → INV-ACME-0001. Derived from the
   /// name on first allocation; stable across renames; editable.
-  invoicePrefix     String? @unique
+  invoicePrefix           String?       @unique
   /// Per-client invoice counter (atomic increment at allocation)
-  nextInvoiceNumber Int     @default(1)
-  contactName  String?
-  billingEmail String
-  ccEmails     String[]  @default([])
-  addressLine1 String?
-  addressLine2 String?
-  city         String?
-  state        String?
-  postalCode   String?
-  country      String?
-  notes        String?   @db.Text
-  archived     Boolean   @default(false)
+  nextInvoiceNumber       Int           @default(1)
+  contactName             String?
+  billingEmail            String
+  ccEmails                String[]      @default([])
+  addressLine1            String?
+  addressLine2            String?
+  city                    String?
+  state                   String?
+  postalCode              String?
+  country                 String?
+  notes                   String?       @db.Text
+  archived                Boolean       @default(false)
   /// Auto-draft cadence: e.g. 14 = biweekly draft prepared by the tick; null = off
   billingCadenceDays      Int?
   /// Per-client gate for the (globally-toggled) overdue reminder emails
-  overdueRemindersEnabled Boolean @default(true)
+  overdueRemindersEnabled Boolean       @default(true)
   /// Payment terms override: null = use the company default. netDays is the
   /// count; netDaysMode is whether it skips weekends.
   netDays                 Int?
   netDaysMode             NetDaysMode?
   // --- CRM / BD layer (Phase 3, all INTERNAL — never client-facing) ---
   /// Relationship stage; existing clients default ACTIVE. Drives the coach.
-  stage             ClientStage @default(ACTIVE)
+  stage                   ClientStage   @default(ACTIVE)
   /// The next step to take with this client (the "system of action" prompt).
-  nextActionNote    String?     @db.Text
+  nextActionNote          String?       @db.Text
   /// When that next step is due — drives follow-up nudges via the tick.
-  nextActionDueDate DateTime?   @db.Date
+  nextActionDueDate       DateTime?     @db.Date
   /// Simple deal size (integer cents); no separate Opportunity entity in v1.
-  dealValueCents    Int?
+  dealValueCents          Int?
   /// Simple expected-close forecast date.
-  expectedCloseDate DateTime?   @db.Date
-  contacts     Contact[]
-  interactions Interaction[]
-  invoices     Invoice[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  expectedCloseDate       DateTime?     @db.Date
+  contacts                Contact[]
+  interactions            Interaction[]
+  invoices                Invoice[]
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 }
 
 model Invoice {
-  id            String            @id @default(cuid())
-  number        String            @unique
-  clientId      String
-  client        Client            @relation(fields: [clientId], references: [id])
-  status        InvoiceStatus     @default(DRAFT)
-  issueDate     DateTime          @db.Date
-  dueDate       DateTime          @db.Date
-  taxRateBps    Int               @default(0)
-  subtotalCents Int               @default(0)
-  taxCents      Int               @default(0)
-  totalCents    Int               @default(0)
-  memo          String?           @db.Text
+  id                 String            @id @default(cuid())
+  number             String            @unique
+  clientId           String
+  client             Client            @relation(fields: [clientId], references: [id])
+  status             InvoiceStatus     @default(DRAFT)
+  issueDate          DateTime          @db.Date
+  dueDate            DateTime          @db.Date
+  taxRateBps         Int               @default(0)
+  subtotalCents      Int               @default(0)
+  taxCents           Int               @default(0)
+  totalCents         Int               @default(0)
+  memo               String?           @db.Text
   /// CompanySettings frozen at first send so later edits don't rewrite history
-  fromSnapshot  Json?
+  fromSnapshot       Json?
   /// Unguessable token for the client-facing invoice page (/i/{token}).
   /// Created at first send; cleared on void (revokes the link).
-  shareToken    String?       @unique
-  sentAt        DateTime?
-  paidAt        DateTime?
-  lineItems     InvoiceLineItem[]
+  shareToken         String?           @unique
+  sentAt             DateTime?
+  paidAt             DateTime?
+  lineItems          InvoiceLineItem[]
   /// Set when a bank deposit was confirmed as this invoice's payment
   matchedTransaction Transaction?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([clientId])
   @@index([status, dueDate])
@@ -276,7 +276,7 @@ model TaxSettings {
   ownerSalaryAnnualCents Int      @default(0)
   withholdingYtdCents    Int      @default(0)
   /// Onboarding facts
-  cpaFiles1120S          Boolean? 
+  cpaFiles1120S          Boolean?
   payrollProvider        String?
   updatedAt              DateTime @updatedAt
 }
@@ -521,102 +521,106 @@ model JobBoard {
 
 /// An employer. Holds the per-company interview-question notes.
 model JobCompany {
-  id               String       @id @default(cuid())
+  id               String          @id @default(cuid())
   name             String
   /// Lowercased, suffix-stripped ("Booz Allen Hamilton Inc." → "booz allen hamilton").
-  normalizedName   String       @unique
+  normalizedName   String          @unique
   lane             JobLane?
   /// Recruiting/staffing firm reposting other employers' roles → hard-filtered.
-  isStaffingAgency Boolean      @default(false)
+  isStaffingAgency Boolean         @default(false)
   /// Answers keyed by INTERVIEW_QUESTIONS keys (primeOrSub, awardedOrContingent,
   /// optionYears, architectureOwner, aiToolsApproved, outsideWorkPolicy, ipCarveOut).
-  questions        Json         @default("{}")
+  questions        Json            @default("{}")
   /// Owner-entered benefits (from recruiters/offers), keyed by BENEFITS key:
   /// { [key]: { value?: string, note?: string } }. Wins over extracted ones.
-  benefits         Json         @default("{}")
-  notes            String?      @db.Text
+  benefits         Json            @default("{}")
+  notes            String?         @db.Text
   postings         JobPosting[]
   awards           ContractAward[]
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model JobPosting {
-  id               String      @id @default(cuid())
-  source           JobSource
+  id              String     @id @default(cuid())
+  source          JobSource
   /// The source's own id for the posting (unique per source).
-  sourceJobId      String
-  boardId          String?
-  board            JobBoard?   @relation(fields: [boardId], references: [id], onDelete: SetNull)
-  companyId        String
-  company          JobCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  title            String
-  location         String
-  workMode         WorkMode    @default(UNKNOWN)
-  url              String
-  descriptionText  String      @db.Text
+  sourceJobId     String
+  boardId         String?
+  board           JobBoard?  @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  companyId       String
+  company         JobCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title           String
+  location        String
+  workMode        WorkMode   @default(UNKNOWN)
+  url             String
+  descriptionText String     @db.Text
   /// Posted range, annualized, integer cents. Hourly ranges × 2080.
-  compMinCents     Int?
-  compMaxCents     Int?
-  postedAt         DateTime?
-  firstSeenAt      DateTime    @default(now())
-  lastSeenAt       DateTime    @default(now())
+  compMinCents    Int?
+  compMaxCents    Int?
+  postedAt        DateTime?
+  firstSeenAt     DateTime   @default(now())
+  lastSeenAt      DateTime   @default(now())
   /// Set when a refresh no longer sees the posting in its feed.
-  closedAt         DateTime?
+  closedAt        DateTime?
 
   /// normalize(title) | normalize(company) | normalize(location), see
   /// src/lib/jobs/dedupe.ts. Unique: a duplicate is never stored as a second
   /// posting; it becomes a JobPostingAlias of this one instead.
-  dedupeKey        String      @unique
-  aliases          JobPostingAlias[]
+  dedupeKey  String            @unique
+  aliases    JobPostingAlias[]
   /// Hidden from every list but kept with its history. Restorable.
-  archivedAt       DateTime?
+  archivedAt DateTime?
 
   // --- Derived by scoring (recomputed when SCORING_VERSION changes) ---
-  lane             JobLane     @default(UNCLASSIFIED)
+  lane           JobLane   @default(UNCLASSIFIED)
   /// Manual lane correction; wins over the classifier.
-  laneOverride     JobLane?
+  laneOverride   JobLane?
   /// Hard-filter failures, e.g. ["clearance: TS/SCI required"]. Empty = passed.
-  filterFailures   String[]    @default([])
+  filterFailures String[]  @default([])
   /// 0–100; null until scored. Rejected postings are still scored, for review.
-  score            Int?
+  score          Int?
   /// [{ category, rule, points, evidence }] — every point is explained.
-  scoreBreakdown   Json        @default("[]")
+  scoreBreakdown Json      @default("[]")
   /// Notes such as "no comp range posted" — neutral but worth knowing.
-  scoreFlags       String[]    @default([])
-  scoringVersion   Int?
-  scoredAt         DateTime?
+  scoreFlags     String[]  @default([])
+  scoringVersion Int?
+  scoredAt       DateTime?
   /// Benefits extracted from this posting's text (src/lib/jobs/benefits.ts):
   /// [{ key, label, value?, evidence }]. Shown merged with the company's.
-  benefits         Json        @default("[]")
+  benefits       Json      @default("[]")
 
   // --- Owner pipeline ---
-  status           JobStatus   @default(NEW)
-  statusChangedAt  DateTime?
-  appliedAt        DateTime?
+  status          JobStatus       @default(NEW)
+  statusChangedAt DateTime?
+  appliedAt       DateTime?
   /// The exact tailored version sent with the application (frozen snapshot).
-  appliedResumeId  String?     @unique
-  appliedResume    TailoredResume? @relation("AppliedResume", fields: [appliedResumeId], references: [id], onDelete: SetNull)
+  appliedResumeId String?         @unique
+  appliedResume   TailoredResume? @relation("AppliedResume", fields: [appliedResumeId], references: [id], onDelete: SetNull)
   /// Next follow-up; set from the pipeline cadence or by hand. Drives nudges.
-  nextActionNote   String?
-  nextActionDue    DateTime?   @db.Date
-  notes            String?     @db.Text
+  nextActionNote  String?
+  nextActionDue   DateTime?       @db.Date
+  notes           String?         @db.Text
   /// Owner's steer for tailoring ("recruiter cares most about Medicaid work").
   /// Shapes emphasis only; it cannot add claims that aren't in master.
-  tailoringNotes   String?     @db.Text
+  tailoringNotes  String?         @db.Text
 
   /// MANUAL only: "bookmarklet" | "share" | "shortcut" | "paste".
-  capturedVia      String?
+  capturedVia        String?
   /// Claude's fit analysis (lib/jobs/fit.ts FitAnalysis), kept until run again.
-  fitAnalysis      Json?
-  fitAnalyzedAt    DateTime?
+  fitAnalysis        Json?
+  fitAnalyzedAt      DateTime?
   /// The résumé chat with Claude for this job (lib/jobs/tailor-ai.ts ChatTurn[] plus timestamps).
-  tailorChat       Json?
-  raw              Json
-  activity         JobActivity[]
-  tailored         TailoredResume[]
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  tailorChat         Json?
+  /// The chat about this job on its page (lib/jobs/answers-ai.ts).
+  jobChat            Json?
+  /// Application form answers (lib/jobs/answers.ts ApplicationAnswer[]).
+  applicationAnswers Json?
+  raw                Json
+  activity           JobActivity[]
+  tailored           TailoredResume[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@unique([source, sourceJobId])
   @@index([status, score])
@@ -673,8 +677,8 @@ model JobActivity {
   fromStatus JobStatus?
   toStatus   JobStatus?
   occurredAt DateTime
-  note       String?    @db.Text
-  createdAt  DateTime   @default(now())
+  note       String?         @db.Text
+  createdAt  DateTime        @default(now())
 
   @@index([postingId, occurredAt])
 }
@@ -692,21 +696,21 @@ model ResumeMaster {
 
 /// A tailored variant for one posting. Each save is a new version.
 model TailoredResume {
-  id         String       @id @default(cuid())
-  postingId  String
-  posting    JobPosting   @relation(fields: [postingId], references: [id], onDelete: Cascade)
-  masterId   String
-  master     ResumeMaster @relation(fields: [masterId], references: [id], onDelete: Restrict)
-  version    Int
+  id        String       @id @default(cuid())
+  postingId String
+  posting   JobPosting   @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  masterId  String
+  master    ResumeMaster @relation(fields: [masterId], references: [id], onDelete: Restrict)
+  version   Int
   /// Same shape as the master résumé. Bullets keep their master ids so the diff
   /// view and the truthfulness check can trace every line back to master.
-  data       Json
+  data      Json
   /// Per-bullet review state: { [bulletId]: "accepted" | "rejected" | "edited" }.
-  decisions  Json         @default("{}")
-  coverNote  String?      @db.Text
+  decisions Json         @default("{}")
+  coverNote String?      @db.Text
   /// Set when this version was sent; a sent version can no longer be edited.
-  appliedTo  JobPosting?  @relation("AppliedResume")
-  createdAt  DateTime     @default(now())
+  appliedTo JobPosting?  @relation("AppliedResume")
+  createdAt DateTime     @default(now())
 
   @@unique([postingId, version])
 }

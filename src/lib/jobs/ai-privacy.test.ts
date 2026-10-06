@@ -24,6 +24,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
 }));
 
 import { resumeSchema } from "@/lib/jobs/resume-schema";
+import { draftAnswersWithClaude, jobChatWithClaude } from "@/lib/jobs/answers-ai";
 import { analyzeFitWithClaude } from "@/lib/jobs/fit-ai";
 import { docFromOutput } from "@/lib/jobs/tailor";
 import { chatAboutResumeWithClaude, tailorWithClaude } from "@/lib/jobs/tailor-ai";
@@ -139,6 +140,27 @@ describe("nothing personal reaches Claude", () => {
       },
       breakdown: [],
       now: new Date("2026-10-06T12:00:00Z"),
+    });
+    expectNothingPersonal();
+  });
+
+  it("drafting application answers", async () => {
+    nextOutput = { answers: [] };
+    await draftAnswersWithClaude({ master, posting, fit: null, questions: ["Why do you want to work with Jordan Quill's old team in Towson?"] });
+    expectNothingPersonal();
+  });
+
+  it("the chat about the job", async () => {
+    nextOutput = { reply: "ok", answers: [] };
+    await jobChatWithClaude({
+      master,
+      posting,
+      fit: null,
+      history: [
+        { role: "user", text: "Call me at 410-555-0199" },
+        { role: "assistant", text: "Noted." },
+      ],
+      message: "I'm Jordan (jordan.quill@example.com). Is this a building role?",
     });
     expectNothingPersonal();
   });

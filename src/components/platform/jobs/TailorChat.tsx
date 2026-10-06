@@ -35,8 +35,10 @@ export function TailorChat(props: {
   const [pending, start] = useTransition();
   const end = useRef<HTMLDivElement>(null);
 
+  // Keep the newest message in view by scrolling the message list, never the page.
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
+    const box = end.current?.parentElement;
+    if (box) box.scrollTop = box.scrollHeight;
   }, [turns, proposal]);
 
   const send = () => {

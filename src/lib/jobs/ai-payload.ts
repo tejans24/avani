@@ -45,6 +45,9 @@ function personalValues(contact: Contact): string[] {
     contact.phone,
     phoneDigits && phoneDigits.length >= 7 ? phoneDigits.slice(-7) : undefined,
     contact.location,
+    // The city on its own too ("Baltimore" as well as "Baltimore, MD"). Postings that name it get it
+    // redacted; the commute is checked in code, so nothing needs it.
+    contact.location?.split(",")[0],
     ...urls,
   ]
     .filter((v): v is string => Boolean(v && v.trim().length >= 3))

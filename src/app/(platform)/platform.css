@@ -545,3 +545,25 @@ input[type="file"].file-input::file-selector-button:hover {
     overflow-y: auto;
   }
 }
+
+/* Job pages use the full width: the content is two columns there. */
+.platform-main:has(.wide-page) {
+  max-width: 1560px;
+}
+.job-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.job-main,
+.job-side {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .job-layout {
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
+  }
+}

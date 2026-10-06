@@ -167,3 +167,43 @@ test("start from master, reuse it on another job, and change it by chatting with
   await expect(page.getByText(/Copied from v2 for Senior Software Engineer, Medicaid Modernization/)).toBeVisible();
   await expect(page.getByTestId("role-agency").getByText("Left out of this version.")).toBeVisible();
 });
+
+test("application answers: the app fills personal ones, Claude drafts the rest, and the chat adds drafts", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const [{ id }] = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`);
+  await page.goto(`/jobs/${id}`);
+  await expect(page.getByTestId("fit-panel").getByText("Test evaluation")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  const qa = page.getByTestId("application-answers");
+  await qa.getByLabel("Application questions").fill("1. First name *\nEmail (required)\nAre you legally authorized to work in the United States?\nWhy do you want to work here?\nGender");
+  await qa.getByRole("button", { name: "Fill answers" }).click();
+  await expect(qa.getByText("4 filled by the app, 1 drafted by Claude.")).toBeVisible();
+  await expect(qa.getByLabel("Answer: First name")).toHaveValue("Jordan");
+  await expect(qa.getByLabel("Answer: Email")).toHaveValue("jordan@example.com");
+  await expect(qa.getByLabel("Answer: Are you legally authorized to work in the United States?")).toHaveValue("Yes");
+  await expect(qa.getByLabel("Answer: Gender")).toHaveValue("");
+  await expect(qa.getByText(/Voluntary self-identification/)).toBeVisible();
+  await expect(qa.getByLabel("Answer: Why do you want to work here?")).toHaveValue("Fake draft for: Why do you want to work here?");
+
+  // An edit becomes the owner's; filling again doesn't overwrite it.
+  await qa.getByLabel("Answer: Why do you want to work here?").fill("Because of the Medicaid work.");
+  await qa.getByRole("button", { name: "Save" }).click();
+  await expect(qa.getByText("Yours")).toBeVisible();
+  await qa.getByLabel("Application questions").fill("Why do you want to work here?");
+  await qa.getByRole("button", { name: "Fill answers" }).click();
+  await expect(qa.getByText(/drafted by Claude\.$/)).toBeVisible();
+  await expect(qa.getByLabel("Answer: Why do you want to work here?")).toHaveValue("Because of the Medicaid work.");
+
+  // The chat about the job can draft an answer into the list.
+  const chat = page.getByTestId("job-chat");
+  await chat.getByLabel("Message about this job").fill("Draft: What interests you about public sector work?");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Here's a draft.")).toBeVisible();
+  await chat.getByRole("button", { name: "Add to application answers" }).click();
+  await expect(qa.getByLabel("Answer: What interests you about public sector work?")).toHaveValue("Fake draft for: What interests you about public sector work?");
+
+  const [row] = await queryRows(`SELECT "applicationAnswers", "jobChat" FROM "JobPosting" WHERE id = $1`, [id]);
+  expect(row.applicationAnswers).toHaveLength(6);
+  expect(row.jobChat).toHaveLength(2);
+});
