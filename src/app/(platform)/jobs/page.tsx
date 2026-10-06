@@ -31,8 +31,18 @@ const STATUS_TONE: Record<JobStatus, string> = {
   SKIPPED: "neutral",
 };
 
-function whereFor(view: View, lane: Lane | null): Prisma.JobPostingWhereInput {
-  const base: Prisma.JobPostingWhereInput = lane ? { lane } : {};
+/** Work-mode filter for the list ("Remote" includes remote jobs with occasional travel, which are flagged). */
+const MODES = {
+  remote: { label: "Remote", modes: ["REMOTE"] },
+  occasional: { label: "Occasional office days", modes: ["OCCASIONAL_HYBRID"] },
+  unknown: { label: "Not stated", modes: ["UNKNOWN"] },
+  hybrid: { label: "Hybrid", modes: ["HYBRID"] },
+  onsite: { label: "On-site", modes: ["ONSITE"] },
+} as const satisfies Record<string, { label: string; modes: WorkMode[] }>;
+type Mode = keyof typeof MODES;
+
+function whereFor(view: View, lane: Lane | null, mode: Mode | null): Prisma.JobPostingWhereInput {
+  const base: Prisma.JobPostingWhereInput = { ...(lane ? { lane } : {}), ...(mode ? { workMode: { in: [...MODES[mode].modes] } } : {}) };
   switch (view) {
     case "matches":
       return { ...base, archivedAt: null, closedAt: null, filterFailures: { isEmpty: true }, status: { in: ["NEW", "SHORTLISTED"] } };
@@ -47,14 +57,15 @@ function whereFor(view: View, lane: Lane | null): Prisma.JobPostingWhereInput {
   }
 }
 
-export default async function JobsPage({ searchParams }: { searchParams: { view?: string; lane?: string } }) {
+export default async function JobsPage({ searchParams }: { searchParams: { view?: string; lane?: string; mode?: string } }) {
   const view: View = (Object.keys(VIEWS) as View[]).includes(searchParams.view as View) ? (searchParams.view as View) : "matches";
   const lane = (Object.keys(LANE_LABEL) as Lane[]).includes(searchParams.lane as Lane) ? (searchParams.lane as Lane) : null;
+  const mode = (Object.keys(MODES) as Mode[]).includes(searchParams.mode as Mode) ? (searchParams.mode as Mode) : null;
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
 
   const [postings, counts, newThisWeek, failingBoards, boardCount] = await Promise.all([
     db.jobPosting.findMany({
-      where: whereFor(view, lane),
+      where: whereFor(view, lane, mode),
       orderBy: view === "pipeline" ? [{ statusChangedAt: "desc" }] : [{ score: { sort: "desc", nulls: "last" } }, { firstSeenAt: "desc" }],
       take: 300,
       include: { company: { select: { name: true } }, _count: { select: { aliases: true } } },
@@ -66,7 +77,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
   ]);
   const countOf = (s: JobStatus) => counts.find((c) => c.status === s)?._count ?? 0;
 
-  const href = (v: View, l: Lane | null = lane) => `/jobs?view=${v}${l ? `&lane=${l}` : ""}`;
+  const href = (v: View, l: Lane | null = lane, m: Mode | null = mode) => `/jobs?view=${v}${l ? `&lane=${l}` : ""}${m ? `&mode=${m}` : ""}`;
 
   return (
     <>
@@ -110,6 +121,16 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
               {LANE_LABEL[l]}
             </Link>
           ))}
+      </div>
+      <div className="filter-tabs" style={{ marginTop: -8 }} aria-label="Work mode">
+        <Link href={href(view, lane, null)} data-active={!mode || undefined}>
+          All work modes
+        </Link>
+        {(Object.keys(MODES) as Mode[]).map((m) => (
+          <Link key={m} href={href(view, lane, m)} data-active={mode === m || undefined}>
+            {MODES[m].label}
+          </Link>
+        ))}
       </div>
 
       {postings.length === 0 ? (

@@ -202,3 +202,23 @@ test("a filtered-out job is saved, and correcting its work mode rescores it into
   await page.goto("/jobs");
   await expect(page.getByText(hybrid.title as string)).toBeVisible();
 });
+
+test("the job list filters by work mode, alongside the other filters", async ({ page }) => {
+  await page.goto("/jobs");
+  const workMode = page.getByLabel("Work mode");
+  await workMode.getByRole("link", { name: "Remote", exact: true }).click();
+  await page.waitForURL(/mode=remote/);
+  const rows = page.getByTestId("job-row");
+  await expect(rows.first()).toContainText("Senior Software Engineer, Medicaid Modernization");
+  const shown = await rows.count();
+  const [{ n }] = await queryRows(
+    `SELECT count(*)::int AS n FROM "JobPosting" WHERE "workMode" = 'REMOTE' AND "archivedAt" IS NULL AND "closedAt" IS NULL AND "filterFailures" = '{}' AND status IN ('NEW','SHORTLISTED')`
+  );
+  expect(shown).toBe(n);
+
+  // The filter stays on when switching views.
+  await page.getByRole("link", { name: "Filtered out" }).click();
+  await expect(page).toHaveURL(/view=filtered.*mode=remote/);
+  await page.getByLabel("Work mode").getByRole("link", { name: "Hybrid", exact: true }).click();
+  await expect(page.getByTestId("job-row").first()).toContainText("Regular hybrid (set in-office days)");
+});
