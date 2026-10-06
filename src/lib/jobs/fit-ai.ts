@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
-import { assertNoPersonalData, buildTailoringPayload, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
+import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import { codeChecks, codeChecksForPrompt, fakeFitOutput, finalizeFit, fitOutputSchema, postingMetadata, type FitAnalysis, type FitPostingFacts } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
 import type { Resume } from "@/lib/jobs/resume-schema";
@@ -36,7 +36,7 @@ export async function analyzeFitWithClaude(input: {
   }
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Set ANTHROPIC_API_KEY to evaluate jobs with Claude.");
 
-  const contact = input.master.contact;
+  const contact = guardedContact(input.master);
   const payload = buildTailoringPayload({
     master: input.master,
     posting: { title: input.posting.title, company: input.posting.companyName, lane: input.posting.lane, description: input.posting.descriptionText },

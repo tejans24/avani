@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
-import { assertNoPersonalData, buildTailoringPayload, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
+import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import type { Resume } from "@/lib/jobs/resume-schema";
 import { styleRulesForPrompt } from "@/lib/jobs/resume-style";
@@ -88,11 +88,11 @@ export async function tailorWithClaude(input: {
     posting: { title: input.posting.title, company: input.posting.companyName, lane: input.posting.lane, description: input.posting.descriptionText },
     tailoringNotes: input.tailoringNotes,
   });
-  const parts = serializeForAiParts(payload, input.master.contact);
+  const parts = serializeForAiParts(payload, guardedContact(input.master));
   const federal = FEDERAL_VOCABULARY_LANES.includes(input.posting.lane);
   const planRaw = fitPlanText(input.fitPlan ?? null);
-  const plan = planRaw ? scrubPersonal(planRaw, input.master.contact) : null;
-  if (plan) assertNoPersonalData(plan, input.master.contact);
+  const plan = planRaw ? scrubPersonal(planRaw, guardedContact(input.master)) : null;
+  if (plan) assertNoPersonalData(plan, guardedContact(input.master));
 
   const client = new Anthropic();
   const response = await client.beta.messages.parse({
@@ -154,7 +154,7 @@ export async function chatAboutResumeWithClaude(input: {
   if (process.env.TAILOR_MODE === "fake") return fakeChat(input.master, input.message);
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Set ANTHROPIC_API_KEY to chat with Claude about your résumé.");
 
-  const contact = input.master.contact;
+  const contact = guardedContact(input.master);
   const s = (t: string) => scrubPersonal(t, contact);
   const payload = buildTailoringPayload({
     master: input.master,

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
-import { assertNoPersonalData, buildTailoringPayload, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
+import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import { draftedAnswersSchema, jobChatOutputSchema, type DraftedAnswers, type JobChatOutput } from "@/lib/jobs/answers";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
@@ -61,7 +61,7 @@ type Ctx = {
 
 /** The parts every request shares, built and checked once. */
 function requestParts(ctx: Ctx) {
-  const contact = ctx.master.contact;
+  const contact = guardedContact(ctx.master);
   const payload = buildTailoringPayload({
     master: ctx.master,
     posting: { title: ctx.posting.title, company: ctx.posting.companyName, lane: ctx.posting.lane, description: ctx.posting.descriptionText },

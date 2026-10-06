@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { isoToUtcDate } from "@/lib/dates";
 import { BENEFITS, type BenefitKey } from "@/lib/jobs/benefits";
+import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
@@ -464,7 +465,7 @@ export async function fillCaptureWithClaude(input: { pageTitle?: string; text: s
     const { resumeSchema } = await import("@/lib/jobs/resume-schema");
     const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
     const parsed = master ? resumeSchema.safeParse(master.data) : null;
-    const r = await extractJobWithClaude({ pageTitle: input.pageTitle, text, contact: parsed?.success ? parsed.data.contact : null });
+    const r = await extractJobWithClaude({ pageTitle: input.pageTitle, text, contact: parsed?.success ? guardedContact(parsed.data) : null });
     return { ok: true as const, ...r };
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Couldn't read the page" };

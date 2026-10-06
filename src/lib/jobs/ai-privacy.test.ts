@@ -164,4 +164,36 @@ describe("nothing personal reaches Claude", () => {
     });
     expectNothingPersonal();
   });
+
+  it("an employer named after the home city is résumé content: sent intact, not refused", async () => {
+    // The owner lives in Towson and worked for the City of Towson.
+    const local = resumeSchema.parse({
+      ...master,
+      experience: [
+        ...master.experience,
+        {
+          id: "towson-city",
+          organization: "City of Towson, Digital Services",
+          title: "Lead Engineer",
+          location: "Towson, MD",
+          periods: [{ start: "2018-01", end: "2021-02" }],
+          bullets: [{ id: "towson-city-1", text: "Moved permits online for the City of Towson.", skills: [] }],
+        },
+      ],
+    });
+    nextOutput = { headline: "Principal Engineer", summary: "s", experience: [], skillGroupOrder: [], coverNote: "", rationale: "" };
+    await tailorWithClaude({ master: local, posting, tailoringNotes: null });
+    nextOutput = { reply: "ok", edits: [] };
+    const doc = docFromOutput(local, { headline: "Principal Engineer", summary: "s", experience: [], skillGroupOrder: [], coverNote: "", rationale: "" }, "claude");
+    await chatAboutResumeWithClaude({ master: local, posting, doc, history: [], message: "Lead with the City of Towson work." });
+    nextOutput = { answers: [] };
+    await draftAnswersWithClaude({ master: local, posting, fit: null, questions: ["Tell us about your City of Towson work."] });
+
+    const body = JSON.stringify(sent);
+    expect(body).toContain("City of Towson, Digital Services");
+    expect(body).toContain("towson-city-1");
+    for (const v of ["jordan", "quill", "jordan.quill@example.com", "410-555-0199", "5550199", "towson, md", "linkedin.com/in/jquill"]) {
+      expect(body.toLowerCase(), `request contained "${v}"`).not.toContain(v);
+    }
+  });
 });

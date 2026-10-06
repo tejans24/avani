@@ -20,7 +20,27 @@ import type { Resume } from "@/lib/jobs/resume-schema";
  * the output of serializeForAi.
  */
 
-export type Contact = Resume["contact"];
+/**
+ * The contact block, plus whether the résumé's own content names the home
+ * city (an employer like "City of Baltimore"). Build it with guardedContact().
+ */
+export type Contact = Resume["contact"] & { cityIsContent?: boolean };
+
+const wordIn = (word: string, text: string) => new RegExp(`(?<![\\w])${escapeRe(word.toLowerCase())}(?![\\w])`).test(text.toLowerCase());
+
+/**
+ * The contact block as the guards should see it. The city on its own is
+ * guarded too, unless the résumé content already names it: then it's
+ * content the owner sends anyway (their employer), and redacting it would
+ * garble the résumé. The full location ("City, ST") is always guarded.
+ */
+export function guardedContact(master: Resume): Contact {
+  const city = master.contact.location?.split(",")[0]?.trim();
+  // Everything that can be sent: not the contact block, not per-role locations (never copied).
+  const { contact: _contact, experience, ...rest } = master;
+  const content = JSON.stringify({ ...rest, experience: experience.map(({ location: _loc, ...e }) => e) });
+  return { ...master.contact, cityIsContent: Boolean(city && wordIn(city, content)) };
+}
 
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const PHONE_RE = /(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g;
@@ -45,9 +65,8 @@ function personalValues(contact: Contact): string[] {
     contact.phone,
     phoneDigits && phoneDigits.length >= 7 ? phoneDigits.slice(-7) : undefined,
     contact.location,
-    // The city on its own too ("Baltimore" as well as "Baltimore, MD"). Postings that name it get it
-    // redacted; the commute is checked in code, so nothing needs it.
-    contact.location?.split(",")[0],
+    // The city on its own too, unless the résumé content itself names it (see guardedContact).
+    contact.cityIsContent ? undefined : contact.location?.split(",")[0],
     ...urls,
   ]
     .filter((v): v is string => Boolean(v && v.trim().length >= 3))
@@ -98,7 +117,7 @@ export function buildTailoringPayload(input: {
   tailoringNotes?: string | null;
 }): TailoringPayload {
   const { master } = input;
-  const s = (t: string) => scrubPersonal(t, master.contact);
+  const s = (t: string) => scrubPersonal(t, guardedContact(master));
   const bullets = (bs: Resume["experience"][number]["bullets"]): PayloadBullet[] =>
     bs.map((b) => ({ id: b.id, text: s(b.text), skills: b.skills, reserve: b.reserve }));
 
