@@ -2,6 +2,7 @@ import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { db } from "@/lib/db";
 import { resumeSchema, type Resume } from "@/lib/jobs/resume-schema";
+import { maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
 import { checkDocStyle, checkTruth, hasBlocking, renderResume, type TailoredDoc } from "@/lib/jobs/tailor";
 import { ResumePdf } from "./ResumePdf";
 
@@ -24,7 +25,7 @@ export function pdfPageCount(buffer: Buffer): number {
 
 export class ResumeExportBlockedError extends Error {}
 
-export async function renderTailoredPdf(tailoredId: string): Promise<{ buffer: Buffer; filename: string; pages: number }> {
+export async function renderTailoredPdf(tailoredId: string): Promise<{ buffer: Buffer; filename: string; pages: number; maxPages: number }> {
   const t = await db.tailoredResume.findUniqueOrThrow({
     where: { id: tailoredId },
     include: { master: true, posting: { include: { company: { select: { name: true } } } } },
@@ -37,5 +38,10 @@ export async function renderTailoredPdf(tailoredId: string): Promise<{ buffer: B
   }
   const resume = renderResume(master, doc);
   const buffer = await renderToBuffer(<ResumePdf resume={resume} />);
-  return { buffer, filename: resumeFilename(resume, t.posting.company.name, t.posting.title), pages: pdfPageCount(buffer) };
+  return {
+    buffer,
+    filename: resumeFilename(resume, t.posting.company.name, t.posting.title),
+    pages: pdfPageCount(buffer),
+    maxPages: maxResumePages(t.posting.lane as Lane),
+  };
 }

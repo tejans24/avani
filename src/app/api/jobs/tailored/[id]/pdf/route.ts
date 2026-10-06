@@ -5,7 +5,7 @@ import { ResumeExportBlockedError, renderTailoredPdf } from "@/pdf/resume-render
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Tailored résumé PDF: inline for the preview pane, ?download=1 to save. */
+/** Tailored résumé PDF: inline for the preview, ?download=1 to save, ?info=1 for its name and page count. */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAuth();
@@ -13,7 +13,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const { buffer, filename } = await renderTailoredPdf(params.id);
+    const { buffer, filename, pages, maxPages } = await renderTailoredPdf(params.id);
+    // ?info=1: what the preview shows beside the file (name, page count, limit).
+    if (req.nextUrl.searchParams.get("info") === "1") return NextResponse.json({ filename, pages, maxPages });
     const disposition = req.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline";
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,

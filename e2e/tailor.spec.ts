@@ -65,24 +65,24 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   expect(agencyBullets.find((b: { id: string }) => b.id === "agency-2").status).toBe("rejected");
   expect(v2.data.experience.find((r: { id: string }) => r.id === "agency").omitted).toBe(true);
 
-  // Preview shows the exact file; download is a separate step.
-  await page.getByRole("link", { name: "Preview PDF" }).click();
-  await expect(page.getByText("Quill_Jordan_Chesapeake-Civic-Digital_Senior-Software-Engineer-Medicaid-Modernization.pdf")).toBeVisible();
-  await expect(page.getByText(/^1 page$/)).toBeVisible();
+  // Preview opens over the editor and shows the exact file; download is a separate step.
+  await page.getByRole("button", { name: "Preview PDF" }).click();
+  const preview = page.getByRole("dialog");
+  await expect(preview.getByText("Quill_Jordan_Chesapeake-Civic-Digital_Senior-Software-Engineer-Medicaid-Modernization.pdf")).toBeVisible();
+  await expect(preview.getByText(/^1 page$/)).toBeVisible();
   // The preview iframe may show it: the PDF allows framing by the app (and only the app).
-  const inline = await page.request.get((await page.locator("iframe").getAttribute("src"))!);
+  const inline = await page.request.get((await preview.locator("iframe").getAttribute("src"))!);
   expect(inline.headers()["content-type"]).toBe("application/pdf");
   expect(inline.headers()["content-security-policy"]).toBe("frame-ancestors 'self'");
-  const href = await page.getByRole("link", { name: "Download PDF" }).getAttribute("href");
+  const href = await preview.getByRole("link", { name: "Download" }).getAttribute("href");
   const pdf = await page.request.get(href!);
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
   expect(pdf.headers()["content-disposition"]).toContain("attachment;");
   expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+  await preview.getByRole("button", { name: "Close preview" }).click();
+  await expect(preview).toBeHidden();
 
   // Record that this version was sent; it locks.
-  await page.getByRole("link", { name: "Back to editor" }).click();
-  // A full page load: wait for hydration before using client-side buttons.
-  await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "I applied with this version" }).click();
   await expect(page.getByText(/sent with your application \(locked\)/)).toBeVisible();
   const [p] = await queryRows(

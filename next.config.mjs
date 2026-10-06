@@ -31,7 +31,6 @@ const nextConfig = {
     // files ship with the serverless function.
     outputFileTracingIncludes: {
       "/api/jobs/tailored/[id]/pdf": ["./src/pdf/fonts/**"],
-      "/jobs/[id]/tailor/preview": ["./src/pdf/fonts/**"],
     },
   },
   async headers() {

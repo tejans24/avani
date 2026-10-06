@@ -6,6 +6,7 @@ import { generateTailored, markAppliedWithVersion, reuseTailoredVersion, saveTai
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import type { Resume } from "@/lib/jobs/resume-schema";
 import { checkDocStyle, checkTruth, hasBlocking, omittedRoleGaps, type BulletStatus, type TailoredDoc } from "@/lib/jobs/tailor";
+import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import { TailorChat, type ChatTurnView } from "./TailorChat";
 import { ActionMessage, useAction } from "./useAction";
 
@@ -266,9 +267,7 @@ export function TailorEditor(props: {
             >
               Save as new version
             </Button>
-            <Button href={`/jobs/${props.postingId}/tailor/preview?v=${props.versionId}`} variant="secondary" size="sm" aria-disabled={blocking || dirty}>
-              Preview PDF
-            </Button>
+            {props.versionId && <PdfPreviewDialog versionId={props.versionId} version={props.version ?? 0} unsaved={dirty} blocking={blocking} />}
             {!isSent && (
               <Button
                 type="button"
