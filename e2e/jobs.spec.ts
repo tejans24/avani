@@ -189,3 +189,16 @@ test("on a phone the menu folds behind a button and closes after navigating", as
   await page.keyboard.press("Escape");
   await expect(page.getByRole("link", { name: "Dashboard" })).toBeHidden();
 });
+
+test("a filtered-out job is saved, and correcting its work mode rescores it into Matches", async ({ page }) => {
+  const [hybrid] = await queryRows(`SELECT id, title FROM "JobPosting" WHERE 'Regular hybrid (set in-office days)' = ANY("filterFailures")`);
+  await page.goto(`/jobs/${hybrid.id}`);
+  await expect(page.getByText("Saved, but filtered out.")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Work mode").selectOption("REMOTE");
+  await expect(page.getByText("Saved, but filtered out.")).toBeHidden();
+  const [after] = await queryRows(`SELECT "workMode", "workModeOverride", "filterFailures" FROM "JobPosting" WHERE id = $1`, [hybrid.id]);
+  expect(after).toMatchObject({ workMode: "REMOTE", workModeOverride: "REMOTE", filterFailures: [] });
+  await page.goto("/jobs");
+  await expect(page.getByText(hybrid.title as string)).toBeVisible();
+});

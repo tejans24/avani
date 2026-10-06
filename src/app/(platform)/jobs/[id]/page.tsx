@@ -109,12 +109,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
               fontSize: "var(--text-sm)",
             }}
           >
-            <strong>Filtered out.</strong> It failed {posting.filterFailures.length === 1 ? "a must-have" : "must-haves"}:
+            <strong>Saved, but filtered out.</strong> It failed {posting.filterFailures.length === 1 ? "a must-have" : "must-haves"}, so it&apos;s listed
+            under Filtered out instead of Matches:
             <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
               {posting.filterFailures.map((f) => (
                 <li key={f}>{f}</li>
               ))}
             </ul>
+            <div style={{ marginTop: 6 }}>Wrong? Set the work mode (or lane) under Your pipeline and it&apos;s rescored.</div>
           </div>
         </div>
       )}
@@ -202,6 +204,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             tailoringNotes={posting.tailoringNotes}
             lane={posting.lane as Lane}
             laneOverride={posting.laneOverride as Lane | null}
+            workMode={posting.workMode as WorkMode}
+            workModeOverride={posting.workModeOverride as WorkMode | null}
             archived={posting.archivedAt !== null}
             deletable={canDeletePosting(posting)}
           />

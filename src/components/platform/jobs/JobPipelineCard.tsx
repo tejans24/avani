@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteJob, setJobArchived, setJobLane, setJobNextAction, setJobNotes, setJobStatus } from "@/actions/jobs";
+import { deleteJob, setJobArchived, setJobLane, setJobNextAction, setJobNotes, setJobStatus, setJobWorkMode } from "@/actions/jobs";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import { Field, Input, Select, Textarea } from "@/components/form/shared";
-import { LANE_LABEL } from "@/lib/jobs/display";
+import { LANE_LABEL, WORK_MODE_LABEL } from "@/lib/jobs/display";
 import { JOB_STATUS_LABEL, STATUS_FOLLOW_UP, type JobStatus } from "@/lib/jobs/pipeline";
-import type { Lane } from "@/lib/jobs/scoring-config";
+import type { Lane, WorkMode } from "@/lib/jobs/scoring-config";
 import { ActionMessage, useAction } from "./useAction";
 
 const STATUSES = Object.keys(JOB_STATUS_LABEL) as JobStatus[];
@@ -22,6 +22,8 @@ export function JobPipelineCard(props: {
   tailoringNotes: string | null;
   lane: Lane;
   laneOverride: Lane | null;
+  workMode: WorkMode;
+  workModeOverride: WorkMode | null;
   archived: boolean;
   deletable: boolean;
 }) {
@@ -130,6 +132,23 @@ export function JobPipelineCard(props: {
           {(Object.keys(LANE_LABEL) as Lane[]).map((l) => (
             <option key={l} value={l}>
               {LANE_LABEL[l]}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="job-work-mode" style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+          Work mode
+        </label>
+        <select
+          id="job-work-mode"
+          value={props.workModeOverride ?? ""}
+          disabled={pending}
+          title="Set it when you know better than the posting, e.g. the recruiter said it's fully remote"
+          onChange={(e) => run(() => setJobWorkMode(props.postingId, (e.target.value || null) as WorkMode | null))}
+        >
+          <option value="">Auto ({WORK_MODE_LABEL[props.workMode]})</option>
+          {(["REMOTE", "OCCASIONAL_HYBRID", "HYBRID", "ONSITE"] as WorkMode[]).map((m) => (
+            <option key={m} value={m}>
+              {WORK_MODE_LABEL[m]}
             </option>
           ))}
         </select>

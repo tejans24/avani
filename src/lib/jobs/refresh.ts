@@ -4,7 +4,7 @@ import { emitEvent } from "@/lib/events/emit";
 import { formatAwardAmount, pickCurrentAward } from "@/lib/jobs/awards";
 import { extractBenefits } from "@/lib/jobs/benefits";
 import { normalizeCompany, resolveBatch, sourceIdKey, type ExistingIndex, type Incoming } from "@/lib/jobs/dedupe";
-import { SCORING_VERSION, passesTitlePrefilter, type Lane } from "@/lib/jobs/scoring-config";
+import { SCORING_VERSION, passesTitlePrefilter, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
 import { scorePosting } from "@/lib/jobs/scoring";
 import { sourceFetchCtx } from "@/lib/jobs/sources/http";
 import { pluginFor } from "@/lib/jobs/sources/index";
@@ -84,7 +84,7 @@ export async function currentAwardSummary(companyId: string, now: Date): Promise
 /** Scoring + benefits columns for a posting, from its current content. */
 export function derivedFields(
   p: Pick<NormalizedPosting, "title" | "descriptionText" | "location" | "companyName" | "source" | "postedAt" | "compMinCents" | "compMaxCents" | "workModeHint">,
-  opts: { isStaffingAgency: boolean; laneOverride: Lane | null; now: Date; currentAward?: { summary: string } | null }
+  opts: { isStaffingAgency: boolean; laneOverride: Lane | null; workModeOverride?: WorkMode | null; now: Date; currentAward?: { summary: string } | null }
 ) {
   const r = scorePosting(
     {
@@ -96,7 +96,7 @@ export function derivedFields(
       postedAt: p.postedAt,
       compMinCents: p.compMinCents,
       compMaxCents: p.compMaxCents,
-      workModeHint: p.workModeHint,
+      workModeHint: opts.workModeOverride ?? p.workModeHint,
       isStaffingAgency: opts.isStaffingAgency,
       laneOverride: opts.laneOverride,
       currentAward: opts.currentAward ?? null,
@@ -194,6 +194,7 @@ export async function ingestPostings(
                 ...derivedFields(item as NormalizedPosting, {
                   isStaffingAgency: existing.company.isStaffingAgency,
                   laneOverride: existing.laneOverride,
+                  workModeOverride: existing.workModeOverride as WorkMode | null,
                   now: opts.now,
                   currentAward: await currentAwardSummary(existing.companyId, opts.now),
                 }),
@@ -303,16 +304,28 @@ export async function refreshBoard(boardId: string, ctx: FetchCtx): Promise<Boar
 
 /**
  * Recompute one posting's derived fields from its stored content, company
- * flags, lane override and current award. The one rescoring path, used by
- * version bumps, award updates, and owner edits (lane, staffing flag).
+ * flags, lane and work-mode overrides and current award. The one rescoring
+ * path, used by version bumps, award updates, and owner edits.
  */
 export async function rescorePosting(id: string, now: Date): Promise<void> {
   const p = await db.jobPosting.findUniqueOrThrow({ where: { id }, include: { company: { select: { name: true, isStaffingAgency: true } } } });
   await db.jobPosting.update({
     where: { id },
     data: derivedFields(
-      { ...p, companyName: p.company.name, source: p.source as SourceName, workModeHint: p.workMode === "UNKNOWN" ? null : p.workMode },
-      { isStaffingAgency: p.company.isStaffingAgency, laneOverride: p.laneOverride, now, currentAward: await currentAwardSummary(p.companyId, now) }
+      {
+        ...p,
+        companyName: p.company.name,
+        source: p.source as SourceName,
+        // Feeds' own flags (Workday remoteType) live only in the stored mode; jobs added by hand are re-read from their text.
+        workModeHint: p.source === "MANUAL" || p.workMode === "UNKNOWN" ? null : (p.workMode as WorkMode),
+      },
+      {
+        isStaffingAgency: p.company.isStaffingAgency,
+        laneOverride: p.laneOverride,
+        workModeOverride: p.workModeOverride as WorkMode | null,
+        now,
+        currentAward: await currentAwardSummary(p.companyId, now),
+      }
     ),
   });
 }

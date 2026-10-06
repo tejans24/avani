@@ -154,6 +154,20 @@ export async function setJobLane(id: string, lane: Lane | null): Promise<ActionR
   }
 }
 
+/** Manual work-mode correction (null clears it), e.g. after the recruiter says it's fully remote. */
+export async function setJobWorkMode(id: string, mode: WorkMode | null): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    const workModeOverride = mode === null ? null : z.enum(["REMOTE", "OCCASIONAL_HYBRID", "HYBRID", "ONSITE"]).parse(mode);
+    await db.jobPosting.update({ where: { id }, data: { workModeOverride } });
+    await rescorePosting(id, new Date());
+    revalidateJob(id);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 // --- Archive / delete --------------------------------------------------------
 
 export async function setJobArchived(id: string, archived: boolean): Promise<ActionResult> {

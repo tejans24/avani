@@ -9,7 +9,7 @@
  * Patterns are matched case-insensitively against title + description.
  */
 
-export const SCORING_VERSION = 3;
+export const SCORING_VERSION = 4;
 
 /*
  * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
@@ -93,6 +93,15 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
       /\b(once|1-2 days?|one day|a few days) (a|per) (month|quarter)\b/i,
       /\b(monthly|quarterly) (on[- ]?site|in[- ]person|team) (visits?|meetings?|days?|gatherings?)\b/i,
       /\bremote[^.]{0,60}\b(occasional|as needed)\b/i,
+    ],
+  },
+  // Remote offered as one of the options ("a hybrid, remote, or client-site environment as program needs
+  // require", "remote or hybrid"): it depends on the program, so it's not stated. Ask.
+  {
+    mode: "UNKNOWN",
+    patterns: [
+      /\b(hybrid|on[- ]?site|client[- ]site|in[- ]office)\s*(,|\/|or|and\/or)\s*(an?\s+)?remote\b/i,
+      /\bremote\s*(,|\/|or|and\/or)\s*(an?\s+)?(hybrid|on[- ]?site|client[- ]site|in[- ]office)\b/i,
     ],
   },
   // Generic "hybrid" with no occasional qualifier → assume regular hybrid.

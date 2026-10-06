@@ -576,6 +576,8 @@ model JobPosting {
   lane           JobLane   @default(UNCLASSIFIED)
   /// Manual lane correction; wins over the classifier.
   laneOverride   JobLane?
+  /// Owner's correction of the work mode ("the recruiter said fully remote"); scoring uses it over the text.
+  workModeOverride WorkMode?
   /// Hard-filter failures, e.g. ["clearance: TS/SCI required"]. Empty = passed.
   filterFailures String[]  @default([])
   /// 0–100; null until scored. Rejected postings are still scored, for review.

@@ -173,3 +173,12 @@ describe("classifyLane", () => {
     expect(classifyLane({ source: "ASHBY", companyName: "X", laneOverride: null }, "nothing relevant")).toBe("UNCLASSIFIED");
   });
 });
+
+describe("classifyWorkMode: remote offered as one option", () => {
+  it("doesn't call it regular hybrid when remote is among the choices", () => {
+    expect(classifyWorkMode("Washington, DC", "Ability to work in a hybrid, remote, or client-site environment as program needs require.")).toBe("UNKNOWN");
+    expect(classifyWorkMode("Reston, VA", "This role can be remote or hybrid.")).toBe("UNKNOWN");
+    expect(classifyWorkMode("Reston, VA", "This is a hybrid role, 3 days a week in the office.")).toBe("HYBRID");
+    expect(classifyWorkMode("Reston, VA", "Hybrid schedule with our Reston team.")).toBe("HYBRID");
+  });
+});
