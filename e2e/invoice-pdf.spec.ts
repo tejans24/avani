@@ -27,6 +27,8 @@ test("pdf endpoint streams the invoice PDF inline", async ({ request }) => {
   expect(res.headers()["content-type"]).toContain("application/pdf");
   expect(res.headers()["content-disposition"]).toContain("inline");
   expect(res.headers()["content-disposition"]).toContain("INV-0042.pdf");
+  // The invoice page previews it in an iframe: the app (and only the app) may frame it.
+  expect(res.headers()["content-security-policy"]).toBe("frame-ancestors 'self'");
   const body = await res.body();
   expect(body.length).toBeGreaterThan(3000);
   expect(body.subarray(0, 5).toString()).toBe("%PDF-");

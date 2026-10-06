@@ -69,6 +69,10 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   await page.getByRole("link", { name: "Preview PDF" }).click();
   await expect(page.getByText("Quill_Jordan_Chesapeake-Civic-Digital_Senior-Software-Engineer-Medicaid-Modernization.pdf")).toBeVisible();
   await expect(page.getByText(/^1 page$/)).toBeVisible();
+  // The preview iframe may show it: the PDF allows framing by the app (and only the app).
+  const inline = await page.request.get((await page.locator("iframe").getAttribute("src"))!);
+  expect(inline.headers()["content-type"]).toBe("application/pdf");
+  expect(inline.headers()["content-security-policy"]).toBe("frame-ancestors 'self'");
   const href = await page.getByRole("link", { name: "Download PDF" }).getAttribute("href");
   const pdf = await page.request.get(href!);
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
