@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HARD_FILTERS, PAY, payK, type WorkMode } from "@/lib/jobs/scoring-config";
+import type { Resume } from "@/lib/jobs/resume-schema";
 import type { BreakdownEntry } from "@/lib/jobs/scoring";
 
 /**
@@ -117,10 +118,58 @@ export type FitPostingFacts = {
 };
 
 type Check = { status: "PASS" | "FAIL" | "UNKNOWN" | "UNDER_TARGET"; note: string };
-export type CodeChecks = { location: Check; pay: Check };
+export type CodeChecks = { location: Check; pay: Check; citizenship?: Check; clearance?: Check };
 
-/** Location and pay, checked from the posting's data in code. */
-export function codeChecks(p: FitPostingFacts): CodeChecks {
+/**
+ * The owner's citizenship and clearance, reduced to what the checks need.
+ * Read from the master résumé in the app; never sent to a model.
+ */
+export type CandidateFacts = { usCitizen: boolean; clearanceLevel: number };
+
+const CLEARANCE_LEVELS: { level: number; name: string; re: RegExp }[] = [
+  { level: 5, name: "a polygraph", re: /\b(polygraph|full[- ]scope poly|ci poly)\b/i },
+  { level: 4, name: "TS/SCI", re: /\b(ts\s*\/\s*sci|tssci)\b/i },
+  { level: 3, name: "Top Secret", re: /\btop secret\b/i },
+  { level: 2, name: "Secret", re: /\bsecret\b/i },
+  { level: 1, name: "Public Trust", re: /\bpublic trust\b/i },
+];
+const levelOf = (text: string) => CLEARANCE_LEVELS.find((c) => c.re.test(text))?.level ?? 0;
+
+export function candidateFacts(master: Resume): CandidateFacts {
+  // Current clearances only: lines marked expired, inactive or former are history.
+  const current = master.clearance.filter((l) => !/\b(expired|inactive|former|previous|lapsed)\b/i.test(l));
+  return {
+    usCitizen: /\bu\.?s\.?\s*citizen|united states citizen/i.test(master.contact.citizenship ?? ""),
+    clearanceLevel: Math.max(0, ...current.map(levelOf)),
+  };
+}
+
+/**
+ * Citizenship and clearance gates, checked in code. The notes name only what
+ * the posting asks for, never the owner's own level, since they go into the
+ * evaluator's prompt.
+ */
+export function personalGates(text: string, c: CandidateFacts | null): Pick<CodeChecks, "citizenship" | "clearance"> {
+  if (!c) return {};
+  const out: Pick<CodeChecks, "citizenship" | "clearance"> = {};
+  if (/\bu\.?s\.? citizen(ship)?\b[^.]{0,30}\brequired\b|\bmust be (a )?(u\.?s\.?|united states) citizen|\b(united states|u\.?s\.?) citizenship (is )?required\b/i.test(text)) {
+    out.citizenship = c.usCitizen ? { status: "PASS", note: "US citizenship required: you meet it" } : { status: "FAIL", note: "US citizenship required" };
+  }
+  const needed = CLEARANCE_LEVELS.find((l) => l.re.test(text));
+  if (needed) {
+    const obtainable = /\b(able|ability|willing(ness)?|eligible) to obtain\b/i.test(text);
+    out.clearance =
+      c.clearanceLevel >= needed.level
+        ? { status: "PASS", note: `Posting asks for ${needed.name}: you meet it` }
+        : obtainable
+          ? { status: "UNKNOWN", note: `Posting asks for the ability to obtain ${needed.name}` }
+          : { status: "FAIL", note: `Posting asks for ${needed.name}: you don't currently hold it` };
+  }
+  return out;
+}
+
+/** Location, pay, and (with the owner's facts) citizenship and clearance, checked in code. */
+export function codeChecks(p: FitPostingFacts, candidate: CandidateFacts | null = null): CodeChecks {
   const workFailure = p.filterFailures.find((f) => /hybrid|on-site|office not within|not us-based/i.test(f));
   // The commute filter's message names the home city; this note goes into the prompt, so it doesn't.
   const location: Check = workFailure
@@ -145,12 +194,19 @@ export function codeChecks(p: FitPostingFacts): CodeChecks {
           ? { status: "PASS", note: `${range}, in or above the ${payK(PAY.targetMinCents)} to ${payK(PAY.targetMaxCents)} target` }
           : { status: "UNDER_TARGET", note: `${range}: above the ${payK(floor)} floor, middle of the range under the ${payK(PAY.targetMinCents)} target` };
 
-  return { location, pay };
+  return { location, pay, ...personalGates(p.descriptionText, candidate) };
 }
 
 /** The LOCATION_CHECK block of the request. */
 export function codeChecksForPrompt(c: CodeChecks): string {
-  return `LOCATION_CHECK: ${c.location.status}. ${c.location.note}.\nPAY_CHECK (from the posting's structured data, may miss a program budget note): ${c.pay.status}. ${c.pay.note}.`;
+  return [
+    `LOCATION_CHECK: ${c.location.status}. ${c.location.note}.`,
+    `PAY_CHECK (from the posting's structured data, may miss a program budget note): ${c.pay.status}. ${c.pay.note}.`,
+    c.citizenship ? `CITIZENSHIP_CHECK: ${c.citizenship.status}. ${c.citizenship.note}.` : "",
+    c.clearance ? `CLEARANCE_CHECK: ${c.clearance.status}. ${c.clearance.note}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** POSTING metadata line(s) for the request. */
@@ -209,7 +265,7 @@ function allStrings(v: unknown): string[] {
  */
 export function finalizeFit(
   out: FitOutput,
-  ctx: { posting: FitPostingFacts; bulletIds: Set<string>; model: string; now: Date }
+  ctx: { posting: FitPostingFacts; bulletIds: Set<string>; model: string; now: Date; candidate?: CandidateFacts | null }
 ): FitAnalysis {
   const checks: string[] = [];
   const text = ctx.posting.descriptionText;
@@ -231,10 +287,11 @@ export function finalizeFit(
   const unverifiedQuotes = out.realJob.quotes.flatMap((q, i) => (quoteInText(q, text) ? [] : [i]));
   if (unverifiedQuotes.length) checks.push(`${unverifiedQuotes.length} quote(s) aren't in the posting as written.`);
 
-  const code = codeChecks(ctx.posting);
+  const code = codeChecks(ctx.posting, ctx.candidate ?? null);
   const applying = out.verdict === "APPLY" || out.verdict === "APPLY_LOW_EFFORT";
   if (applying && code.pay.status === "FAIL") checks.push(`Check: ${code.pay.note}.`);
   if (applying && code.location.status === "FAIL") checks.push(`Check: ${code.location.note}.`);
+  for (const g of [code.citizenship, code.clearance]) if (applying && g?.status === "FAIL") checks.push(`Check: ${g.note}.`);
 
   const dashes = allStrings(out).filter((s) => s.includes("—")).length;
   if (dashes) checks.push(`${dashes} field(s) contain an em dash. Don't copy those into an application as is.`);

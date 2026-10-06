@@ -145,6 +145,18 @@ export function FitPanel({
             <p style={{ ...muted, margin: 0 }}>
               App checks: location <Status s={a.codeChecks.location.status} /> ({a.codeChecks.location.note}) · pay <Status s={a.codeChecks.pay.status} /> (
               {a.codeChecks.pay.note})
+              {a.codeChecks.citizenship && (
+                <>
+                  {" "}
+                  · citizenship <Status s={a.codeChecks.citizenship.status} /> ({a.codeChecks.citizenship.note})
+                </>
+              )}
+              {a.codeChecks.clearance && (
+                <>
+                  {" "}
+                  · clearance <Status s={a.codeChecks.clearance.status} /> ({a.codeChecks.clearance.note})
+                </>
+              )}
             </p>
           </div>
 

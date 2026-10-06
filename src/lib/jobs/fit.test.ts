@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { postingSiteLabel, postingSourceText } from "@/lib/jobs/display";
-import { codeChecks, codeChecksForPrompt, finalizeFit, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
+import { candidateFacts, codeChecks, codeChecksForPrompt, finalizeFit, personalGates, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
+import { resumeSchema } from "@/lib/jobs/resume-schema";
 import { COMP_BANDS, PAY } from "@/lib/jobs/scoring-config";
 
 const posting = (over: Partial<FitPostingFacts> = {}): FitPostingFacts => ({
@@ -123,5 +124,32 @@ describe("posting source", () => {
     expect(postingSourceText(eab)).toBe("Added by you from careers.eab.com with the Add to Avani button");
     expect(postingSiteLabel({ source: "MANUAL", url: "https://www.linkedin.com/jobs/view/1/" })).toBe("LinkedIn");
     expect(postingSourceText({ source: "GREENHOUSE", url: "https://boards.greenhouse.io/x/jobs/1", capturedVia: null })).toBe("From Greenhouse");
+  });
+});
+
+describe("citizenship and clearance gates, checked in the app", () => {
+  const cleared = { usCitizen: true, clearanceLevel: 1 };
+  it("passes, fails or asks, naming only what the posting wants", () => {
+    expect(personalGates("U.S. Citizenship required. Public Trust clearance.", cleared)).toEqual({
+      citizenship: { status: "PASS", note: "US citizenship required: you meet it" },
+      clearance: { status: "PASS", note: "Posting asks for Public Trust: you meet it" },
+    });
+    expect(personalGates("Active TS/SCI required.", cleared).clearance).toEqual({ status: "FAIL", note: "Posting asks for TS/SCI: you don't currently hold it" });
+    expect(personalGates("Must be able to obtain a Secret clearance.", cleared).clearance?.status).toBe("UNKNOWN");
+    expect(personalGates("Build things.", cleared)).toEqual({});
+    expect(personalGates("U.S. Citizenship required.", null)).toEqual({});
+  });
+
+  it("reads the owner's facts from the master, ignoring expired clearances", () => {
+    const base = { contact: { firstName: "A", lastName: "B", email: "a@b.co", citizenship: "U.S. Citizen" }, headline: "Engineer", summary: "s", skills: [], experience: [{ id: "r", organization: "O", title: "T", periods: [{ start: "2020-01", end: null }], bullets: [{ id: "b", text: "Did it.", skills: [] }] }], education: [] };
+    const m = (clearance: string[]) => resumeSchema.parse({ ...base, clearance });
+    expect(candidateFacts(m(["Secret (active)"]))).toEqual({ usCitizen: true, clearanceLevel: 2 });
+    expect(candidateFacts(m(["Top Secret (expired 2019)", "Public Trust (active)"])).clearanceLevel).toBe(1);
+  });
+
+  it("puts only the results in the prompt", () => {
+    const text = codeChecksForPrompt(codeChecks(posting({ descriptionText: "U.S. Citizenship required. Public Trust." }), cleared));
+    expect(text).toContain("CITIZENSHIP_CHECK: PASS");
+    expect(text).toContain("CLEARANCE_CHECK: PASS");
   });
 });

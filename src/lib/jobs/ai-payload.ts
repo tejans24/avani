@@ -99,7 +99,6 @@ export type TailoringPayload = {
   }[];
   projects: { id: string; name: string; bullets: PayloadBullet[] }[];
   /** Sent so gov-lane summaries can mention eligibility; rendered verbatim. */
-  clearance: string[];
   stories: { id: string; title: string; text: string; skills: string[] }[];
   posting: { title: string; company: string; lane: string; description: string };
   tailoringNotes?: string;
@@ -135,7 +134,6 @@ export function buildTailoringPayload(input: {
       bullets: bullets(e.bullets),
     })),
     projects: master.projects.map((p) => ({ id: p.id, name: s(p.name), bullets: bullets(p.bullets) })),
-    clearance: master.clearance.map(s),
     stories: master.stories.map((st) => ({ id: st.id, title: s(st.title), text: s(st.text), skills: st.skills })),
     posting: {
       title: s(input.posting.title),

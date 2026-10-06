@@ -51,10 +51,12 @@ const master = resumeSchema.parse({
       bullets: [{ id: "firm-1", text: "Built eligibility services on AWS Lambda.", skills: [] }],
     },
   ],
+  clearance: ["Public Trust (active), Example Agency, 2023"],
   education: [{ id: "edu-1", text: "B.S. Computer Science" }],
 });
 
-const PERSONAL = ["jordan", "quill", "jordan.quill@example.com", "410-555-0199", "5550199", "towson", "linkedin.com/in/jquill"];
+// Clearance details stay in the app too (the evaluator gets only the app's pass/fail check).
+const PERSONAL = ["jordan", "quill", "jordan.quill@example.com", "410-555-0199", "5550199", "towson", "linkedin.com/in/jquill", "example agency, 2023"];
 const posting = {
   title: "Senior Engineer",
   companyName: "Example Agency",

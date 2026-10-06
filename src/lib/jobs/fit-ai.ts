@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
 import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
-import { codeChecks, codeChecksForPrompt, fakeFitOutput, finalizeFit, fitOutputSchema, postingMetadata, type FitAnalysis, type FitPostingFacts } from "@/lib/jobs/fit";
+import { candidateFacts, codeChecks, codeChecksForPrompt, fakeFitOutput, finalizeFit, fitOutputSchema, postingMetadata, type FitAnalysis, type FitPostingFacts } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
 import type { Resume } from "@/lib/jobs/resume-schema";
 import type { BreakdownEntry } from "@/lib/jobs/scoring";
@@ -29,7 +29,9 @@ export async function analyzeFitWithClaude(input: {
   const bulletIds = new Set(
     [...input.master.experience.flatMap((e) => e.bullets), ...input.master.projects.flatMap((p) => p.bullets)].map((b) => b.id)
   );
-  const ctx = { posting: input.posting, bulletIds, now: input.now };
+  // Citizenship and clearance are checked here, in the app; only the results go to Claude.
+  const candidate = candidateFacts(input.master);
+  const ctx = { posting: input.posting, bulletIds, now: input.now, candidate };
 
   if (process.env.TAILOR_MODE === "fake") {
     return finalizeFit(fakeFitOutput(input.posting, input.breakdown, [...bulletIds]), { ...ctx, model: "fake" });
@@ -44,7 +46,7 @@ export async function analyzeFitWithClaude(input: {
   });
   const parts = serializeForAiParts(payload, contact);
   const system = fitSystemPrompt();
-  const checked = scrubPersonal(codeChecksForPrompt(codeChecks(input.posting)), contact);
+  const checked = scrubPersonal(codeChecksForPrompt(codeChecks(input.posting, candidate)), contact);
   const metadata = scrubPersonal(postingMetadata(input.posting), contact);
   for (const part of [system, checked, metadata]) assertNoPersonalData(part, contact);
 
