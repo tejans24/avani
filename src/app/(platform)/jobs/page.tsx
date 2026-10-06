@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 const VIEWS = {
   matches: { label: "Matches", blurb: "Open postings that pass your filters, best first." },
-  pipeline: { label: "Pipeline", blurb: "Shortlisted, applied, interviewing and offers." },
+  pipeline: { label: "Applications", blurb: "Shortlisted, applied, interviewing and offers." },
   filtered: { label: "Filtered out", blurb: "Postings that failed a must-have. Each shows why." },
   skipped: { label: "Skipped", blurb: "Postings you passed on." },
   archived: { label: "Archived", blurb: "Hidden but kept, with their history." },
@@ -75,20 +75,9 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
           <h1>Jobs</h1>
           <p className="sub">{VIEWS[view].blurb} Nothing here is ever submitted for you.</p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <Button href="/jobs/awards" variant="secondary" size="md">
-            Awards
-          </Button>
-          <Button href="/jobs/resume" variant="secondary" size="md">
-            Résumé
-          </Button>
-          <Button href="/jobs/boards" variant="secondary" size="md">
-            Boards
-          </Button>
-          <Button href="/jobs/capture" variant="primary" size="md">
-            Add a job
-          </Button>
-        </div>
+        <Button href="/jobs/capture" variant="primary" size="md">
+          Add a job
+        </Button>
       </div>
 
       <div className="stat-row">
@@ -96,7 +85,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
         <StatTile label="Applied" value={String(countOf("APPLIED"))} sublabel="Waiting to hear back" />
         <StatTile label="Interviewing" value={String(countOf("INTERVIEWING"))} tone={countOf("INTERVIEWING") ? "positive" : "default"} />
         <StatTile
-          label="Boards"
+          label="Sources"
           value={`${boardCount - failingBoards}/${boardCount}`}
           sublabel={failingBoards ? `${failingBoards} failing` : "All fetching"}
           tone={failingBoards ? "critical" : "default"}

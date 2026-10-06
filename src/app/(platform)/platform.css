@@ -70,6 +70,30 @@
   color: var(--text-on-brand);
 }
 
+/* A section's own menu, under its sidebar item (Jobs). */
+.platform-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-on-dark);
+}
+.platform-nav .platform-subnav a {
+  padding: 6px 10px;
+  font-size: var(--text-xs);
+  color: rgba(239, 237, 226, 0.62);
+}
+.platform-nav .platform-subnav a[data-active="true"] {
+  background: rgba(239, 237, 226, 0.1);
+  color: var(--text-on-brand);
+}
+
+/* The same menu as tabs on Jobs pages; only shown where the sidebar is a top bar. */
+.jobs-tabs {
+  display: none;
+}
+
 .platform-sidebar .sidebar-foot {
   margin-top: auto;
   padding: 12px 10px 0;
@@ -497,6 +521,32 @@ input[type="file"].file-input::file-selector-button:hover {
   .platform-nav {
     flex-direction: row;
     flex-wrap: wrap;
+  }
+  .platform-subnav {
+    display: none;
+  }
+  .jobs-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin: -8px 0 20px;
+    padding-bottom: 4px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+  }
+  .jobs-tabs a {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+  .jobs-tabs a[data-active="true"] {
+    background: var(--color-surface);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+    font-weight: 600;
   }
   .platform-sidebar .brand {
     padding-bottom: 4px;

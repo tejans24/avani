@@ -4,7 +4,7 @@ import { Badge, Eyebrow } from "@/components/platform/ds";
 import { AddBoardForm, BoardRowActions } from "@/components/platform/jobs/BoardControls";
 import { SOURCE_LABEL, ago } from "@/lib/jobs/display";
 
-export const metadata = { title: "Job boards — Avani" };
+export const metadata = { title: "Sources — Avani" };
 export const dynamic = "force-dynamic";
 
 export default async function BoardsPage({ searchParams }: { searchParams: { company?: string } }) {
@@ -18,9 +18,9 @@ export default async function BoardsPage({ searchParams }: { searchParams: { com
       <div className="page-head">
         <div>
           <p className="sub" style={{ marginBottom: 6 }}>
-            <Link href="/jobs">Jobs</Link> / Boards
+            <Link href="/jobs">Jobs</Link> / Sources
           </p>
-          <h1>Job boards</h1>
+          <h1>Sources</h1>
           <p className="sub">
             Feeds checked about once a day, a few per tick. Only documented public job APIs, and Workday sites whose robots.txt allows it.
           </p>

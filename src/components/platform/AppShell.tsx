@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
+import { JobsSubNav } from "./jobs/JobsNav";
 import { NavLink } from "./NavLink";
 import { NotificationBell } from "./NotificationBell";
 
@@ -27,9 +29,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <nav className="platform-nav">
           {NAV.map((item) => (
-            <NavLink key={item.href} href={item.href}>
-              {item.label}
-            </NavLink>
+            <div key={item.href} style={{ display: "contents" }}>
+              <NavLink href={item.href}>{item.label}</NavLink>
+              {item.href === "/jobs" && (
+                <Suspense>
+                  <JobsSubNav />
+                </Suspense>
+              )}
+            </div>
           ))}
         </nav>
         <div className="sidebar-foot">
