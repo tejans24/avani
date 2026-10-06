@@ -108,3 +108,62 @@ test("the evaluator runs on its own the first time a matching job is opened, and
   await page.goto("/jobs");
   await expect(page.getByTestId("job-row").first()).toContainText("Fit: Apply");
 });
+
+test("start from master, reuse it on another job, and change it by chatting with Claude", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const [{ id }] = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`);
+
+  // The evaluation feeds the posting panel: requirements matched to bullets.
+  await page.goto(`/jobs/${id}`);
+  await expect(page.getByTestId("fit-panel").getByText("Test evaluation")).toBeVisible();
+  await page.getByRole("link", { name: /Résumé for this job/ }).click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByRole("button", { name: "Use master as is" }).click();
+  await page.waitForURL(/tailor\?v=/);
+  await expect(page.getByText(/^v1 · master as is/)).toBeVisible();
+  await expect(page.getByText("Ready to export")).toBeVisible();
+
+  const panel = page.getByTestId("posting-panel");
+  await panel.getByRole("button").first().click();
+  await expect(page.locator("[data-focused]").first()).toBeVisible();
+  await expect(page.getByText(/^Answers: /).first()).toBeVisible();
+
+  // Chat: the fake Claude leaves out the role it's asked to; nothing changes until Apply.
+  await page.waitForLoadState("networkidle");
+  const chat = page.getByTestId("tailor-chat");
+  await chat.getByLabel("Message to Claude").fill("Please leave out agency, it's old.");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Left out Senior Engineer at Example Digital Service.")).toBeVisible();
+  const agency = page.getByTestId("role-agency");
+  await expect(agency.getByText("Left out of this version.")).toHaveCount(0);
+  await chat.getByRole("button", { name: "Apply changes" }).click();
+  await expect(agency.getByText("Left out of this version.")).toBeVisible();
+  await chat.getByRole("button", { name: "Undo" }).click();
+  await expect(agency.getByText("Left out of this version.")).toHaveCount(0);
+  await chat.getByLabel("Message to Claude").fill("leave out agency");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await chat.getByRole("button", { name: "Apply changes" }).click();
+  await page.getByRole("button", { name: "Save as new version" }).click();
+  await page.waitForURL(/tailor\?v=/);
+  await expect(page.getByText(/^v2 ·/)).toBeVisible();
+  const [v2] = await queryRows(`SELECT data FROM "TailoredResume" WHERE version = 2 AND "postingId" = $1`, [id]);
+  expect(v2.data.experience.find((r: { id: string }) => r.id === "agency").omitted).toBe(true);
+
+  // The conversation is kept with the job.
+  const [{ tailorChat }] = await queryRows(`SELECT "tailorChat" FROM "JobPosting" WHERE id = $1`, [id]);
+  expect(tailorChat).toHaveLength(4);
+  await page.reload();
+  await expect(page.getByTestId("tailor-chat").getByText("Please leave out agency, it's old.")).toBeVisible();
+
+  // Another job can start from this one.
+  const [{ id: other }] = await queryRows(`SELECT id FROM "JobPosting" WHERE id <> $1 LIMIT 1`, [id]);
+  await page.goto(`/jobs/${other}/tailor`);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByLabel("Version to reuse")).toContainText("Chesapeake Civic Digital: Senior Software Engineer, Medicaid Modernization v2");
+  await page.getByRole("button", { name: "Reuse this version" }).click();
+  await page.waitForURL(/tailor\?v=/);
+  await expect(page.getByText(/^v1 · reused/)).toBeVisible();
+  await expect(page.getByText(/Copied from v2 for Senior Software Engineer, Medicaid Modernization/)).toBeVisible();
+  await expect(page.getByTestId("role-agency").getByText("Left out of this version.")).toBeVisible();
+});

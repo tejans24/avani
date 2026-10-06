@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { resumeSchema } from "@/lib/jobs/resume-schema";
-import { checkDocStyle, checkTruth, docFromOutput, hasBlocking, omittedRoleGaps, quickTailor, renderResume, type TailorOutput } from "@/lib/jobs/tailor";
+import {
+  applyTailorEdits,
+  checkDocStyle,
+  checkTruth,
+  docFromOutput,
+  hasBlocking,
+  masterDoc,
+  omittedRoleGaps,
+  postingSimilarity,
+  quickTailor,
+  renderResume,
+  reuseDoc,
+  type TailorEdit,
+  type TailorOutput,
+} from "@/lib/jobs/tailor";
 
 const master = resumeSchema.parse({
   contact: { firstName: "Jordan", lastName: "Quill", email: "j@example.com" },
@@ -158,5 +172,76 @@ describe("quickTailor", () => {
   it("brings in a reserve bullet when the posting asks for it", () => {
     const doc = quickTailor(master, { title: "AI Engineer", descriptionText: "RAG evaluation, LLM guardrails and prompt injection testing." });
     expect(doc.experience[0].bullets.map((b) => b.id)).toContain("avani-3");
+  });
+});
+
+describe("starting points", () => {
+  it("master as is: every non-reserve bullet, accepted, passes the checks", () => {
+    const doc = masterDoc(master);
+    expect(doc.experience.find((r) => r.id === "avani")!.bullets.map((b) => b.id)).toEqual(["avani-1", "avani-2"]);
+    expect(doc.experience.every((r) => r.bullets.every((b) => b.status === "accepted"))).toBe(true);
+    expect(hasBlocking(checkTruth(master, doc), checkDocStyle(master, doc))).toBe(false);
+  });
+
+  it("reuse: keeps choices and edits, drops bullets no longer in master, leaves the cover note behind", () => {
+    const from = docFromOutput(master, output(), "claude");
+    from.experience[0].bullets[0] = { id: "avani-1", text: "Built the AWS backend for a prior-authorization platform.", status: "edited" };
+    from.experience[0].bullets.push({ id: "gone-1", text: "Old bullet", status: "accepted" });
+    from.experience[1].omitted = true;
+    from.coverNote = "Dear Acme";
+    const doc = reuseDoc(master, from, "v2 for Engineer at Acme");
+    expect(doc.experience[0].bullets.map((b) => b.id)).not.toContain("gone-1");
+    expect(doc.experience[0].bullets[0]).toMatchObject({ status: "edited", text: "Built the AWS backend for a prior-authorization platform." });
+    expect(doc.experience[1].omitted).toBe(true);
+    expect(doc).toMatchObject({ coverNote: "", generatedBy: "reuse" });
+    expect(doc.rationale).toContain("v2 for Engineer at Acme");
+  });
+
+  it("ranks similar postings above unrelated ones", () => {
+    const base = "Build FHIR integrations on AWS Lambda for Medicaid eligibility";
+    expect(postingSimilarity(base, "Medicaid eligibility services on AWS Lambda with FHIR")).toBeGreaterThan(
+      postingSimilarity(base, "Retail merchandising associate, weekend shifts")
+    );
+    expect(postingSimilarity("", base)).toBe(0);
+  });
+});
+
+describe("applyTailorEdits", () => {
+  const edit = (over: Partial<TailorEdit>): TailorEdit => ({ op: "SET_SUMMARY", roleId: "", bulletId: "", text: "", position: -1, skillGroups: [], why: "", ...over });
+
+  it("applies valid edits and marks rewording", () => {
+    const doc = masterDoc(master);
+    const { doc: next, applied, skipped } = applyTailorEdits(master, doc, [
+      edit({ op: "SET_SUMMARY", text: "Engineer building regulated systems.", why: "Shorter summary" }),
+      edit({ op: "REWORD_BULLET", roleId: "avani", bulletId: "avani-1", text: "Built the AWS backend for a prior-authorization platform." }),
+      edit({ op: "MOVE_BULLET", roleId: "avani", bulletId: "avani-2", position: 0 }),
+      edit({ op: "ADD_BULLET", roleId: "avani", bulletId: "avani-3", position: -1, why: "Bring in the RAG work" }),
+      edit({ op: "REMOVE_BULLET", roleId: "va", bulletId: "va-1" }),
+      edit({ op: "OMIT_ROLE", roleId: "va" }),
+      edit({ op: "SET_SKILL_ORDER", skillGroups: ["Healthcare interoperability"] }),
+    ]);
+    expect(skipped).toEqual([]);
+    expect(applied).toContain("Shorter summary");
+    expect(next.summary).toBe("Engineer building regulated systems.");
+    const avani = next.experience.find((r) => r.id === "avani")!.bullets;
+    expect(avani.map((b) => b.id)).toEqual(["avani-2", "avani-1", "avani-3"]);
+    expect(avani[1].status).toBe("edited");
+    expect(next.experience.find((r) => r.id === "va")).toMatchObject({ omitted: true });
+    expect(next.skillGroupOrder).toEqual(["Healthcare interoperability", "Languages"]);
+    expect(doc.summary).toBe(master.summary); // the original is untouched
+  });
+
+  it("skips edits that don't trace to master, and the checks still catch added facts", () => {
+    const doc = masterDoc(master);
+    const { doc: next, skipped } = applyTailorEdits(master, doc, [
+      edit({ op: "SET_HEADLINE", text: "Chief Technology Officer" }),
+      edit({ op: "ADD_BULLET", roleId: "avani", bulletId: "invented-9" }),
+      edit({ op: "ADD_BULLET", roleId: "va", bulletId: "avani-1" }),
+      edit({ op: "OMIT_ROLE", roleId: "nope" }),
+      edit({ op: "REWORD_BULLET", roleId: "va", bulletId: "va-1", text: "Caseflow Intake shipped in one month for 900,000+ appeals." }),
+    ]);
+    expect(skipped).toHaveLength(4);
+    expect(next.headline).toBe(master.headline);
+    expect(checkTruth(master, next).some((i) => i.severity === "block" && i.where === "bullet:va-1")).toBe(true);
   });
 });

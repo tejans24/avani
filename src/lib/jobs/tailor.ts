@@ -56,7 +56,8 @@ export type TailoredDoc = {
   skillGroupOrder: string[];
   coverNote: string;
   rationale: string;
-  generatedBy: "claude" | "quick";
+  /** How the version started: Claude, the quick tailor, master as is, or copied from another job. */
+  generatedBy: "claude" | "quick" | "master" | "reuse";
 };
 
 function masterBullets(master: Resume): Map<string, { roleId: string; text: string }> {
@@ -302,4 +303,229 @@ export function omittedRoleGaps(master: Resume, doc: TailoredDoc, now: Date): { 
       return { roleId: e.id, gaps };
     })
     .filter((g) => g.gaps.length > 0);
+}
+
+// --- Other ways to start --------------------------------------------------------
+
+/** Master as is: every non-reserve bullet, in master order, already accepted. */
+export function masterDoc(master: Resume): TailoredDoc {
+  return {
+    headline: master.headline,
+    summary: master.summary,
+    experience: master.experience.map((e) => ({
+      id: e.id,
+      bullets: e.bullets.filter((b) => !b.reserve).map((b) => ({ id: b.id, text: b.text, status: "accepted" as const })),
+    })),
+    skillGroupOrder: master.skills.map((s) => s.group),
+    coverNote: "",
+    rationale: "Your master résumé as is.",
+    generatedBy: "master",
+  };
+}
+
+/**
+ * A version made for another job, carried over to this one against the
+ * current master: bullets no longer in master (or moved to another role) are
+ * dropped, roles added to master since then come in with their default
+ * bullets for review, and nothing new is invented. The checks run again in
+ * the editor, against this posting.
+ */
+export function reuseDoc(master: Resume, from: TailoredDoc, label: string): TailoredDoc {
+  const byRole = new Map(from.experience.map((r) => [r.id, r]));
+  const headlines = [master.headline, ...master.headlineOptions];
+  return {
+    headline: headlines.includes(from.headline) ? from.headline : master.headline,
+    summary: from.summary,
+    experience: master.experience.map((e) => {
+      const prev = byRole.get(e.id);
+      const src = new Map(e.bullets.map((b) => [b.id, b]));
+      if (!prev) {
+        return { id: e.id, bullets: e.bullets.filter((b) => !b.reserve).map((b) => ({ id: b.id, text: b.text, status: "pending" as const })) };
+      }
+      return {
+        id: e.id,
+        ...(prev.omitted ? { omitted: true } : {}),
+        bullets: prev.bullets.filter((b) => src.has(b.id)).map((b) => ({ ...b })),
+      };
+    }),
+    skillGroupOrder: from.skillGroupOrder.filter((g) => master.skills.some((s) => s.group === g)),
+    coverNote: "",
+    rationale: `Copied from ${label}. The cover note was left out: it was written for that job.`,
+    generatedBy: "reuse",
+  };
+}
+
+const wordSet = (text: string) => new Set((text.toLowerCase().match(WORD) ?? []).filter((w) => !STOP.has(w)));
+
+/** How alike two postings read (0 to 1): shared words over all words. Used to rank versions to reuse. */
+export function postingSimilarity(a: string, b: string): number {
+  const x = wordSet(a);
+  const y = wordSet(b);
+  if (!x.size || !y.size) return 0;
+  let shared = 0;
+  for (const w of x) if (y.has(w)) shared++;
+  return shared / (x.size + y.size - shared);
+}
+
+// --- Edits proposed in the chat -------------------------------------------------
+
+export const TAILOR_EDIT_OPS = [
+  "SET_HEADLINE",
+  "SET_SUMMARY",
+  "REWORD_BULLET",
+  "ADD_BULLET",
+  "REMOVE_BULLET",
+  "MOVE_BULLET",
+  "OMIT_ROLE",
+  "INCLUDE_ROLE",
+  "SET_SKILL_ORDER",
+  "SET_COVER_NOTE",
+] as const;
+
+/**
+ * One change Claude proposes in the chat. Flat on purpose (structured output):
+ * fields an op doesn't use are "" / -1 / [].
+ */
+export const tailorEditSchema = z.object({
+  op: z.enum(TAILOR_EDIT_OPS),
+  roleId: z.string(),
+  bulletId: z.string(),
+  /** New text for SET_HEADLINE, SET_SUMMARY, REWORD_BULLET, SET_COVER_NOTE. */
+  text: z.string(),
+  /** 0-based position for ADD_BULLET and MOVE_BULLET; -1 for the end. */
+  position: z.number().int(),
+  /** SET_SKILL_ORDER: group names, most relevant first. */
+  skillGroups: z.array(z.string()),
+  /** One short line for the owner. */
+  why: z.string(),
+});
+export type TailorEdit = z.infer<typeof tailorEditSchema>;
+
+export const tailorChatOutputSchema = z.object({
+  /** The answer to the owner, plain and short. */
+  reply: z.string(),
+  /** Changes to apply, in order. Empty when the owner only asked a question. */
+  edits: z.array(tailorEditSchema),
+});
+export type TailorChatOutput = z.infer<typeof tailorChatOutputSchema>;
+
+/**
+ * Apply proposed edits to a copy of the document. Each edit is checked
+ * against master first: bullets must belong to the role in master, headlines
+ * must be approved ones, skill groups must exist. Edits that fail are skipped
+ * with a reason; the truth and style checks still run on the result in the
+ * editor. Reworded bullets become "edited", added ones "accepted".
+ */
+export function applyTailorEdits(master: Resume, doc: TailoredDoc, edits: TailorEdit[]): { doc: TailoredDoc; applied: string[]; skipped: string[] } {
+  const next: TailoredDoc = structuredClone(doc);
+  const applied: string[] = [];
+  const skipped: string[] = [];
+  const roleOf = (roleId: string) => {
+    const m = master.experience.find((e) => e.id === roleId);
+    if (!m) return null;
+    let r = next.experience.find((x) => x.id === roleId);
+    if (!r) {
+      r = { id: roleId, bullets: [] };
+      next.experience.push(r);
+    }
+    return { m, r };
+  };
+  const label = (e: TailorEdit) => e.why || e.op.toLowerCase().replace(/_/g, " ");
+
+  for (const e of edits) {
+    const fail = (why: string) => skipped.push(`${label(e)}: ${why}`);
+    switch (e.op) {
+      case "SET_HEADLINE":
+        if (![master.headline, ...master.headlineOptions].includes(e.text.trim())) {
+          fail("that headline isn't one of your approved headlines");
+          continue;
+        }
+        next.headline = e.text.trim();
+        break;
+      case "SET_SUMMARY":
+        if (!e.text.trim()) {
+          fail("empty summary");
+          continue;
+        }
+        next.summary = e.text.trim();
+        break;
+      case "SET_COVER_NOTE":
+        next.coverNote = e.text.trim();
+        break;
+      case "SET_SKILL_ORDER": {
+        const groups = e.skillGroups.filter((g) => master.skills.some((s) => s.group === g));
+        if (!groups.length) {
+          fail("none of those skill groups exist");
+          continue;
+        }
+        next.skillGroupOrder = [...groups, ...master.skills.map((s) => s.group).filter((g) => !groups.includes(g))];
+        break;
+      }
+      case "OMIT_ROLE":
+      case "INCLUDE_ROLE": {
+        const x = roleOf(e.roleId);
+        if (!x) {
+          fail("no such role");
+          continue;
+        }
+        x.r.omitted = e.op === "OMIT_ROLE";
+        break;
+      }
+      default: {
+        const x = roleOf(e.roleId);
+        const src = x?.m.bullets.find((b) => b.id === e.bulletId);
+        if (!x || !src) {
+          fail("that bullet isn't in your master résumé under that role");
+          continue;
+        }
+        const list = x.r.bullets;
+        const idx = list.findIndex((b) => b.id === e.bulletId);
+        const at = (n: number) => (n < 0 || n > list.length ? list.length : n);
+        if (e.op === "ADD_BULLET") {
+          if (idx >= 0 && list[idx].status !== "rejected") {
+            fail("already on the résumé");
+            continue;
+          }
+          if (idx >= 0) list.splice(idx, 1);
+          list.splice(at(e.position), 0, { id: src.id, text: src.text, status: "accepted" });
+        } else if (idx < 0) {
+          fail("that bullet isn't on this version");
+          continue;
+        } else if (e.op === "REMOVE_BULLET") {
+          list[idx].status = "rejected";
+        } else if (e.op === "MOVE_BULLET") {
+          const [b] = list.splice(idx, 1);
+          list.splice(at(e.position), 0, b);
+        } else if (e.op === "REWORD_BULLET") {
+          if (!e.text.trim()) {
+            fail("empty text");
+            continue;
+          }
+          list[idx].text = e.text.trim();
+          list[idx].status = e.text.trim() === src.text ? "accepted" : "edited";
+        }
+      }
+    }
+    applied.push(label(e));
+  }
+  return { doc: next, applied, skipped };
+}
+
+/** The working version as the chat sees it: ids and text only. */
+export function docForChat(master: Resume, doc: TailoredDoc) {
+  const byRole = new Map(doc.experience.map((r) => [r.id, r]));
+  return {
+    headline: doc.headline,
+    summary: doc.summary,
+    skillGroupOrder: doc.skillGroupOrder,
+    roles: master.experience.map((e) => {
+      const r = byRole.get(e.id);
+      return {
+        roleId: e.id,
+        omitted: Boolean(r?.omitted),
+        bullets: (r?.bullets ?? []).filter((b) => b.status !== "rejected").map((b) => ({ id: b.id, text: b.text })),
+      };
+    }),
+    coverNote: doc.coverNote,
+  };
 }

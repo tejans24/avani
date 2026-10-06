@@ -89,7 +89,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             Open posting
           </Button>
           <Button href={`/jobs/${posting.id}/tailor`} variant="primary" size="md">
-            Tailor résumé{posting._count.tailored ? ` (${posting._count.tailored})` : ""}
+            Résumé for this job{posting._count.tailored ? ` (${posting._count.tailored})` : ""}
           </Button>
         </div>
       </div>

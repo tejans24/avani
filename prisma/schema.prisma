@@ -610,6 +610,8 @@ model JobPosting {
   /// Claude's fit analysis (lib/jobs/fit.ts FitAnalysis), kept until run again.
   fitAnalysis      Json?
   fitAnalyzedAt    DateTime?
+  /// The résumé chat with Claude for this job (lib/jobs/tailor-ai.ts ChatTurn[] plus timestamps).
+  tailorChat       Json?
   raw              Json
   activity         JobActivity[]
   tailored         TailoredResume[]

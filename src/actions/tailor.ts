@@ -2,14 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { defaultNextAction } from "@/lib/jobs/pipeline";
 import { resumeSchema, type Resume } from "@/lib/jobs/resume-schema";
 import { checkStyle } from "@/lib/jobs/resume-style";
-import { checkDocStyle, checkTruth, hasBlocking, quickTailor, type TailoredDoc } from "@/lib/jobs/tailor";
-import { tailorWithClaude } from "@/lib/jobs/tailor-ai";
+import type { FitAnalysis } from "@/lib/jobs/fit";
+import { checkDocStyle, checkTruth, hasBlocking, masterDoc, quickTailor, reuseDoc, type TailorEdit, type TailoredDoc } from "@/lib/jobs/tailor";
+import { chatAboutResumeWithClaude, tailorWithClaude, type ChatTurn } from "@/lib/jobs/tailor-ai";
 import type { Lane } from "@/lib/jobs/scoring-config";
 
 export type TailorResult = { ok: true; id?: string; version?: number; note?: string } | { ok: false; error: string };
@@ -74,7 +75,12 @@ export async function generateTailored(postingId: string, mode: "claude" | "quic
     const doc =
       mode === "quick"
         ? quickTailor(master.data, input)
-        : await tailorWithClaude({ master: master.data, posting: input, tailoringNotes: posting.tailoringNotes });
+        : await tailorWithClaude({
+            master: master.data,
+            posting: input,
+            tailoringNotes: posting.tailoringNotes,
+            fitPlan: (posting.fitAnalysis as unknown as FitAnalysis | null)?.tailoring ?? null,
+          });
     const version = await nextVersion(postingId);
     const created = await db.tailoredResume.create({
       data: { postingId, masterId: master.id, version, data: doc as unknown as Prisma.InputJsonValue, coverNote: doc.coverNote || null },
@@ -99,7 +105,7 @@ const docSchema = z.object({
   skillGroupOrder: z.array(z.string()),
   coverNote: z.string().max(5000),
   rationale: z.string().max(2000),
-  generatedBy: z.enum(["claude", "quick"]),
+  generatedBy: z.enum(["claude", "quick", "master", "reuse"]),
 });
 
 /** Every save is a new version; earlier versions (and sent ones) never change. */
@@ -165,6 +171,99 @@ export async function markAppliedWithVersion(postingId: string, tailoredId: stri
     revalidatePath(`/jobs/${postingId}`);
     revalidatePath(`/jobs/${postingId}/tailor`);
     revalidatePath("/jobs");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Start this job's résumé from master as is. */
+export async function startFromMaster(postingId: string): Promise<TailorResult> {
+  try {
+    await requireAuth();
+    await db.jobPosting.findUniqueOrThrow({ where: { id: postingId }, select: { id: true } });
+    const master = await latestMaster();
+    const doc = masterDoc(master.data);
+    const version = await nextVersion(postingId);
+    const created = await db.tailoredResume.create({
+      data: { postingId, masterId: master.id, version, data: doc as unknown as Prisma.InputJsonValue },
+    });
+    revalidatePath(`/jobs/${postingId}/tailor`);
+    return { ok: true, id: created.id, version };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Start this job's résumé from a version made for another job. */
+export async function reuseTailoredVersion(postingId: string, fromId: string): Promise<TailorResult> {
+  try {
+    await requireAuth();
+    const from = await db.tailoredResume.findUniqueOrThrow({
+      where: { id: fromId },
+      include: { posting: { select: { title: true, company: { select: { name: true } } } } },
+    });
+    const master = await latestMaster();
+    const doc = reuseDoc(master.data, from.data as unknown as TailoredDoc, `v${from.version} for ${from.posting.title} at ${from.posting.company.name}`);
+    const version = await nextVersion(postingId);
+    const created = await db.tailoredResume.create({
+      data: { postingId, masterId: master.id, version, data: doc as unknown as Prisma.InputJsonValue },
+    });
+    revalidatePath(`/jobs/${postingId}/tailor`);
+    return { ok: true, id: created.id, version };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+type StoredTurn = ChatTurn & { at: string; edits?: string[] };
+
+export type ChatResult =
+  | { ok: true; reply: string; edits: TailorEdit[]; history: StoredTurn[] }
+  | { ok: false; error: string };
+
+/**
+ * One chat turn about this job's résumé. Claude sees the master content and
+ * the posting (personal details removed and checked, as in tailoring), the
+ * version on screen and the conversation so far; it answers and may propose
+ * edits, which the editor applies only when the owner says so.
+ */
+export async function chatAboutResume(postingId: string, doc: TailoredDoc, message: string): Promise<ChatResult> {
+  try {
+    await requireAuth();
+    const text = z.string().trim().min(1, "Type a message").max(4000).parse(message);
+    const parsedDoc = docSchema.parse(doc) as TailoredDoc;
+    const [posting, master] = await Promise.all([
+      db.jobPosting.findUniqueOrThrow({ where: { id: postingId }, include: { company: { select: { name: true } } } }),
+      latestMaster(),
+    ]);
+    const history = ((posting.tailorChat ?? []) as unknown as StoredTurn[]).map(({ role, text }) => ({ role, text }));
+    const out = await chatAboutResumeWithClaude({
+      master: master.data,
+      posting: { title: posting.title, companyName: posting.company.name, lane: posting.lane as Lane, descriptionText: posting.descriptionText },
+      doc: parsedDoc,
+      history,
+      message: text,
+      fitPlan: (posting.fitAnalysis as unknown as FitAnalysis | null)?.tailoring ?? null,
+    });
+    const now = new Date().toISOString();
+    const stored: StoredTurn[] = [
+      ...((posting.tailorChat ?? []) as unknown as StoredTurn[]),
+      { role: "user", text, at: now },
+      { role: "assistant", text: out.reply, at: now, edits: out.edits.map((e) => e.why || e.op) },
+    ];
+    await db.jobPosting.update({ where: { id: postingId }, data: { tailorChat: stored as unknown as Prisma.InputJsonValue } });
+    return { ok: true, reply: out.reply, edits: out.edits, history: stored };
+  } catch (e) {
+    return { ok: false, error: e instanceof z.ZodError ? (e.issues[0]?.message ?? "Invalid input") : e instanceof Error ? e.message : "Something went wrong" };
+  }
+}
+
+/** Start the conversation over. */
+export async function clearResumeChat(postingId: string): Promise<TailorResult> {
+  try {
+    await requireAuth();
+    await db.jobPosting.update({ where: { id: postingId }, data: { tailorChat: Prisma.DbNull } });
     return { ok: true };
   } catch (e) {
     return fail(e);
