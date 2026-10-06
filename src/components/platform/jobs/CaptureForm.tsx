@@ -34,7 +34,9 @@ export function CaptureForm({
   const [url, setUrl] = useState(initial.url ?? initial.text?.match(URL_IN_TEXT)?.[0] ?? "");
   const [paste, setPaste] = useState("");
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
-  const [form, setForm] = useState({ title: "", companyName: "", location: "", postedOn: "", compMin: "", compMax: "", descriptionText: "" });
+  const [form, setForm] = useState({ title: "", companyName: "", location: "", workMode: "", postedOn: "", compMin: "", compMax: "", descriptionText: "" });
+  // Fields the owner has typed in: Claude never overwrites them.
+  const touched = useRef(new Set<string>());
   const jsonLdRef = useRef<unknown[] | undefined>(undefined);
   const pageRef = useRef<{ pageTitle?: string; text: string }>({ text: "" });
   const [aiBusy, setAiBusy] = useState(false);
@@ -51,14 +53,16 @@ export function CaptureForm({
       return;
     }
     const f = r.fields;
+    const pick = (k: string, fromClaude: string, prev: string) => (touched.current.has(k) || !fromClaude ? prev : fromClaude);
     setForm((prev) => ({
-      title: f.title || prev.title,
-      companyName: f.companyName || prev.companyName,
-      location: f.location || (f.workMode === "REMOTE" ? "Remote" : prev.location),
-      postedOn: /^\d{4}-\d{2}-\d{2}$/.test(f.postedOn) ? f.postedOn : prev.postedOn,
-      compMin: f.payMin ? String(Math.round(f.payMin)) : prev.compMin,
-      compMax: f.payMax ? String(Math.round(f.payMax)) : prev.compMax,
-      descriptionText: f.descriptionText || prev.descriptionText,
+      title: pick("title", f.title, prev.title),
+      companyName: pick("companyName", f.companyName, prev.companyName),
+      location: pick("location", f.location || (f.workMode === "REMOTE" ? "Remote" : ""), prev.location),
+      workMode: pick("workMode", f.workMode === "UNKNOWN" ? "" : f.workMode, prev.workMode),
+      postedOn: pick("postedOn", /^\d{4}-\d{2}-\d{2}$/.test(f.postedOn) ? f.postedOn : "", prev.postedOn),
+      compMin: pick("compMin", f.payMin ? String(Math.round(f.payMin)) : "", prev.compMin),
+      compMax: pick("compMax", f.payMax ? String(Math.round(f.payMax)) : "", prev.compMax),
+      descriptionText: pick("descriptionText", f.descriptionText, prev.descriptionText),
     }));
     setAiWarnings(r.warnings);
     setStatus("Filled by Claude from the page. Check every field, then save.");
@@ -74,6 +78,7 @@ export function CaptureForm({
       title: d.title ?? "",
       companyName: d.companyName ?? "",
       location: d.location ?? (d.remote ? "Remote" : ""),
+      workMode: "",
       postedOn: d.postedAt ? new Date(d.postedAt).toISOString().slice(0, 10) : "",
       compMin: d.compMinCents ? String(Math.round(d.compMinCents / 100)) : "",
       compMax: d.compMaxCents ? String(Math.round(d.compMaxCents / 100)) : "",
@@ -81,13 +86,14 @@ export function CaptureForm({
     });
   };
 
-  // No structured job data on the page: let Claude read the captured page text
-  // right away (once), instead of waiting for a click. The button stays for retries.
+  // Claude reads the page (once, right away) unless the page carried complete
+  // structured job data: the app's own reading is the instant first draft and
+  // the fallback; Claude handles the layouts rules can't. The button stays for retries.
   const autoFilled = useRef(false);
   useEffect(() => {
     if (!draft || !aiEnabled || autoFilled.current) return;
     const essentialsMissing = draft.missing.some((m) => m === "title" || m === "companyName" || m === "location");
-    if (!essentialsMissing || pageRef.current.text.trim().length < 40) return;
+    if ((!essentialsMissing && draft.guessed.length === 0) || pageRef.current.text.trim().length < 40) return;
     autoFilled.current = true;
     void fillWithClaude();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +141,10 @@ export function CaptureForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    touched.current.add(k);
+    setForm({ ...form, [k]: e.target.value });
+  };
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -218,6 +227,15 @@ export function CaptureForm({
             <Field label="Location" htmlFor="cap-location" hint="Use “Remote” for remote roles.">
               <Input id="cap-location" value={form.location} onChange={set("location")} />
             </Field>
+            <Field label="Work mode" htmlFor="cap-work-mode" hint="From the page; you can change it later on the job page.">
+              <select id="cap-work-mode" value={form.workMode} onChange={set("workMode")} style={{ font: "inherit", padding: "8px 10px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--color-surface)", width: "100%" }}>
+                <option value="">Read it from the text</option>
+                <option value="REMOTE">Remote</option>
+                <option value="OCCASIONAL_HYBRID">Occasional office days</option>
+                <option value="HYBRID">Hybrid (set office days)</option>
+                <option value="ONSITE">On-site</option>
+              </select>
+            </Field>
             <Field label="Posted" htmlFor="cap-posted">
               <Input id="cap-posted" type="date" value={form.postedOn} onChange={set("postedOn")} />
             </Field>
@@ -252,6 +270,7 @@ export function CaptureForm({
                       capturedVia: via,
                       jsonLd: jsonLdRef.current,
                       questions: draft.questions,
+                      workMode: (form.workMode || undefined) as "REMOTE" | "OCCASIONAL_HYBRID" | "HYBRID" | "ONSITE" | undefined,
                     }),
                   (r) => router.push(`/jobs/${r.id}${r.note ? "?existing=1" : ""}`)
                 )

@@ -165,7 +165,7 @@ export function parseCapture(input: CapturePayload): CaptureDraft {
 
   const descriptionText =
     (job && str(job.description) ? htmlToText(String(job.description)) : undefined) ??
-    payload.text?.trim() ??
+    (payload.text !== undefined ? jobSection(payload.text) : undefined) ??
     "";
 
   const draft: CaptureDraft = {
@@ -203,7 +203,7 @@ export function parseCapture(input: CapturePayload): CaptureDraft {
 
 /** Separators careers sites put between job title and company in <title>. */
 const TITLE_SEP = /\s+[|\-\u2013\u2014\u00b7:]\s+/;
-const GENERIC_HEADING = /^(careers?|jobs?|job details?|search jobs|apply|home|join us|open positions?|job description)$/i;
+const GENERIC_HEADING = /^(careers?|jobs?|job details?|search jobs|apply|home|join us|open positions?|job description)$|\bjobs (in|at|near|for)\b|\bsearch results?\b|\b\d+ jobs\b/i;
 const SITE_WORDS = /\b(careers?|jobs?|job board|recruiting|talent)\b/gi;
 const AGGREGATOR = /^(linkedin|indeed|glassdoor|ziprecruiter|dice|monster|builtin|wellfound|usajobs)$/i;
 /** Hosts that belong to the job platform, not the employer. */
@@ -265,6 +265,26 @@ export function companyInText(slugName: string | undefined, text: string): strin
     }
   }
   return undefined;
+}
+
+// ---- The job's own section of a page --------------------------------------
+
+const SECTION_START = /^\s*(job description|about the job|job details|position description)\s*$/im;
+const SECTION_END = /^\s*(similar jobs|recommended jobs|more jobs( like this)?|jobs you may (also )?like|people also viewed|related jobs)\s*$/im;
+
+/**
+ * The posting itself, without the site around it: from a "Job Description"
+ * heading (when the page has one) to a "Similar jobs" list (when it has one).
+ * Careers sites that show the job inside a search page (Eightfold, LinkedIn)
+ * put other jobs above and below it.
+ */
+export function jobSection(text: string): string {
+  let out = text;
+  const start = out.search(SECTION_START);
+  if (start > 0) out = out.slice(start).replace(SECTION_START, "");
+  const end = out.search(SECTION_END);
+  if (end > 0) out = out.slice(0, end);
+  return out.trim();
 }
 
 // ---- The application form at the bottom of a job page ----------------------
@@ -343,6 +363,8 @@ function fillFromPageSignals(draft: CaptureDraft, payload: CapturePayload) {
   const gh = clean(payload.pageTitle).match(/^job application for (.+?) at (.+)$/i);
   guess("title", tidy(embStr(emb, "title", "jobTitle")));
   guess("title", gh ? tidy(gh[1]) : undefined);
+  // "Job Title: AWS Solution Architect" (Eightfold, Workday and others print it in the description).
+  guess("title", tidy((payload.text ?? "").match(/^\s*(?:job|position) title:\s*(.{3,120})$/im)?.[1]?.trim()));
   // Pasted text has no page title or heading: its first line is the title when it reads like one.
   const firstLine = (payload.text ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
   if (!payload.pageTitle && !h1 && firstLine && firstLine.length <= 100 && !PLACE.test(firstLine) && !/[.!?:]$/.test(firstLine)) {
@@ -370,9 +392,12 @@ function fillFromPageSignals(draft: CaptureDraft, payload: CapturePayload) {
   const text = payload.text ?? "";
   // The line under the title is usually the location ("Enterprise Architect / Washington, DC / Apply").
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const titleAt = draft.title ? lines.slice(0, 15).findIndex((l) => l.toLowerCase() === draft.title!.toLowerCase()) : -1;
-  // No known title (pasted text): a place-shaped line near the top.
-  const underTitle = (titleAt >= 0 ? lines.slice(titleAt + 1, titleAt + 4) : lines.slice(0, 6)).find((l) => PLACE.test(l));
+  // Search-style pages list other jobs first: try each line with the title, last first (the open job's
+  // header sits nearest its description). No known title (pasted text): a place-shaped line near the top.
+  const titleLines = draft.title ? lines.flatMap((l, i) => (l.toLowerCase() === draft.title!.toLowerCase() ? [i] : [])).reverse() : [];
+  const underTitle = titleLines.length
+    ? titleLines.map((i) => lines.slice(i + 1, i + 4).find((l) => PLACE.test(l))).find(Boolean)
+    : lines.slice(0, 6).find((l) => PLACE.test(l));
   // "Location: Baltimore, MD", but never a form label ("Location (City)*").
   const line = [...text.matchAll(new RegExp(LOCATION_LINE.source, "gim"))].map((m) => m[1].trim()).find((v) => !FORM_LABEL.test(v));
   if (titleSaysRemote || embRemote || REMOTE_IN_TEXT.test(text)) {

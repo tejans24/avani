@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { scorePosting } from "@/lib/jobs/scoring";
+
 import { canonicalJobUrl, companyFromHost, companyFromPlatformPath, companyInText, splitApplicationForm, findJobPosting, htmlToText, parseCapture } from "@/lib/jobs/capture";
 
 describe("canonicalJobUrl", () => {
@@ -247,5 +249,29 @@ describe("splitApplicationForm / companyInText", () => {
   it("finds a run-together slug as the page writes it", () => {
     expect(companyInText("Chesapeakecivic", "Join Chesapeake Civic Digital today")).toBe("Chesapeake Civic");
     expect(companyInText("Nobodyhere", "Nothing matches")).toBeUndefined();
+  });
+});
+
+describe("a job shown inside a search page (CACI on Eightfold)", () => {
+  const text = readFileSync(join(__dirname, "__fixtures__", "eightfold-caci.txt"), "utf8");
+  const draft = parseCapture({ url: "https://searchcareers.caci.com/careers?pid=331069", pageTitle: "Architect jobs in Remote", meta: { h1: "" }, text });
+
+  it("takes the open job's title, not the search page's, and its own location and pay", () => {
+    expect(draft).toMatchObject({ title: "AWS Solution Architect", companyName: "CACI", location: "Remote", compMinCents: 82_100_00, compMaxCents: 172_400_00 });
+  });
+
+  it("keeps the search results and similar jobs out of the description", () => {
+    expect(draft.descriptionText).toContain("Job Title: AWS Solution Architect");
+    expect(draft.descriptionText).not.toMatch(/Lakehouse Architect|Similar jobs|Senior Cloud DevSecOps Engineer|Sort: Distance/);
+  });
+
+  it("scores it as remote with occasional site visits, and filters it for the active Secret it requires", () => {
+    const r = scorePosting(
+      { title: draft.title!, descriptionText: draft.descriptionText, location: draft.location!, companyName: "CACI", source: "MANUAL", postedAt: null, compMinCents: draft.compMinCents ?? null, compMaxCents: draft.compMaxCents ?? null, workModeHint: null, isStaffingAgency: false },
+      new Date()
+    );
+    expect(r.workMode).toBe("REMOTE");
+    expect(r.flags).toContain("Remote with occasional in-person travel");
+    expect(r.filterFailures[0]).toMatch(/^Clearance above Public Trust/);
   });
 });

@@ -3,7 +3,8 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { scrubPersonal, type Contact } from "@/lib/jobs/ai-payload";
-import { splitApplicationForm } from "@/lib/jobs/capture";
+import { jobSection, parseCapture, splitApplicationForm } from "@/lib/jobs/capture";
+import { classifyWorkMode } from "@/lib/jobs/scoring";
 
 /**
  * Claude-assisted capture: when a job page has no structured job data
@@ -27,7 +28,7 @@ export const captureExtractSchema = z.object({
   title: z.string(),
   companyName: z.string(),
   location: z.string(),
-  workMode: z.enum(["REMOTE", "HYBRID", "ONSITE", "UNKNOWN"]),
+  workMode: z.enum(["REMOTE", "OCCASIONAL_HYBRID", "HYBRID", "ONSITE", "UNKNOWN"]),
   /** Annual USD, whole dollars; 0 when the page states no pay. */
   payMin: z.number(),
   payMax: z.number(),
@@ -47,6 +48,8 @@ export type ExtractResult = {
 const SYSTEM = `You extract one job posting from the text of a careers web page.
 Return the posting's title, hiring company, location, work arrangement, posted pay range (annual US dollars; convert hourly at 2080 hours; 0 if not stated), posted date (YYYY-MM-DD, or empty), and the description.
 For the description, copy the posting's own sentences (responsibilities, requirements, qualifications, benefits, pay) and leave out navigation, cookie banners, "similar jobs", and footer text. Do not summarize, reword, or add anything.
+Some careers sites show the job inside a search page, with other jobs listed above and "similar jobs" below: extract only the job whose full description is shown.
+Work arrangement: REMOTE (fully remote, or remote with occasional travel), OCCASIONAL_HYBRID (mostly remote with occasional office or customer-site days), HYBRID (set in-office days each week), ONSITE (in the office or at the client site full time), UNKNOWN (not stated, or it varies by program). Words like "hybrid cloud" are technology, not a work arrangement.
 If the page is not a single job posting, set isJobPosting to false.`;
 
 const WORD = /[a-z0-9][a-z0-9+#.%$-]*/g;
@@ -73,18 +76,20 @@ export function checkExtract(fields: CaptureExtract, pageText: string): string[]
   return warnings;
 }
 
+/** TAILOR_MODE=fake (tests): the app's own rules stand in for Claude. */
 function heuristic(pageTitle: string | undefined, text: string): CaptureExtract {
-  const [title = "", company = ""] = (pageTitle ?? "").split(/\s[|–-]\s/).map((s) => s.trim());
+  const d = parseCapture({ url: "https://example.invalid/", pageTitle, text });
+  const workMode = classifyWorkMode(d.location ?? "", d.descriptionText);
   return {
     isJobPosting: true,
-    title,
-    companyName: company,
-    location: /\bremote\b/i.test(text) ? "Remote" : "",
-    workMode: /\bremote\b/i.test(text) ? "REMOTE" : "UNKNOWN",
-    payMin: 0,
-    payMax: 0,
-    postedOn: "",
-    descriptionText: text.trim(),
+    title: d.title ?? "",
+    companyName: d.companyName && d.companyName !== "Example" ? d.companyName : "",
+    location: d.location ?? "",
+    workMode,
+    payMin: d.compMinCents ? d.compMinCents / 100 : 0,
+    payMax: d.compMaxCents ? d.compMaxCents / 100 : 0,
+    postedOn: d.postedAt ? d.postedAt.toISOString().slice(0, 10) : "",
+    descriptionText: d.descriptionText,
   };
 }
 
@@ -116,7 +121,7 @@ export async function extractJobWithClaude(input: { pageTitle?: string; text: st
 
   const warnings = checkExtract(fields, text);
   // An ungrounded description is never trusted: fall back to the page's own text.
-  if (fields.descriptionText && groundedShare(fields.descriptionText, text) < 0.9) fields = { ...fields, descriptionText: text.trim() };
+  if (fields.descriptionText && groundedShare(fields.descriptionText, text) < 0.9) fields = { ...fields, descriptionText: jobSection(text) };
   // A job in the owner's own city came back as "[redacted], MD": put the city back here, in the app.
   const city = input.contact?.location?.split(",")[0]?.trim();
   if (city && fields.location.includes("[redacted]")) fields = { ...fields, location: fields.location.replace(/\[redacted\]/g, city) };

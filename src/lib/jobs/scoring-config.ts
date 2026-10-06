@@ -9,7 +9,7 @@
  * Patterns are matched case-insensitively against title + description.
  */
 
-export const SCORING_VERSION = 4;
+export const SCORING_VERSION = 5;
 
 /*
  * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
@@ -93,6 +93,9 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
       /\b(once|1-2 days?|one day|a few days) (a|per) (month|quarter)\b/i,
       /\b(monthly|quarterly) (on[- ]?site|in[- ]person|team) (visits?|meetings?|days?|gatherings?)\b/i,
       /\bremote[^.]{0,60}\b(occasional|as needed)\b/i,
+      // "Work site is primarily at the employee's home site; ... occasionally need to work at the customer site"
+      /\b(work ?site|work location|work)\b[^.]{0,20}\b(is )?(primarily|mostly|mainly) (at|from) (the )?(employee['’]?s? |your )?home\b/i,
+      /\boccasionally (need to )?(work|be|report|travel)\b[^.]{0,40}\b(on[- ]?site|customer site|client site|office)\b/i,
     ],
   },
   // Remote offered as one of the options ("a hybrid, remote, or client-site environment as program needs
@@ -105,7 +108,8 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
     ],
   },
   // Generic "hybrid" with no occasional qualifier → assume regular hybrid.
-  { mode: "HYBRID", patterns: [/\bhybrid\b/i] },
+  // ("Hybrid cloud", "hybrid IT" and the like are technology, not a schedule.)
+  { mode: "HYBRID", patterns: [/\bhybrid\b(?!\s*(cloud|it\b|infrastructure|architectures?|environments?|multi-?cloud|on-?prem|data|integration|solutions?|deployments?|networks?|apps?|applications?))/i] },
   {
     mode: "REMOTE",
     patterns: [/\b(fully remote|100% remote|remote[- ]first|remote \(us\)|remote[- ]us|work from anywhere in the us)\b/i, /\bremote\b/i],
@@ -163,6 +167,8 @@ export const HARD_FILTERS = {
     /\b(polygraph|full[- ]scope poly|ci poly)\b/i,
     /\bactive secret (clearance )?(is )?required\b/i,
     /\bmust (currently )?(hold|possess|have) an? (active )?secret\b/i,
+    /\bmust (currently )?(hold|possess|have) (an? )?active (dod |doe |dhs )?(secret|top secret)\b/i,
+    /\bminimum clearance required to start:\s*(secret|top secret|ts\/sci)\b/i,
   ],
   /** Allow even if a reject pattern also matched (e.g. "willing to obtain"). */
   clearanceAllowPatterns: [

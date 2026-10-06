@@ -180,5 +180,7 @@ describe("classifyWorkMode: remote offered as one option", () => {
     expect(classifyWorkMode("Reston, VA", "This role can be remote or hybrid.")).toBe("UNKNOWN");
     expect(classifyWorkMode("Reston, VA", "This is a hybrid role, 3 days a week in the office.")).toBe("HYBRID");
     expect(classifyWorkMode("Reston, VA", "Hybrid schedule with our Reston team.")).toBe("HYBRID");
+    // Technology, not a schedule.
+    expect(classifyWorkMode("Reston, VA", "Familiarity with hybrid cloud architectures.")).toBe("UNKNOWN");
   });
 });

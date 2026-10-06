@@ -318,6 +318,8 @@ const captureSchema = z.object({
   jsonLd: z.unknown().optional(),
   /** The application form's questions, when the page had the form. */
   questions: z.array(z.string().max(600)).max(40).optional(),
+  /** Work mode as confirmed on the form (from Claude's reading or the owner); kept as the job's override. */
+  workMode: z.enum(["REMOTE", "OCCASIONAL_HYBRID", "HYBRID", "ONSITE"]).optional(),
 });
 
 /**
@@ -340,7 +342,7 @@ export async function captureJob(input: z.input<typeof captureSchema>): Promise<
           title: c.title,
           companyName: c.companyName,
           location: c.location,
-          workModeHint: null,
+          workModeHint: c.workMode ?? null,
           url,
           descriptionText: c.descriptionText,
           postedAt: c.postedOn ? isoToUtcDate(c.postedOn) : null,
@@ -354,6 +356,10 @@ export async function captureJob(input: z.input<typeof captureSchema>): Promise<
     );
     revalidateJob();
     const savedId = report.created[0]?.id ?? [...report.seenPostingIds][0];
+    if (savedId && c.workMode) {
+      await db.jobPosting.update({ where: { id: savedId }, data: { workModeOverride: c.workMode } });
+      await rescorePosting(savedId, now);
+    }
     // The form's questions go to the job's application answers (no model call; needs a master résumé).
     if (savedId && c.questions?.length) {
       const hasMaster = await db.resumeMaster.count();

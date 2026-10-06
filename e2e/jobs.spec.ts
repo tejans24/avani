@@ -159,19 +159,19 @@ test("bookmarklet works on a Phenom-style careers site with no JSON-LD and a sev
   // The data travelled in the URL fragment, which is cleared after reading.
   await expect.poll(() => new URL(popup.url()).hash).toBe("");
 
-  // Filled from the page itself; Claude isn't needed.
+  // An instant draft from the page itself, then Claude reads the page (no complete job data on it).
   await expect(popup.getByText(/were taken from the page heading, title and address/)).toBeVisible();
+  await expect(popup.getByText("Filled by Claude from the page.", { exact: false })).toBeVisible();
   await expect(popup.getByLabel("Title")).toHaveValue("Senior Cloud Architect");
   await expect(popup.getByLabel("Company")).toHaveValue("Example Federal");
   await expect(popup.getByLabel("Location")).toHaveValue("Remote, United States");
   await expect(popup.getByLabel("Posted")).toHaveValue("2026-09-30");
-  await expect(popup.getByText("Filled by Claude from the page.", { exact: false })).toHaveCount(0);
 
   await popup.getByRole("button", { name: "Save job" }).click();
   await popup.waitForURL(/\/jobs\/[a-z0-9]+$/);
   const [saved] = await queryRows(`SELECT "capturedVia", url, "descriptionText" FROM "JobPosting" WHERE title = 'Senior Cloud Architect'`);
   expect(saved).toMatchObject({ capturedVia: "bookmarklet", url: "https://careers.example.test/job/R1" });
-  expect(saved.descriptionText).toBe("Design and build AWS platforms end-to-end for federal health programs.");
+  expect(saved.descriptionText).toContain("Design and build AWS platforms end-to-end for federal health programs.");
 });
 
 test("on a phone the menu folds behind a button and closes after navigating", async ({ page }) => {
