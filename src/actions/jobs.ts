@@ -519,7 +519,7 @@ export async function analyzeJobFit(postingId: string): Promise<ActionResult> {
 
 
 /**
- * Evaluate the next few unevaluated matches at once, so the list shows
+ * Evaluate the next few unevaluated remote matches at once, so the list shows
  * verdicts without opening each job. A few at a time keeps it inside one
  * request; they run side by side.
  */
@@ -532,7 +532,7 @@ export async function evaluateNextMatches(limit = 4): Promise<ActionResult> {
       take: Math.min(Math.max(limit, 1), 6),
       select: { id: true },
     });
-    if (!next.length) return { ok: true, note: "Every match is evaluated." };
+    if (!next.length) return { ok: true, note: "Every remote match is evaluated." };
     const results = await Promise.allSettled(next.map((p) => evaluatePosting(p.id)));
     revalidateJob();
     const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];

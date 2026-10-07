@@ -81,6 +81,7 @@ export function FitPanel({
   bulletText,
   aiEnabled,
   autoRun,
+  notRemote = false,
 }: {
   postingId: string;
   analysis: FitAnalysis | null;
@@ -88,6 +89,8 @@ export function FitPanel({
   bulletText: Record<string, string>;
   aiEnabled: boolean;
   autoRun: boolean;
+  /** Not remote: Claude waits to be asked. */
+  notRemote?: boolean;
 }) {
   const { pending, error, run } = useAction();
   const started = useRef(false);
@@ -124,7 +127,9 @@ export function FitPanel({
         <p style={{ ...small, margin: 0, color: "var(--text-secondary)" }}>
           {pending
             ? "Claude is reading the posting against your criteria and résumé. This takes a minute or two."
-            : aiEnabled
+            : aiEnabled && notRemote
+              ? "This job isn't remote, so Claude doesn't read it unless you ask. Evaluate to get its read."
+              : aiEnabled
               ? "Claude reads the posting the way the recruiter and hiring manager will, against your criteria and résumé content. Your contact details are never sent."
               : "Set ANTHROPIC_API_KEY to have Claude evaluate this job against your criteria and résumé."}
         </p>

@@ -292,3 +292,28 @@ test("Have Claude read the next few: verdicts land on the list without opening e
   const [{ n }] = await queryRows(`SELECT count(*)::int AS n FROM "JobPosting" WHERE "fitAnalyzedAt" IS NULL AND "filterFailures" = '{}'`);
   expect(n).toBe(0);
 });
+
+test("a job that isn't remote waits for Evaluate, and the list's batch skips it", async ({ page }) => {
+  await queryRows(`INSERT INTO "ResumeMaster" (id, version, data) VALUES ('m1', 1, $1::jsonb)`, [MASTER]);
+  const [{ id }] = await queryRows(
+    `UPDATE "JobPosting" SET "workMode" = 'OCCASIONAL_HYBRID' WHERE title = 'Senior Software Engineer, Medicaid Modernization' RETURNING id`
+  );
+
+  await page.goto(`/jobs/${id}`);
+  const panel = page.getByTestId("fit-panel");
+  await expect(panel.getByText(/isn't remote, so Claude doesn't read it unless you ask/)).toBeVisible();
+  await expect(page.getByTestId("job-steps")).toContainText("Not remote, so Claude waits for you");
+  await page.waitForTimeout(1500);
+  const [before] = await queryRows(`SELECT "fitAnalyzedAt" FROM "JobPosting" WHERE id = $1`, [id]);
+  expect(before.fitAnalyzedAt).toBeNull();
+
+  // The list's batch only counts remote matches; this one isn't, and it's the only open match here.
+  await page.goto("/jobs");
+  await expect(page.getByTestId("job-row").first()).toContainText("not read yet");
+  await expect(page.getByRole("button", { name: /Have Claude read/ })).toHaveCount(0);
+
+  // Asking for it works.
+  await page.goto(`/jobs/${id}`);
+  await panel.getByRole("button", { name: "Evaluate" }).click();
+  await expect(panel.getByText("Test evaluation")).toBeVisible({ timeout: 60_000 });
+});

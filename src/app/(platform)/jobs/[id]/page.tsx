@@ -9,6 +9,7 @@ import { JobAssistant } from "@/components/platform/jobs/JobAssistant";
 import { JobActivityPanel } from "@/components/platform/jobs/JobActivityPanel";
 import { JobPipelineCard } from "@/components/platform/jobs/JobPipelineCard";
 import { JobSteps } from "@/components/platform/jobs/JobSteps";
+import { autoEvaluates } from "@/lib/jobs/views";
 import { dateToIso } from "@/lib/dates";
 import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
@@ -135,6 +136,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           appliedOnIso={posting.appliedAt ? dateToIso(posting.appliedAt) : null}
           verdict={fit?.verdict ?? null}
           filteredOut={!passed}
+          notRemote={!autoEvaluates(posting.workMode)}
           resume={{ versions: posting.tailored.length, latest: posting.tailored[0]?.version ?? null, sent: sent?.version ?? null }}
           coverLetter={fit?.coverLetter ?? null}
           answers={{ total: answers.length, ready: answers.filter((a) => a.source !== "todo" && a.answer.trim()).length }}
@@ -145,7 +147,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
             analysis={fit}
             bulletText={bulletText}
             aiEnabled={aiEnabled}
-            autoRun={aiEnabled && passed && !posting.archivedAt && Boolean(parsedMaster?.success)}
+            autoRun={aiEnabled && passed && !posting.archivedAt && autoEvaluates(posting.workMode) && Boolean(parsedMaster?.success)}
+            notRemote={!autoEvaluates(posting.workMode)}
           />
           <JobAssistant
             postingId={posting.id}

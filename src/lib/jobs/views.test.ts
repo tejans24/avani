@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseView, triageKey, verdictBucket } from "@/lib/jobs/views";
+import { autoEvaluates, parseView, triageKey, verdictBucket } from "@/lib/jobs/views";
 
 const p = (over: Partial<Parameters<typeof triageKey>[0]> = {}) => ({
   status: "NEW",
@@ -39,5 +39,12 @@ describe("job list views", () => {
     const calm = p({ fitAnalysis: fit("APPLY", "CALM"), score: 70 });
     const intense = p({ fitAnalysis: fit("APPLY", "INTENSE"), score: 80 });
     expect(triageKey(calm)).toBeLessThan(triageKey(intense));
+  });
+});
+
+describe("automatic evaluation", () => {
+  it("only remote jobs are read without being asked", () => {
+    expect(autoEvaluates("REMOTE")).toBe(true);
+    for (const m of ["OCCASIONAL_HYBRID", "HYBRID", "ONSITE", "UNKNOWN"]) expect(autoEvaluates(m)).toBe(false);
   });
 });

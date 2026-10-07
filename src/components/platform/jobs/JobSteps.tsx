@@ -39,6 +39,8 @@ export function JobSteps(props: {
   verdict: FitVerdict | null;
   /** Filtered out by a must-have (the evaluator doesn't run on its own then). */
   filteredOut: boolean;
+  /** Not remote: Claude only evaluates it when asked. */
+  notRemote: boolean;
   resume: { versions: number; latest: number | null; sent: number | null };
   coverLetter: { needed: boolean; why: string } | null;
   answers: { total: number; ready: number };
@@ -61,6 +63,8 @@ export function JobSteps(props: {
             </span>
           ) : props.filteredOut ? (
             <span style={muted}>Filtered out by a must-have (see above). Evaluate it anyway if that&apos;s wrong.</span>
+          ) : props.notRemote ? (
+            <span style={muted}>Not remote, so Claude waits for you: Evaluate it if it&apos;s worth a look.</span>
           ) : (
             <span style={muted}>Waiting for Claude&apos;s read.</span>
           )}

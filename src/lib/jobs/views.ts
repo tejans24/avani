@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { APPLYING_VERDICTS, paceOf, type FitAnalysis, type FitVerdict, type Pace } from "@/lib/jobs/fit";
 import type { BreakdownEntry } from "@/lib/jobs/scoring";
+import type { WorkMode } from "@/lib/jobs/scoring-config";
 
 /**
  * The job list's views, built around one question: is this worth applying
@@ -32,8 +33,16 @@ export const OPEN_MATCH: Prisma.JobPostingWhereInput = {
   status: { in: ["NEW", "SHORTLISTED"] },
 };
 
-/** Matches not evaluated yet: what "Evaluate" on the list works through. */
-export const UNEVALUATED_MATCH: Prisma.JobPostingWhereInput = { ...OPEN_MATCH, fitAnalyzedAt: null };
+/**
+ * Claude reads a job without being asked only when it's remote: on opening
+ * the job and from "Have Claude read the next few". Anything else waits for
+ * "Evaluate" on its page.
+ */
+export const AUTO_EVALUATE_MODES: WorkMode[] = ["REMOTE"];
+export const autoEvaluates = (workMode: string) => (AUTO_EVALUATE_MODES as string[]).includes(workMode);
+
+/** Remote matches not evaluated yet: what "Have Claude read the next few" works through. */
+export const UNEVALUATED_MATCH: Prisma.JobPostingWhereInput = { ...OPEN_MATCH, fitAnalyzedAt: null, workMode: { in: AUTO_EVALUATE_MODES } };
 
 /** Which postings each view loads; "To apply" and "Not for me" then split matches by verdict (verdictBucket). */
 export function viewWhere(view: View): Prisma.JobPostingWhereInput {
