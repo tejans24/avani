@@ -275,3 +275,18 @@ describe("a job shown inside a search page (CACI on Eightfold)", () => {
     expect(r.filterFailures[0]).toMatch(/^Clearance above Public Trust/);
   });
 });
+
+describe("pasted Leidos posting (program budget, wide band in cents, #Remote)", () => {
+  const text = readFileSync(join(__dirname, "__fixtures__", "leidos-remote.txt"), "utf8");
+  const draft = parseCapture({ url: "https://careers.leidos.com/jobs/16950000-solution-architect", text });
+
+  it("takes the program budget over the job level's wide band", () => {
+    expect(draft).toMatchObject({ compMinCents: 150_000_00, compMaxCents: 170_000_00 });
+  });
+
+  it("scores it as remote: \"hybrid and multi cloud environments\" is technology, not a schedule", () => {
+    const facts = { title: "Solution Architect/Engineer", descriptionText: draft.descriptionText, companyName: "Leidos", source: "MANUAL" as const, postedAt: null, compMinCents: null, compMaxCents: null, workModeHint: null, isStaffingAgency: false };
+    expect(scorePosting({ ...facts, location: "" }, new Date()).workMode).toBe("REMOTE");
+    expect(scorePosting({ ...facts, location: "Remote, Virginia" }, new Date()).workMode).toBe("REMOTE");
+  });
+});

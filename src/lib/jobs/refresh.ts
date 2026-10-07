@@ -4,6 +4,7 @@ import { emitEvent } from "@/lib/events/emit";
 import { formatAwardAmount, pickCurrentAward } from "@/lib/jobs/awards";
 import { extractBenefits } from "@/lib/jobs/benefits";
 import { normalizeCompany, resolveBatch, sourceIdKey, type ExistingIndex, type Incoming } from "@/lib/jobs/dedupe";
+import { parsePayRange } from "@/lib/jobs/pay";
 import { SCORING_VERSION, passesTitlePrefilter, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
 import { scorePosting } from "@/lib/jobs/scoring";
 import { sourceFetchCtx } from "@/lib/jobs/sources/http";
@@ -308,10 +309,15 @@ export async function refreshBoard(boardId: string, ctx: FetchCtx): Promise<Boar
  * path, used by version bumps, award updates, and owner edits.
  */
 export async function rescorePosting(id: string, now: Date): Promise<void> {
-  const p = await db.jobPosting.findUniqueOrThrow({ where: { id }, include: { company: { select: { name: true, isStaffingAgency: true } } } });
+  const found = await db.jobPosting.findUniqueOrThrow({ where: { id }, include: { company: { select: { name: true, isStaffingAgency: true } } } });
+  // A job added by hand with no pay saved: read it from the text again (the parser improves over time).
+  const reread = found.source === "MANUAL" && found.compMinCents === null && found.compMaxCents === null ? parsePayRange(found.descriptionText) : null;
+  const p = reread ? { ...found, compMinCents: reread.minCents, compMaxCents: reread.maxCents } : found;
   await db.jobPosting.update({
     where: { id },
-    data: derivedFields(
+    data: {
+      ...(reread ? { compMinCents: reread.minCents, compMaxCents: reread.maxCents } : {}),
+      ...derivedFields(
       {
         ...p,
         companyName: p.company.name,
@@ -327,6 +333,7 @@ export async function rescorePosting(id: string, now: Date): Promise<void> {
         currentAward: await currentAwardSummary(p.companyId, now),
       }
     ),
+    },
   });
 }
 

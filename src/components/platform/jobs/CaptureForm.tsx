@@ -86,14 +86,14 @@ export function CaptureForm({
     });
   };
 
-  // Claude reads the page (once, right away) unless the page carried complete
-  // structured job data: the app's own reading is the instant first draft and
-  // the fallback; Claude handles the layouts rules can't. The button stays for retries.
+  // Claude reads every posting (once, right away): even pages with structured
+  // job data often leave out the pay or bury it in the text ("program budget").
+  // The app's own reading is the instant first draft and the fallback. The
+  // button stays for retries; fields you've edited are never overwritten.
   const autoFilled = useRef(false);
   useEffect(() => {
     if (!draft || !aiEnabled || autoFilled.current) return;
-    const essentialsMissing = draft.missing.some((m) => m === "title" || m === "companyName" || m === "location");
-    if ((!essentialsMissing && draft.guessed.length === 0) || pageRef.current.text.trim().length < 40) return;
+    if (pageRef.current.text.trim().length < 40) return;
     autoFilled.current = true;
     void fillWithClaude();
     // eslint-disable-next-line react-hooks/exhaustive-deps

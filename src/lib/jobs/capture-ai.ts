@@ -46,10 +46,10 @@ export type ExtractResult = {
 };
 
 const SYSTEM = `You extract one job posting from the text of a careers web page.
-Return the posting's title, hiring company, location, work arrangement, posted pay range (annual US dollars; convert hourly at 2080 hours; 0 if not stated), posted date (YYYY-MM-DD, or empty), and the description.
+Return the posting's title, hiring company, location, work arrangement, posted pay range (annual US dollars; convert hourly at 2080 hours; 0 if not stated; when a narrower "program budget" or proposed range appears alongside a wide band for the job level, return the narrower one), posted date (YYYY-MM-DD, or empty), and the description.
 For the description, copy the posting's own sentences (responsibilities, requirements, qualifications, benefits, pay) and leave out navigation, cookie banners, "similar jobs", and footer text. Do not summarize, reword, or add anything.
 Some careers sites show the job inside a search page, with other jobs listed above and "similar jobs" below: extract only the job whose full description is shown.
-Work arrangement: REMOTE (fully remote, or remote with occasional travel), OCCASIONAL_HYBRID (mostly remote with occasional office or customer-site days), HYBRID (set in-office days each week), ONSITE (in the office or at the client site full time), UNKNOWN (not stated, or it varies by program). Words like "hybrid cloud" are technology, not a work arrangement.
+Work arrangement: REMOTE (fully remote, or remote with occasional travel), OCCASIONAL_HYBRID (mostly remote with occasional office or customer-site days), HYBRID (set in-office days each week), ONSITE (in the office or at the client site full time), UNKNOWN (not stated, or it varies by program). Words like "hybrid cloud" or "hybrid and multi cloud environments" are technology, not a work arrangement.
 If the page is not a single job posting, set isJobPosting to false.`;
 
 const WORD = /[a-z0-9][a-z0-9+#.%$-]*/g;

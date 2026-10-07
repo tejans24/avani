@@ -90,10 +90,13 @@ const firstMatch = (patterns: RegExp[], text: string) => {
 
 export function classifyWorkMode(location: string, text: string, hint?: WorkMode | null): WorkMode {
   if (hint && hint !== "UNKNOWN") return hint;
+  const remoteLocation = REMOTE_LOCATION.test(location);
   for (const group of WORK_MODE_PATTERNS) {
+    // A bare "hybrid" somewhere in the text doesn't overrule a location that says Remote.
+    if (group.weak && remoteLocation) continue;
     if (group.patterns.some((p) => p.test(text))) return group.mode;
   }
-  if (REMOTE_LOCATION.test(location)) return "REMOTE";
+  if (remoteLocation) return "REMOTE";
   return "UNKNOWN";
 }
 

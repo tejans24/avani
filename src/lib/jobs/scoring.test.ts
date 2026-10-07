@@ -175,6 +175,15 @@ describe("classifyLane", () => {
 });
 
 describe("classifyWorkMode: remote offered as one option", () => {
+  it("a bare \"hybrid\" doesn't overrule a Remote location, and hybrid-and-multi-cloud is technology", () => {
+    expect(classifyWorkMode("Remote, Virginia", "Join our hybrid team supporting the agency.")).toBe("REMOTE");
+    expect(classifyWorkMode("Baltimore, MD", "Join our hybrid team supporting the agency.")).toBe("HYBRID");
+    expect(classifyWorkMode("", "Architect across hybrid and multi cloud environments. #Remote")).toBe("REMOTE");
+    expect(classifyWorkMode("", "Designs for hybrid/multi-cloud workloads. Remote.")).toBe("REMOTE");
+    // A stated schedule still wins over the location.
+    expect(classifyWorkMode("Remote, Virginia", "This role is 3 days a week in the office.")).toBe("HYBRID");
+  });
+
   it("doesn't call it regular hybrid when remote is among the choices", () => {
     expect(classifyWorkMode("Washington, DC", "Ability to work in a hybrid, remote, or client-site environment as program needs require.")).toBe("UNKNOWN");
     expect(classifyWorkMode("Reston, VA", "This role can be remote or hybrid.")).toBe("UNKNOWN");

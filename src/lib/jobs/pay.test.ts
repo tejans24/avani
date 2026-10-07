@@ -26,4 +26,16 @@ describe("parsePayRange", () => {
     const states = "California, Colorado, Connecticut, Hawaii, Illinois, Maine, Maryland, Massachusetts, Minnesota, New Jersey, New York, Ohio, Vermont, Virginia, Washington, and the District of Columbia";
     expect(parsePayRange(`The pay range for the states of ${states}, and also ${states}, is:\n\n$73,900 - $213,600 USD`)).toEqual({ minCents: 73_900_00, maxCents: 213_600_00 });
   });
+
+  it("reads amounts with cents", () => {
+    expect(parsePayRange("Pay Range:\nPay Range $131,300.00 - $237,350.00")).toEqual({ minCents: 131_300_00, maxCents: 237_350_00 });
+  });
+
+  it("prefers a program budget over the wide band for the job level, wherever each appears", () => {
+    const text =
+      "The program budget salary for this role could fall anywhere between mid $150,000 to low/mid $170,000 with a slight wiggle room.\n" +
+      "Pay Range $131,300.00 - $237,350.00";
+    expect(parsePayRange(text)).toEqual({ minCents: 150_000_00, maxCents: 170_000_00 });
+    expect(parsePayRange(text.split("\n").reverse().join("\n"))).toEqual({ minCents: 150_000_00, maxCents: 170_000_00 });
+  });
 });

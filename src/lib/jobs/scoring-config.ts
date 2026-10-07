@@ -9,7 +9,7 @@
  * Patterns are matched case-insensitively against title + description.
  */
 
-export const SCORING_VERSION = 5;
+export const SCORING_VERSION = 6;
 
 /*
  * Criteria (owner, Oct 2026). Must-haves: whole-problem scope; hands-on with
@@ -70,7 +70,7 @@ export type WorkMode = "REMOTE" | "OCCASIONAL_HYBRID" | "HYBRID" | "ONSITE" | "U
  * decides. Source-provided flags (e.g. Greenhouse "Remote" location, Workday
  * remoteType) are applied first; these patterns read the description.
  */
-export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
+export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[]; weak?: boolean }[] = [
   {
     mode: "ONSITE",
     patterns: [
@@ -109,7 +109,14 @@ export const WORK_MODE_PATTERNS: { mode: WorkMode; patterns: RegExp[] }[] = [
   },
   // Generic "hybrid" with no occasional qualifier → assume regular hybrid.
   // ("Hybrid cloud", "hybrid IT" and the like are technology, not a schedule.)
-  { mode: "HYBRID", patterns: [/\bhybrid\b(?!\s*(cloud|it\b|infrastructure|architectures?|environments?|multi-?cloud|on-?prem|data|integration|solutions?|deployments?|networks?|apps?|applications?))/i] },
+  // "Hybrid and multi cloud environments", "hybrid/multi-cloud" too. Weak: a remote location outranks it.
+  {
+    mode: "HYBRID",
+    weak: true,
+    patterns: [
+      /\bhybrid\b(?!\s*(?:(?:and|or|&|\/|,)\s*)?(cloud|it\b|infrastructure|architectures?|environments?|multi[- ]?cloud|on-?prem|data|integration|solutions?|deployments?|networks?|apps?|applications?))/i,
+    ],
+  },
   {
     mode: "REMOTE",
     patterns: [/\b(fully remote|100% remote|remote[- ]first|remote \(us\)|remote[- ]us|work from anywhere in the us)\b/i, /\bremote\b/i],
