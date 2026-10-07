@@ -6,6 +6,7 @@ import { generateTailored, markAppliedWithVersion, reuseTailoredVersion, saveTai
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import type { Resume } from "@/lib/jobs/resume-schema";
 import { checkDocStyle, checkTruth, hasBlocking, omittedRoleGaps, type BulletStatus, type TailoredDoc } from "@/lib/jobs/tailor";
+import { madeAgo } from "@/lib/jobs/display";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import { TailorChat, type ChatTurnView } from "./TailorChat";
 import { ActionMessage, useAction } from "./useAction";
@@ -38,6 +39,8 @@ export function TailorEditor(props: {
   master: Resume;
   versionId: string | null;
   version: number | null;
+  /** When this version was made (ISO). */
+  createdAtIso: string | null;
   initial: TailoredDoc | null;
   appliedVersionId: string | null;
   hasApiKey: boolean;
@@ -290,6 +293,9 @@ export function TailorEditor(props: {
             <Badge tone={blocking ? "critical" : "positive"}>{blocking ? "Has must-fix issues" : "Ready to export"}</Badge>
             <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
               v{props.version} · {ORIGIN_LABEL[doc.generatedBy] ?? doc.generatedBy}
+              {props.createdAtIso && (
+                <span suppressHydrationWarning title={new Date(props.createdAtIso).toLocaleString()}> · made {madeAgo(new Date(props.createdAtIso))}</span>
+              )}
               {isSent ? " · sent with your application (locked)" : ""}
               {dirty ? " · unsaved changes" : ""}
             </span>

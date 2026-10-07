@@ -66,6 +66,19 @@ export function ago(d: Date | null, now = new Date()): string {
   return `${Math.floor(days / 7)}w ago`;
 }
 
+/** "just now", "12 min ago", "3 h ago", "yesterday", "5 days ago", then the date: for things you made (résumé versions). */
+export function madeAgo(d: Date, now = new Date()): string {
+  const min = Math.floor((now.getTime() - d.getTime()) / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
 const SITE_NAMES: [RegExp, string][] = [
   [/(^|\.)linkedin\.com$/, "LinkedIn"],
   [/(^|\.)indeed\.com$/, "Indeed"],

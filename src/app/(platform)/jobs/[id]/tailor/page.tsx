@@ -7,6 +7,7 @@ import { resumeSchema, type Resume } from "@/lib/jobs/resume-schema";
 import type { ChatTurnView } from "@/components/platform/jobs/TailorChat";
 import type { FitAnalysis } from "@/lib/jobs/fit";
 import { postingSimilarity, type TailoredDoc } from "@/lib/jobs/tailor";
+import { madeAgo } from "@/lib/jobs/display";
 
 export const metadata = { title: "Résumé for this job — Avani" };
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ export default async function TailorPage({ params, searchParams }: { params: { i
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             {posting.tailored.map((t) => (
               <Button key={t.id} href={`/jobs/${posting.id}/tailor?v=${t.id}`} variant={t.id === selectedId ? "primary" : "ghost"} size="sm">
-                v{t.version}
+                v{t.version} · {madeAgo(t.createdAt)}
                 {t.id === posting.appliedResumeId ? " (sent)" : ""}
               </Button>
             ))}
@@ -87,6 +88,7 @@ export default async function TailorPage({ params, searchParams }: { params: { i
           master={resumeSchema.parse(masterRow.data) as Resume}
           versionId={selected?.id ?? null}
           version={selected?.version ?? null}
+          createdAtIso={selected?.createdAt.toISOString() ?? null}
           initial={(selected?.data as unknown as TailoredDoc) ?? null}
           appliedVersionId={posting.appliedResumeId}
           hasApiKey={Boolean(process.env.ANTHROPIC_API_KEY) || process.env.TAILOR_MODE === "fake"}

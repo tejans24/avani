@@ -14,6 +14,7 @@ import { dateToIso } from "@/lib/dates";
 import { formatAwardAmount, isCurrentAward } from "@/lib/jobs/awards";
 import { mergeBenefits, type BenefitKey, type ExtractedBenefit } from "@/lib/jobs/benefits";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
+import { madeAgo } from "@/lib/jobs/display";
 import { CATEGORY_LABEL, LANE_LABEL, SOURCE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, postingSourceText, scoreTone } from "@/lib/jobs/display";
 import type { ApplicationAnswer } from "@/lib/jobs/answers";
 import type { FitAnalysis } from "@/lib/jobs/fit";
@@ -34,7 +35,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       company: { include: { awards: { orderBy: { amountCents: { sort: "desc", nulls: "last" } }, take: 8 } } },
       aliases: { orderBy: { firstSeenAt: "asc" } },
       activity: { orderBy: { occurredAt: "desc" } },
-      tailored: { orderBy: { version: "desc" }, select: { id: true, version: true } },
+      tailored: { orderBy: { version: "desc" }, select: { id: true, version: true, createdAt: true } },
     },
   });
   if (!posting) notFound();
@@ -137,7 +138,12 @@ export default async function JobDetailPage({ params }: { params: { id: string }
           verdict={fit?.verdict ?? null}
           filteredOut={!passed}
           notRemote={!autoEvaluates(posting.workMode)}
-          resume={{ versions: posting.tailored.length, latest: posting.tailored[0]?.version ?? null, sent: sent?.version ?? null }}
+          resume={{
+            versions: posting.tailored.length,
+            latest: posting.tailored[0]?.version ?? null,
+            latestMade: posting.tailored[0] ? madeAgo(posting.tailored[0].createdAt) : null,
+            sent: sent?.version ?? null,
+          }}
           coverLetter={fit?.coverLetter ?? null}
           answers={{ total: answers.length, ready: answers.filter((a) => a.source !== "todo" && a.answer.trim()).length }}
         />

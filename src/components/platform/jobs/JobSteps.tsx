@@ -41,7 +41,7 @@ export function JobSteps(props: {
   filteredOut: boolean;
   /** Not remote: Claude only evaluates it when asked. */
   notRemote: boolean;
-  resume: { versions: number; latest: number | null; sent: number | null };
+  resume: { versions: number; latest: number | null; latestMade: string | null; sent: number | null };
   coverLetter: { needed: boolean; why: string } | null;
   answers: { total: number; ready: number };
 }) {
@@ -74,7 +74,8 @@ export function JobSteps(props: {
           {props.resume.versions > 0 ? (
             <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={muted}>
-                Version {props.resume.latest} ready{props.resume.sent ? ` · v${props.resume.sent} sent` : ""}
+                Version {props.resume.latest} ready{props.resume.latestMade ? `, made ${props.resume.latestMade}` : ""}
+                {props.resume.sent ? ` · v${props.resume.sent} sent` : ""}
               </span>
               <Button href={`/jobs/${props.postingId}/tailor`} variant="secondary" size="sm">
                 Open résumé

@@ -48,3 +48,17 @@ describe("automatic evaluation", () => {
     for (const m of ["OCCASIONAL_HYBRID", "HYBRID", "ONSITE", "UNKNOWN"]) expect(autoEvaluates(m)).toBe(false);
   });
 });
+
+describe("madeAgo", () => {
+  it("says how long ago a résumé version was made", async () => {
+    const { madeAgo } = await import("@/lib/jobs/display");
+    const now = new Date("2026-10-07T15:00:00Z");
+    const before = (ms: number) => new Date(now.getTime() - ms);
+    expect(madeAgo(before(20_000), now)).toBe("just now");
+    expect(madeAgo(before(12 * 60_000), now)).toBe("12 min ago");
+    expect(madeAgo(before(3 * 3_600_000), now)).toBe("3 h ago");
+    expect(madeAgo(before(30 * 3_600_000), now)).toBe("yesterday");
+    expect(madeAgo(before(5 * 86_400_000), now)).toBe("5 days ago");
+    expect(madeAgo(new Date("2026-08-01T12:00:00Z"), now)).toBe("Aug 1");
+  });
+});

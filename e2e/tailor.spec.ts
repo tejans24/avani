@@ -61,7 +61,7 @@ test("tailor, guard, version, preview, download, and record the version sent", a
   await expect(agency.getByText(/Leaves a gap/)).toHaveCount(0);
   await page.getByRole("button", { name: "Save as new version" }).click();
   await page.waitForURL(/tailor\?v=/);
-  await expect(page.getByText(/^v2 ·/)).toBeVisible();
+  await expect(page.getByText(/^v2 · .* · made /)).toBeVisible();
   const [v2] = await queryRows(`SELECT data FROM "TailoredResume" WHERE version = 2`);
   const agencyBullets = v2.data.experience.find((r: { id: string }) => r.id === "agency").bullets;
   expect(agencyBullets.find((b: { id: string }) => b.id === "agency-2").status).toBe("rejected");
@@ -155,7 +155,7 @@ test("start from master, reuse it on another job, and change it by chatting with
   await chat.getByRole("button", { name: "Apply changes" }).click();
   await page.getByRole("button", { name: "Save as new version" }).click();
   await page.waitForURL(/tailor\?v=/);
-  await expect(page.getByText(/^v2 ·/)).toBeVisible();
+  await expect(page.getByText(/^v2 · .* · made /)).toBeVisible();
   const [v2] = await queryRows(`SELECT data FROM "TailoredResume" WHERE version = 2 AND "postingId" = $1`, [id]);
   expect(v2.data.experience.find((r: { id: string }) => r.id === "agency").omitted).toBe(true);
 
@@ -273,7 +273,7 @@ test("one click from the job page makes the résumé, and the cover letter only 
   await expect(steps.getByText("Not needed.")).toBeVisible(); // the evaluation's cover letter call
   await steps.getByRole("link", { name: "Make my résumé" }).click();
   await page.waitForURL(/tailor\?v=/, { timeout: 60_000 });
-  await expect(page.getByText(/^v1 · /)).toBeVisible();
+  await expect(page.getByText(/^v1 · .* · made just now/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Preview PDF" })).toBeVisible();
   await expect(page.getByTestId("cover-letter")).not.toHaveAttribute("open", "");
 
