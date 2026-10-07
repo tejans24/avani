@@ -42,7 +42,10 @@ const s = StyleSheet.create({
     paddingHorizontal: L.page.marginSideIn * IN,
   },
   name: { fontSize: L.name.sizePt, fontWeight: 700, color: L.colors.name, letterSpacing: L.name.letterSpacingPt, lineHeight: 1.05, marginBottom: L.name.spaceAfterPt },
+  headlineLine: { fontSize: L.contactLine.sizePt, color: L.colors.contactLine, marginBottom: 1 },
   contact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     fontSize: L.contactLine.sizePt,
     color: L.colors.contactLine,
     paddingBottom: L.contactLine.ruleGapPt,
@@ -62,9 +65,10 @@ const s = StyleSheet.create({
   para: { marginBottom: 1 },
   skill: { marginBottom: L.skillLine.spaceAfterPt },
   skillGroup: { fontWeight: 700, color: L.colors.name },
-  roleHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: L.roleHeader.spaceBeforePt, marginBottom: L.roleHeader.spaceAfterPt },
-  roleTitle: { fontSize: L.roleHeader.sizePt, fontWeight: 700, color: L.colors.name, flexShrink: 1, paddingRight: 8 },
-  roleDates: { fontSize: L.roleHeader.datesSizePt, color: L.roleHeader.datesColor, flexShrink: 0 },
+  // A long "Title, Organization, Location" wraps inside its own column; the dates keep theirs on the right.
+  roleHeader: { flexDirection: "row", alignItems: "flex-start", marginTop: L.roleHeader.spaceBeforePt, marginBottom: L.roleHeader.spaceAfterPt },
+  roleTitle: { fontSize: L.roleHeader.sizePt, fontWeight: 700, color: L.colors.name, flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10 },
+  roleDates: { fontSize: L.roleHeader.datesSizePt, color: L.roleHeader.datesColor, flexShrink: 0, textAlign: "right", paddingTop: 1.5 },
   // Word's list: the dot sits slightly in from the margin, text at the 0.25in tab.
   bulletRow: { flexDirection: "row", marginBottom: L.bullet.spaceAfterPt, paddingLeft: 6 },
   bulletDot: { width: L.bullet.indentIn * IN - 6 },
@@ -83,11 +87,29 @@ export function formatPeriods(periods: { start: string; end?: string | null }[])
   return periods.map((p) => `${month(p.start)}${L.dateFormat.rangeSeparator}${month(p.end ?? null)}`).join(L.dateFormat.multiSeparator);
 }
 
-export function contactLine(r: Resume): string {
+/** A headline longer than this (a posting's full title) goes on its own line. */
+const LONG_HEADLINE_CHARS = 45;
+
+/**
+ * What goes under the name: the headline and the contact items, joined by
+ * "  |  " as in the owner's résumé, wrapping only between items. A long
+ * headline (it matches the posting's title, which can be long) gets its own
+ * line above the contact items instead.
+ */
+export function contactLines(r: Resume): { headline: string | null; items: string[] } {
   const c = r.contact;
-  return [r.headline, c.location, c.phone, c.email, ...c.links.map((l) => l.url.replace(/^https?:\/\//, "")), c.citizenship]
-    .filter((x): x is string => Boolean(x && x.trim()))
-    .join(L.contactLine.separator);
+  const items = [c.location, c.phone, c.email, ...c.links.map((l) => l.url.replace(/^https?:\/\//, "")), c.citizenship]
+    .map((x) => x?.trim())
+    .filter((x): x is string => Boolean(x));
+  const headline = r.headline?.trim() || null;
+  if (!headline) return { headline: null, items };
+  return headline.length > LONG_HEADLINE_CHARS ? { headline, items } : { headline: null, items: [headline, ...items] };
+}
+
+/** Everything under the name as one string (tests and plain-text uses). */
+export function contactLine(r: Resume): string {
+  const { headline, items } = contactLines(r);
+  return [headline, ...items].filter(Boolean).join(L.contactLine.separator);
 }
 
 function Bullet({ children }: { children: string }) {
@@ -108,7 +130,23 @@ export function ResumePdf({ resume }: { resume: Resume }) {
         <Text style={s.name}>
           {r.contact.firstName} {r.contact.lastName}
         </Text>
-        <Text style={s.contact}>{contactLine(r)}</Text>
+        {(() => {
+          const lines = contactLines(r);
+          return (
+            <>
+              {lines.headline && <Text style={s.headlineLine}>{lines.headline}</Text>}
+              {/* Each item is one unit: a line only ever breaks between items, never inside one. */}
+              <View style={s.contact}>
+                {lines.items.map((item, i) => (
+                  <Text key={i}>
+                    {item}
+                    {i < lines.items.length - 1 ? L.contactLine.separator : ""}
+                  </Text>
+                ))}
+              </View>
+            </>
+          );
+        })()}
 
         <Text style={s.heading}>Summary</Text>
         <Text style={s.para}>{r.summary}</Text>
