@@ -70,6 +70,30 @@
   color: var(--text-on-brand);
 }
 
+/* A section's own menu, under its sidebar item (Jobs). */
+.platform-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-on-dark);
+}
+.platform-nav .platform-subnav a {
+  padding: 6px 10px;
+  font-size: var(--text-xs);
+  color: rgba(239, 237, 226, 0.62);
+}
+.platform-nav .platform-subnav a[data-active="true"] {
+  background: rgba(239, 237, 226, 0.1);
+  color: var(--text-on-brand);
+}
+
+/* Menu button: only where the sidebar is a top bar. */
+.nav-toggle {
+  display: none;
+}
+
 .platform-sidebar .sidebar-foot {
   margin-top: auto;
   padding: 12px 10px 0;
@@ -261,6 +285,7 @@
 
 .filter-tabs a {
   padding: 6px 14px;
+  white-space: nowrap;
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
@@ -279,6 +304,70 @@
   background: var(--color-surface);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+}
+
+/* Job list quick filters: two toggles, the rest folded under "More filters". */
+.quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: -8px 0 20px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.quick-filters > a {
+  padding: 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.quick-filters > a[data-active="true"] {
+  background: var(--forest, #26352b);
+  border-color: transparent;
+  color: var(--cream, #f3efe4);
+}
+.more-filters > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 5px 4px;
+}
+.more-filters[open] {
+  flex-basis: 100%;
+}
+.more-filters .filter-tabs {
+  margin: 8px 8px 0 0;
+}
+
+/* Folded side cards on the job page: a one-line summary, the card's own content inside. */
+.fold {
+  margin-bottom: 16px;
+  padding: 14px 20px;
+}
+.fold > summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fold > summary .fold-meta {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.fold[open] > summary {
+  margin-bottom: 12px;
+}
+.fold > .form-card {
+  border: 0;
+  padding: 0;
+  margin: 0 !important;
+  background: none;
+  box-shadow: none;
 }
 
 /* --- CSV file input (import wizard) --- */
@@ -475,7 +564,7 @@ input[type="file"].file-input::file-selector-button:hover {
   .notif-panel {
     left: 16px;
     right: 16px;
-    top: 76px;
+    top: 64px;
     bottom: auto;
     width: auto;
     max-height: calc(100vh - 100px);
@@ -486,20 +575,70 @@ input[type="file"].file-input::file-selector-button:hover {
   .platform-shell {
     flex-direction: column;
   }
+  /* A slim top bar: brand, bell, menu button. The links open as a panel under it. */
   .platform-sidebar {
     width: 100%;
     height: auto;
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 30;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    order: 3;
+    width: 40px;
+    height: 40px;
+    margin-left: 4px;
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-on-brand);
+    cursor: pointer;
+  }
+  .platform-sidebar .sidebar-foot {
+    order: 2;
+    margin-left: auto;
   }
   .platform-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: none;
+  }
+  .platform-nav[data-open="true"] {
+    display: flex;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 31;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px 16px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    background: var(--color-surface-brand);
+    border-top: 1px solid var(--border-on-dark);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  }
+  .platform-nav[data-open="true"] a {
+    padding: 12px;
+  }
+  .platform-nav[data-open="true"] .platform-subnav a {
+    padding: 9px 10px;
+  }
+  .nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: rgba(0, 0, 0, 0.25);
   }
   .platform-sidebar .brand {
-    padding-bottom: 4px;
+    padding: 0;
+    font-size: var(--text-lg);
   }
   /* Keep the notification bell reachable on small screens; hide the
      footer text labels only. */
@@ -515,10 +654,209 @@ input[type="file"].file-input::file-selector-button:hover {
   .platform-main {
     padding: 24px 20px 56px;
   }
+  /* Filter tabs: one row that scrolls sideways. */
+  .filter-tabs {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .filter-tabs a {
+    flex-shrink: 0;
+  }
+  /* The job list as cards: score on the left, the rest stacked beside it. */
+  .table-scroll:has(.job-table) {
+    overflow: visible;
+  }
+  .table-scroll .job-table,
+  .job-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .job-table thead,
+  .job-table .c-lane {
+    display: none;
+  }
+  .job-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 6px;
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .job-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    grid-column: 2;
+  }
+  .job-table td[data-empty="true"] {
+    display: none;
+  }
+  .job-table td.c-score {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    min-width: 72px;
+  }
+  .job-table td.c-pay,
+  .job-table td.c-pace,
+  .job-table td.c-posted,
+  .job-table td.c-status {
+    display: inline-block;
+  }
+  /* Two stat tiles per row in the app (site.css stacks the marketing site's to one). */
+  .platform-main .stat-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
   .form-grid {
     grid-template-columns: 1fr;
   }
   .form-grid .span-2 {
     grid-column: span 1;
   }
+}
+
+/* Tailoring workspace: the posting and chat beside the résumé on wide screens, stacked on narrow ones. */
+.tailor-workspace {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.tailor-aside {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+@media (min-width: 1100px) {
+  .tailor-workspace {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+  .tailor-aside {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+}
+
+/* PDF preview over the editor; full screen on phones. */
+.pdf-dialog {
+  width: min(960px, calc(100vw - 32px));
+  height: calc(100vh - 48px);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: inherit;
+}
+.pdf-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.pdf-dialog::backdrop {
+  background: rgba(20, 24, 20, 0.55);
+}
+.pdf-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pdf-dialog-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+@media (max-width: 860px) {
+  .pdf-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+}
+
+/* Job pages use the full width: the content is two columns there. */
+.platform-main:has(.wide-page) {
+  max-width: 1560px;
+}
+/* Job page: on a phone the next-step card comes first; on a wide screen it sits top right. */
+.job-layout {
+  display: grid;
+  gap: 0 24px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "steps" "main" "side";
+  align-items: start;
+}
+.job-main,
+.job-side {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+.job-main {
+  grid-area: main;
+}
+.job-side {
+  grid-area: side;
+}
+.job-layout > .job-steps {
+  grid-area: steps;
+}
+@media (min-width: 1200px) {
+  .job-layout {
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "main steps" "main side";
+  }
+}
+.job-steps {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+  border: 2px solid var(--forest);
+}
+.job-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.job-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.job-step-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.job-step[data-done="true"] .job-step-mark {
+  background: var(--positive);
+  border-color: var(--positive);
+  color: #fff;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

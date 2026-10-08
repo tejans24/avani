@@ -8,11 +8,15 @@
     "start": "next start",
     "lint": "next lint",
     "db:seed": "tsx prisma/seed.ts",
+    "jobs:refresh": "tsx scripts/refresh-jobs.ts",
+    "jobs:verify-boards": "tsx scripts/verify-job-boards.ts",
+    "jobs:discover-contractors": "tsx scripts/discover-contractors.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@clerk/nextjs": "^6.39.6",
     "@hookform/resolvers": "^5.4.0",
     "@prisma/adapter-pg": "^7.8.0",
