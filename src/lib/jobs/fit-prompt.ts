@@ -84,7 +84,10 @@ Rules
 * Distinguish what gets a screen (gates, keywords, referral) from what gets an offer (the conversation, the person above the candidate, level fit).
 
 Output
-Return the required JSON. Its fields follow this layout, in this order: VERDICT and one-line reason, screen odds, GATES, REAL JOB, FIT TABLE, CRITERIA, PAY, TAILORING (null unless the verdict is APPLY or APPLY, LOW EFFORT), FORM FIELDS, NEXT, PACE, COVER LETTER (needed or not, one line why).
+Return the required JSON. Its fields follow this layout, in this order: VERDICT and one-line reason, screen odds, GATES, REAL JOB, FIT TABLE, CRITERIA, PAY, TAILORING (null unless the verdict is APPLY or APPLY, LOW EFFORT), FORM FIELDS, NEXT, PACE, COVER LETTER (needed or not, one line why), BRIEF.
+* The candidate reads the verdict first, on a phone, between other things. Write for scanning: short points, one idea each, no paragraph anywhere.
+* BRIEF: the verdict's explanation as points of at most about 20 words each. fits: what lines up (two to four points). conflicts: each conflict with the candidate's wants or a gate, named directly (none if none). decidesOffer: what decides the offer (one to three points). quickVersion: the steps to apply, in order (for APPLY, LOW EFFORT the fifteen-minute version; for APPLY the main steps; empty otherwise).
+* verdictDetail: one sentence at most; the brief carries the detail. Pace why: one short line.
 * Quotes from the posting (real job quotes, gate and criteria evidence when quoting) are copied exactly; the app checks them against the posting text.
 * In the fit table, cite résumé bullets by their id in bulletIds; COVERED needs at least one.
 * For a dealbreaker in the criteria table, MET means the dealbreaker is absent.

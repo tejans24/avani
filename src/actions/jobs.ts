@@ -11,6 +11,7 @@ import { addDetectedQuestions } from "@/actions/answers";
 import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting, dedupeKey } from "@/lib/jobs/dedupe";
+import { evaluatePosting } from "@/lib/jobs/evaluate";
 import { UNEVALUATED_MATCH, verdictBucket, viewWhere } from "@/lib/jobs/views";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
 import { ingestPostings, refreshBoard, rescorePosting } from "@/lib/jobs/refresh";
@@ -577,35 +578,3 @@ export async function evaluateNextMatches(limit = 4): Promise<ActionResult> {
   }
 }
 
-async function evaluatePosting(postingId: string): Promise<void> {
-  const posting = await db.jobPosting.findUnique({ where: { id: postingId }, include: { company: { select: { name: true } } } });
-  if (!posting) throw new Error("Job not found");
-  const master = await db.resumeMaster.findFirst({ orderBy: { version: "desc" }, select: { data: true } });
-  if (!master) throw new Error("Import your master résumé first (Jobs → Résumé) so the analysis can compare it.");
-  const { resumeSchema } = await import("@/lib/jobs/resume-schema");
-  const { analyzeFitWithClaude } = await import("@/lib/jobs/fit-ai");
-  const now = new Date();
-  const analysis = await analyzeFitWithClaude({
-    master: resumeSchema.parse(master.data),
-    posting: {
-      title: posting.title,
-      companyName: posting.company.name,
-      location: posting.location,
-      workMode: posting.workMode as WorkMode,
-      compMinCents: posting.compMinCents,
-      compMaxCents: posting.compMaxCents,
-      postedAt: posting.postedAt,
-      url: posting.url,
-      filterFailures: posting.filterFailures,
-      descriptionText: posting.descriptionText,
-      lane: posting.lane as Lane,
-      tailoringNotes: posting.tailoringNotes,
-    },
-    breakdown: posting.scoreBreakdown as unknown as BreakdownEntry[],
-    now,
-  });
-  await db.jobPosting.update({
-    where: { id: postingId },
-    data: { fitAnalysis: analysis as unknown as Prisma.InputJsonValue, fitAnalyzedAt: now },
-  });
-}

@@ -16,6 +16,9 @@ import type { z } from "zod";
 /** Room for thinking plus the longest answer (the evaluator's report). */
 export const STRUCTURED_MAX_TOKENS = 64_000;
 
+/** What a caller can show while Claude works: its reasoning summary, then how much of the answer is written. */
+export type ClaudeProgress = { type: "thinking"; text: string } | { type: "writing"; chars: number };
+
 export class ClaudeRefusedError extends Error {}
 export class ClaudeIncompleteError extends Error {}
 
@@ -27,22 +30,28 @@ export async function claudeStructured<S extends z.ZodType>(
     system: string | Anthropic.Beta.BetaTextBlockParam[];
     messages: Anthropic.Beta.BetaMessageParam[];
   },
-  errors: { refused: string; incomplete: string }
+  errors: { refused: string; incomplete: string },
+  onProgress?: (p: ClaudeProgress) => void
 ): Promise<z.infer<S>> {
   // Sent as a plain JSON schema; parsed here, after the stop reason is checked.
   const { parse, ...format } = betaZodOutputFormat(schema);
   const client = new Anthropic();
-  const message = await client.beta.messages
-    .stream({
-      model: req.model,
-      max_tokens: STRUCTURED_MAX_TOKENS,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: req.effort, format },
-      system: req.system,
-      messages: req.messages,
-    })
-    .finalMessage();
+  const stream = client.beta.messages.stream({
+    model: req.model,
+    max_tokens: STRUCTURED_MAX_TOKENS,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    // A readable summary of the reasoning only when someone is watching; it's billed the same either way.
+    ...(onProgress ? { thinking: { type: "adaptive" as const, display: "summarized" as const } } : {}),
+    output_config: { effort: req.effort, format },
+    system: req.system,
+    messages: req.messages,
+  });
+  if (onProgress) {
+    stream.on("thinking", (delta) => delta && onProgress({ type: "thinking", text: delta }));
+    stream.on("text", (_delta, snapshot) => onProgress({ type: "writing", chars: snapshot.length }));
+  }
+  const message = await stream.finalMessage();
 
   if (message.stop_reason === "refusal") throw new ClaudeRefusedError(errors.refused);
   if (message.stop_reason === "max_tokens") throw new ClaudeIncompleteError(errors.incomplete);

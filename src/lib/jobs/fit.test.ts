@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { postingSiteLabel, postingSourceText } from "@/lib/jobs/display";
-import { candidateFacts, codeChecks, paceFromBreakdown, paceOf, codeChecksForPrompt, finalizeFit, personalGates, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
+import { briefOf, candidateFacts, codeChecks, paceFromBreakdown, paceOf, codeChecksForPrompt, finalizeFit, personalGates, quoteInText, type FitOutput, type FitPostingFacts } from "@/lib/jobs/fit";
 import { fitSystemPrompt } from "@/lib/jobs/fit-prompt";
 import { resumeSchema } from "@/lib/jobs/resume-schema";
 import { COMP_BANDS, PAY } from "@/lib/jobs/scoring-config";
@@ -40,6 +40,7 @@ const output = (over: Partial<FitOutput> = {}): FitOutput => ({
   next: [],
   pace: { rating: "CALM", why: "Mature program." },
   coverLetter: { needed: false, why: "Not asked for." },
+  brief: { fits: ["Owns the platform."], conflicts: [], decidesOffer: ["The interview."], quickVersion: ["Submit."] },
   ...over,
 });
 
@@ -175,5 +176,19 @@ describe("pace", () => {
     const prompt = fitSystemPrompt();
     expect(prompt).toMatch(/calm, predictable pace that pays well/);
     expect(prompt).toMatch(/coverLetter\.needed/);
+  });
+});
+
+describe("brief", () => {
+  it("uses Claude's points, and splits an older paragraph into sentences", () => {
+    const fit = finalizeFit(output(), ctx());
+    expect(briefOf(fit).fits).toEqual(["Owns the platform."]);
+    const { brief: _b, ...legacy } = fit;
+    legacy.verdictDetail = "Close match on Bedrock. Two conflicts. First, pay is $150K. Second, 2 years of LLM work.";
+    expect(briefOf(legacy).fits).toEqual(["Close match on Bedrock.", "Two conflicts.", "First, pay is $150K.", "Second, 2 years of LLM work."]);
+  });
+
+  it("the evaluator is asked to write for scanning", () => {
+    expect(fitSystemPrompt()).toMatch(/no paragraph anywhere/);
   });
 });

@@ -102,12 +102,19 @@ export const fitOutputSchema = z.object({
   pace: z.object({ rating: z.enum(PACES), why: z.string() }),
   /** Whether this application needs a cover letter at all. */
   coverLetter: z.object({ needed: z.boolean(), why: z.string() }),
+  /** The verdict's explanation as short points, so it reads at a glance. */
+  brief: z.object({
+    fits: z.array(z.string()),
+    conflicts: z.array(z.string()),
+    decidesOffer: z.array(z.string()),
+    quickVersion: z.array(z.string()),
+  }),
 });
 export type FitOutput = z.infer<typeof fitOutputSchema>;
 
 /** Analyses saved before pace and coverLetter existed lack them. */
-export type FitAnalysis = Omit<FitOutput, "pace" | "coverLetter"> &
-  Partial<Pick<FitOutput, "pace" | "coverLetter">> & {
+export type FitAnalysis = Omit<FitOutput, "pace" | "coverLetter" | "brief"> &
+  Partial<Pick<FitOutput, "pace" | "coverLetter" | "brief">> & {
   /** Quotes in realJob.quotes not found in the posting text, by index. */
   unverifiedQuotes: number[];
   /** The app's own location and pay checks, shown beside the verdict. */
@@ -345,6 +352,12 @@ export function fakeFitOutput(p: FitPostingFacts, breakdown: BreakdownEntry[], b
     next: ["Submit."],
     pace: paceFromBreakdown(breakdown),
     coverLetter: { needed: false, why: "Fake evaluation: the posting doesn't ask for one." },
+    brief: {
+      fits: positive.slice(0, 2).map((b) => b.label),
+      conflicts: apply ? [] : p.filterFailures.slice(0, 2),
+      decidesOffer: apply ? ["The technical interview."] : [],
+      quickVersion: apply ? ["Swap the header to the posting's title.", "Submit."] : [],
+    },
   };
 }
 
@@ -360,4 +373,17 @@ export function paceFromBreakdown(breakdown: BreakdownEntry[]): { rating: Pace; 
 /** The pace to show: Claude's rating when the job was evaluated, else what the score saw. */
 export function paceOf(fit: FitAnalysis | null, breakdown: BreakdownEntry[]): { rating: Pace; why: string } {
   return fit?.pace ?? paceFromBreakdown(breakdown);
+}
+
+/**
+ * The verdict's explanation as points: Claude's brief when it has one, else
+ * (analyses saved before the brief existed) the old paragraph split into sentences.
+ */
+export function briefOf(fit: FitAnalysis): NonNullable<FitAnalysis["brief"]> {
+  if (fit.brief) return fit.brief;
+  const sentences = fit.verdictDetail
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return { fits: sentences, conflicts: [], decidesOffer: [], quickVersion: [] };
 }

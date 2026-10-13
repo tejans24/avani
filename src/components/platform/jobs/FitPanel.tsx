@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { analyzeJobFit } from "@/actions/jobs";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
-import { FIT_VERDICT_LABEL, PACE_LABEL, SCREEN_ODDS_LABEL, type FitAnalysis, type FitVerdict, type Pace } from "@/lib/jobs/fit";
-import { ActionMessage, useAction } from "./useAction";
+import { FIT_VERDICT_LABEL, PACE_LABEL, briefOf, SCREEN_ODDS_LABEL, type FitAnalysis, type FitVerdict, type Pace } from "@/lib/jobs/fit";
+import { EvaluateLog, useEvaluateStream } from "./EvaluateProgress";
+import { ActionMessage } from "./useAction";
 
 const VERDICT_TONE: Record<FitVerdict, "positive" | "caution" | "neutral" | "critical"> = {
   APPLY: "positive",
@@ -59,12 +59,34 @@ function Section({ title, children, open = true }: { title: string; children: Re
   );
 }
 
+/** The verdict's explanation as short labelled lists, so it reads at a glance. */
+function Brief({ brief }: { brief: ReturnType<typeof briefOf> }) {
+  const groups: { title: string; items: string[]; color?: string; ordered?: boolean }[] = [
+    { title: "Why it fits", items: brief.fits },
+    { title: "Conflicts", items: brief.conflicts, color: "var(--caution)" },
+    { title: "What decides the offer", items: brief.decidesOffer },
+    { title: "The quick version", items: brief.quickVersion, ordered: true },
+  ];
+  const shown = groups.filter((g) => g.items.length > 0);
+  if (!shown.length) return null;
+  return (
+    <div className="fit-brief" data-testid="fit-brief">
+      {shown.map((g) => (
+        <div key={g.title} style={{ display: "grid", gap: 4, alignContent: "start" }}>
+          <strong style={{ ...small, color: g.color ?? "inherit" }}>{g.title}</strong>
+          <List items={g.items} ordered={g.ordered} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function List({ items, ordered }: { items: string[]; ordered?: boolean }) {
   const Tag = ordered ? "ol" : "ul";
   return (
     <Tag style={{ ...small, margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
-      {items.map((t) => (
-        <li key={t}>{t}</li>
+      {items.map((t, i) => (
+        <li key={i}>{t}</li>
       ))}
     </Tag>
   );
@@ -92,9 +114,10 @@ export function FitPanel({
   /** Not remote: Claude waits to be asked. */
   notRemote?: boolean;
 }) {
-  const { pending, error, run } = useAction();
+  const evaluation = useEvaluateStream(postingId);
+  const { running: pending, error } = evaluation;
   const started = useRef(false);
-  const analyze = () => run(() => analyzeJobFit(postingId));
+  const analyze = () => void evaluation.start();
 
   useEffect(() => {
     if (!autoRun || analysis || started.current) return;
@@ -103,7 +126,8 @@ export function FitPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, analysis]);
 
-  const a = analysis;
+  // A fresh result from this page beats the one the page loaded with (until the refresh catches up).
+  const a = evaluation.result ?? analysis;
   return (
     <div className="form-card" style={{ marginBottom: 28, display: "grid", gap: 16 }} data-testid="fit-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -122,11 +146,12 @@ export function FitPanel({
         </div>
       </div>
       <ActionMessage error={error} />
+      {pending && <EvaluateLog startedAt={evaluation.startedAt} thinking={evaluation.thinking} chars={evaluation.chars} done={evaluation.done} />}
 
       {!a && (
         <p style={{ ...small, margin: 0, color: "var(--text-secondary)" }}>
           {pending
-            ? "Claude is reading the posting against your criteria and résumé. This takes a minute or two."
+            ? "Claude's reasoning shows above as it works. Your contact details are never sent."
             : aiEnabled && notRemote
               ? "This job isn't remote, so Claude doesn't read it unless you ask. Evaluate to get its read."
               : aiEnabled
@@ -153,9 +178,17 @@ export function FitPanel({
                 </>
               )}
             </span>
-            {a.verdictDetail && <p style={{ ...small, margin: 0 }}>{a.verdictDetail}</p>}
-            {a.watchTerms.length > 0 && <p style={{ ...small, margin: 0 }}>Alert on: {a.watchTerms.join(", ")}</p>}
-            {a.certToGet && <p style={{ ...small, margin: 0 }}>Cert to get: {a.certToGet}</p>}
+            <Brief brief={briefOf(a)} />
+            {a.watchTerms.length > 0 && (
+              <p style={{ ...small, margin: 0 }}>
+                <strong>Alert on:</strong> {a.watchTerms.join(", ")}
+              </p>
+            )}
+            {a.certToGet && (
+              <p style={{ ...small, margin: 0 }}>
+                <strong>Cert to get:</strong> {a.certToGet}
+              </p>
+            )}
             <p style={{ ...muted, margin: 0 }}>
               App checks: location <Status s={a.codeChecks.location.status} /> ({a.codeChecks.location.note}) · pay <Status s={a.codeChecks.pay.status} /> (
               {a.codeChecks.pay.note})

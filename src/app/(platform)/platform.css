@@ -341,6 +341,14 @@
   margin: 8px 8px 0 0;
 }
 
+/* The verdict's explanation: short labelled lists, two columns when there's room. */
+.fit-brief {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin: 4px 0;
+}
+
 /* Folded side cards on the job page: a one-line summary, the card's own content inside. */
 .fold {
   margin-bottom: 16px;

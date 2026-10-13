@@ -132,6 +132,7 @@ describe("nothing personal reaches Claude", () => {
       next: [],
       pace: { rating: "UNKNOWN", why: "" },
       coverLetter: { needed: false, why: "" },
+      brief: { fits: [], conflicts: [], decidesOffer: [], quickVersion: [] },
     };
     await analyzeFitWithClaude({
       master,

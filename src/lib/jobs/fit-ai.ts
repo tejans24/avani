@@ -1,4 +1,4 @@
-import { claudeStructured } from "@/lib/jobs/claude-structured";
+import { claudeStructured, type ClaudeProgress } from "@/lib/jobs/claude-structured";
 
 import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import { candidateFacts, codeChecks, codeChecksForPrompt, fakeFitOutput, finalizeFit, fitOutputSchema, postingMetadata, type FitAnalysis, type FitPostingFacts } from "@/lib/jobs/fit";
@@ -24,6 +24,8 @@ export async function analyzeFitWithClaude(input: {
   posting: FitPostingFacts & { lane: Lane; tailoringNotes: string | null };
   breakdown: BreakdownEntry[];
   now: Date;
+  /** Live progress for the page that's waiting (Claude's reasoning summary, then the report being written). */
+  onProgress?: (p: ClaudeProgress) => void;
 }): Promise<FitAnalysis> {
   const bulletIds = new Set(
     [...input.master.experience.flatMap((e) => e.bullets), ...input.master.projects.flatMap((p) => p.bullets)].map((b) => b.id)
@@ -33,6 +35,8 @@ export async function analyzeFitWithClaude(input: {
   const ctx = { posting: input.posting, bulletIds, now: input.now, candidate };
 
   if (process.env.TAILOR_MODE === "fake") {
+    input.onProgress?.({ type: "thinking", text: "Fake evaluation: reading the posting against the criteria." });
+    input.onProgress?.({ type: "writing", chars: 1200 });
     return finalizeFit(fakeFitOutput(input.posting, input.breakdown, [...bulletIds]), { ...ctx, model: "fake" });
   }
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Set ANTHROPIC_API_KEY to evaluate jobs with Claude.");
@@ -66,7 +70,8 @@ export async function analyzeFitWithClaude(input: {
         },
       ],
     },
-    { refused: "Claude declined to evaluate this posting.", incomplete: "The evaluation came back incomplete. Try again." }
+    { refused: "Claude declined to evaluate this posting.", incomplete: "The evaluation came back incomplete. Try again." },
+    input.onProgress
   );
   return finalizeFit(output, { ...ctx, model: FIT_MODEL });
 }
