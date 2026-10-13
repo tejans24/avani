@@ -10,7 +10,7 @@ import { BENEFITS, type BenefitKey } from "@/lib/jobs/benefits";
 import { addDetectedQuestions } from "@/actions/answers";
 import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
-import { canDeletePosting } from "@/lib/jobs/dedupe";
+import { canDeletePosting, dedupeKey } from "@/lib/jobs/dedupe";
 import { UNEVALUATED_MATCH, verdictBucket, viewWhere } from "@/lib/jobs/views";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
 import { ingestPostings, refreshBoard, rescorePosting } from "@/lib/jobs/refresh";
@@ -357,6 +357,17 @@ export async function captureJob(input: z.input<typeof captureSchema>): Promise<
     const c = parsed.data;
     const url = canonicalJobUrl(c.url);
     const now = new Date();
+    // Adding a job by hand overrides an earlier delete: drop its tombstones
+    // (this URL, and the same title/company/location from any source).
+    // Refreshes keep honoring deletes; the board's copy now merges into this one.
+    const restored = await db.jobDismissal.deleteMany({
+      where: {
+        OR: [
+          { source: "MANUAL", sourceJobId: url },
+          { dedupeKey: dedupeKey({ title: c.title, companyName: c.companyName, location: c.location }) },
+        ],
+      },
+    });
     const report = await ingestPostings(
       [
         {
@@ -388,7 +399,7 @@ export async function captureJob(input: z.input<typeof captureSchema>): Promise<
       const hasMaster = await db.resumeMaster.count();
       if (hasMaster) await addDetectedQuestions(savedId, c.questions);
     }
-    if (report.created[0]) return { ok: true, id: report.created[0].id };
+    if (report.created[0]) return { ok: true, id: report.created[0].id, ...(restored.count ? { note: "You'd deleted this job before; it's back." } : {}) };
     const existing = [...report.seenPostingIds][0];
     if (existing) return { ok: true, id: existing, note: "You already have this job, so it opened the existing one." };
     if (report.dismissed) return { ok: false, error: "You deleted this job earlier, so it wasn't added again." };

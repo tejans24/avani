@@ -94,6 +94,7 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
 
 test("a deleted posting stays deleted when its board refreshes", async ({ page }) => {
   const id = await postingId("Founding Engineer");
+  const [deleted] = await queryRows(`SELECT title, location FROM "JobPosting" WHERE id = $1`, [id]);
   await page.goto(`/jobs/${id}`);
   page.once("dialog", (d) => d.accept());
   await page.getByTestId("job-steps").getByRole("button", { name: "Delete Founding Engineer" }).click();
@@ -106,6 +107,23 @@ test("a deleted posting stays deleted when its board refreshes", async ({ page }
 
   const rows = await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Founding Engineer'`);
   expect(rows).toHaveLength(0);
+
+  // Adding it again by hand is deliberate, so it comes back; the board's copy then merges into it.
+  await page.goto("/jobs/capture");
+  await page.getByLabel("Link to the posting").fill("https://jobs.example.org/tidewater/founding-engineer");
+  await page.getByLabel("Job text").fill("Founding Engineer at Tidewater Climate. Build the grid data platform from scratch. Remote, US.");
+  await page.getByRole("button", { name: "Use this text" }).click();
+  await page.getByLabel("Title").fill(deleted.title as string);
+  await page.getByLabel("Company").fill("Tidewater Climate");
+  await page.getByLabel("Location").fill(deleted.location as string);
+  await page.getByRole("button", { name: "Save job" }).click();
+  await page.waitForURL(/\/jobs\/[a-z0-9]+$/);
+  await expect(page.getByRole("heading", { name: "Founding Engineer" })).toBeVisible();
+  await page.goto("/jobs/boards");
+  await ashby.getByRole("button", { name: "Refresh now" }).click();
+  await expect(ashby.getByText(/0 new/)).toBeVisible();
+  const [{ n }] = await queryRows(`SELECT count(*)::int AS n FROM "JobPosting" WHERE title = 'Founding Engineer'`);
+  expect(n).toBe(1);
 });
 
 test("paste capture adds a job; capturing a duplicate opens the existing one", async ({ page }) => {
