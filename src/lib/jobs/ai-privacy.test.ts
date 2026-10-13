@@ -9,20 +9,24 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const sent: unknown[] = [];
 let nextOutput: unknown = null;
+let nextStop = "end_turn";
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     beta = {
       messages: {
-        parse: async (args: unknown) => {
+        stream: (args: unknown) => {
           sent.push(args);
-          return { stop_reason: "end_turn", parsed_output: nextOutput };
+          const text = typeof nextOutput === "string" ? nextOutput : JSON.stringify(nextOutput);
+          return { finalMessage: async () => ({ stop_reason: nextStop, content: [{ type: "text", text }] }) };
         },
       },
     };
   },
 }));
 
+import { z } from "zod";
+import { ClaudeIncompleteError, ClaudeRefusedError, STRUCTURED_MAX_TOKENS, claudeStructured } from "@/lib/jobs/claude-structured";
 import { resumeSchema } from "@/lib/jobs/resume-schema";
 import { draftAnswersWithClaude, jobChatWithClaude } from "@/lib/jobs/answers-ai";
 import { analyzeFitWithClaude } from "@/lib/jobs/fit-ai";
@@ -126,6 +130,8 @@ describe("nothing personal reaches Claude", () => {
       tailoring: null,
       formFields: [],
       next: [],
+      pace: { rating: "UNKNOWN", why: "" },
+      coverLetter: { needed: false, why: "" },
     };
     await analyzeFitWithClaude({
       master,
@@ -197,5 +203,39 @@ describe("nothing personal reaches Claude", () => {
     for (const v of ["jordan", "quill", "jordan.quill@example.com", "410-555-0199", "5550199", "towson, md", "linkedin.com/in/jquill"]) {
       expect(body.toLowerCase(), `request contained "${v}"`).not.toContain(v);
     }
+  });
+});
+
+describe("Claude replies that can't be used", () => {
+  const schema = z.object({ reply: z.string() });
+  const req = { model: "m", effort: "low" as const, system: "s", messages: [{ role: "user" as const, content: "hi" }] };
+  const errors = { refused: "declined", incomplete: "cut off" };
+
+  it("streams with room for thinking and a long answer", async () => {
+    nextStop = "end_turn";
+    nextOutput = { reply: "ok" };
+    await expect(claudeStructured(schema, req, errors)).resolves.toEqual({ reply: "ok" });
+    expect((sent.at(-1) as { max_tokens: number }).max_tokens).toBe(STRUCTURED_MAX_TOKENS);
+  });
+
+  it("a reply cut off by the output limit says so instead of failing to parse", async () => {
+    nextStop = "max_tokens";
+    nextOutput = '{"reply": "half a sente';
+    await expect(claudeStructured(schema, req, errors)).rejects.toThrow(new ClaudeIncompleteError("cut off"));
+  });
+
+  it("broken or off-schema JSON is reported the same way", async () => {
+    nextStop = "end_turn";
+    nextOutput = '{"reply": "unterminated';
+    await expect(claudeStructured(schema, req, errors)).rejects.toThrow("cut off");
+    nextOutput = { other: 1 };
+    await expect(claudeStructured(schema, req, errors)).rejects.toThrow("cut off");
+  });
+
+  it("a refusal is its own error", async () => {
+    nextStop = "refusal";
+    nextOutput = "";
+    await expect(claudeStructured(schema, req, errors)).rejects.toBeInstanceOf(ClaudeRefusedError);
+    nextStop = "end_turn";
   });
 });

@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { claudeStructured } from "@/lib/jobs/claude-structured";
 import { z } from "zod";
 
 import { scrubPersonal, type Contact } from "@/lib/jobs/ai-payload";
@@ -104,19 +103,16 @@ export async function extractJobWithClaude(input: { pageTitle?: string; text: st
     fields = heuristic(pageTitle, text);
   } else {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error("Set ANTHROPIC_API_KEY to fill details with Claude.");
-    const client = new Anthropic();
-    const response = await client.beta.messages.parse({
-      model: CAPTURE_MODEL,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "low", format: betaZodOutputFormat(captureExtractSchema) },
-      system: SYSTEM,
-      messages: [{ role: "user", content: `Page title: ${pageTitle ?? "(none)"}\n\nPage text:\n${text}` }],
-    });
-    if (response.stop_reason === "refusal") throw new Error("Claude declined to read this page. Fill the fields by hand.");
-    if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new Error("Couldn't read the page fully. Try again or fill by hand.");
-    fields = response.parsed_output;
+    fields = await claudeStructured(
+      captureExtractSchema,
+      {
+        model: CAPTURE_MODEL,
+        effort: "low",
+        system: SYSTEM,
+        messages: [{ role: "user", content: `Page title: ${pageTitle ?? "(none)"}\n\nPage text:\n${text}` }],
+      },
+      { refused: "Claude declined to read this page. Fill the fields by hand.", incomplete: "Couldn't read the page fully. Try again or fill by hand." }
+    );
   }
 
   const warnings = checkExtract(fields, text);

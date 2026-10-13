@@ -1,5 +1,5 @@
+import { claudeStructured } from "@/lib/jobs/claude-structured";
 import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
 import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import type { FitAnalysis } from "@/lib/jobs/fit";
@@ -55,7 +55,8 @@ ${styleRulesForPrompt()}`;
 
 const FEDERAL = `This is a government-contractor role. Where the master content supports it, use federal vocabulary (mission, program, agency, stakeholders, compliance, modernization, period of performance) without adding facts.`;
 
-export class TailorRefusedError extends Error {}
+/** A refusal from Claude while tailoring (the shared ClaudeRefusedError). */
+export { ClaudeRefusedError as TailorRefusedError } from "@/lib/jobs/claude-structured";
 
 /** The evaluation's tailoring plan, as advice the rules still win over. */
 export function fitPlanText(plan: FitAnalysis["tailoring"]): string | null {
@@ -95,33 +96,26 @@ export async function tailorWithClaude(input: {
   const plan = planRaw ? scrubPersonal(planRaw, guardedContact(input.master)) : null;
   if (plan) assertNoPersonalData(plan, guardedContact(input.master));
 
-  const client = new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: TAILOR_MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "high", format: betaZodOutputFormat(tailorOutputSchema) },
-    system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-    messages: [
-      {
-        role: "user",
-        content: [
-          // Identical for every posting: cached after the first tailoring run.
-          { type: "text", text: `Master résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
-          { type: "text", text: `Length: the finished résumé must fit ${maxResumePages(input.posting.lane)} pages; choose fewer bullets in older roles to get there.\n\n${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
-        ],
-      },
-    ],
-  });
-
-  if (response.stop_reason === "refusal") {
-    throw new TailorRefusedError("Claude declined to tailor this posting. Use Quick tailor or edit by hand.");
-  }
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) {
-    throw new Error("Tailoring came back incomplete. Try again.");
-  }
-  return docFromOutput(input.master, response.parsed_output, "claude");
+  const output = await claudeStructured(
+    tailorOutputSchema,
+    {
+      model: TAILOR_MODEL,
+      effort: "high",
+      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            // Identical for every posting: cached after the first tailoring run.
+            { type: "text", text: `Master résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
+            { type: "text", text: `Length: the finished résumé must fit ${maxResumePages(input.posting.lane)} pages; choose fewer bullets in older roles to get there.\n\n${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
+          ],
+        },
+      ],
+    },
+    { refused: "Claude declined to tailor this posting. Use Quick tailor or edit by hand.", incomplete: "Tailoring came back incomplete. Try again." }
+  );
+  return docFromOutput(input.master, output, "claude");
 }
 
 // --- Chat ----------------------------------------------------------------------
@@ -184,19 +178,17 @@ export async function chatAboutResumeWithClaude(input: {
     messages.push({ role: t.role, content: t.text });
   });
 
-  const client = new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: TAILOR_MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: betaZodOutputFormat(tailorChatOutputSchema) },
-    system: [{ type: "text", text: CHAT_SYSTEM, cache_control: { type: "ephemeral" } }],
-    messages,
-  });
-  if (response.stop_reason === "refusal") throw new TailorRefusedError("Claude declined that request. Edit by hand instead.");
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new Error("The reply came back incomplete. Try again.");
-  return response.parsed_output;
+  const output = await claudeStructured(
+    tailorChatOutputSchema,
+    {
+      model: TAILOR_MODEL,
+      effort: "medium",
+      system: [{ type: "text", text: CHAT_SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages,
+    },
+    { refused: "Claude declined that request. Edit by hand instead.", incomplete: "The reply came back incomplete. Try again." }
+  );
+  return output;
 }
 
 /** TAILOR_MODE=fake (tests): "leave out <roleId>" omits that role; anything else gets an echo and no edits. */

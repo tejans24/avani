@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { claudeStructured } from "@/lib/jobs/claude-structured";
 
 import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import { candidateFacts, codeChecks, codeChecksForPrompt, fakeFitOutput, finalizeFit, fitOutputSchema, postingMetadata, type FitAnalysis, type FitPostingFacts } from "@/lib/jobs/fit";
@@ -50,27 +49,24 @@ export async function analyzeFitWithClaude(input: {
   const metadata = scrubPersonal(postingMetadata(input.posting), contact);
   for (const part of [system, checked, metadata]) assertNoPersonalData(part, contact);
 
-  const client = new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: FIT_MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "high", format: betaZodOutputFormat(fitOutputSchema) },
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: [
-      {
-        role: "user",
-        content: [
-          // The same for every posting: cached after the first run.
-          { type: "text", text: `CANDIDATE_PROFILE:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
-          { type: "text", text: `${checked}\n\nPOSTING metadata:\n${metadata}\n\nPOSTING:\n${parts.posting}` },
-        ],
-      },
-    ],
-  });
-
-  if (response.stop_reason === "refusal") throw new Error("Claude declined to evaluate this posting.");
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new Error("The evaluation came back incomplete. Try again.");
-  return finalizeFit(response.parsed_output, { ...ctx, model: FIT_MODEL });
+  const output = await claudeStructured(
+    fitOutputSchema,
+    {
+      model: FIT_MODEL,
+      effort: "high",
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            // The same for every posting: cached after the first run.
+            { type: "text", text: `CANDIDATE_PROFILE:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
+            { type: "text", text: `${checked}\n\nPOSTING metadata:\n${metadata}\n\nPOSTING:\n${parts.posting}` },
+          ],
+        },
+      ],
+    },
+    { refused: "Claude declined to evaluate this posting.", incomplete: "The evaluation came back incomplete. Try again." }
+  );
+  return finalizeFit(output, { ...ctx, model: FIT_MODEL });
 }

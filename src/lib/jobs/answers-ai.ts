@@ -1,5 +1,5 @@
+import { claudeStructured } from "@/lib/jobs/claude-structured";
 import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 
 import { assertNoPersonalData, buildTailoringPayload, guardedContact, scrubPersonal, serializeForAiParts } from "@/lib/jobs/ai-payload";
 import { draftedAnswersSchema, jobChatOutputSchema, type DraftedAnswers, type JobChatOutput } from "@/lib/jobs/answers";
@@ -94,27 +94,25 @@ export async function draftAnswersWithClaude(ctx: Ctx & { questions: string[] })
   const questions = scrubPersonal(ctx.questions.map((q, i) => `${i + 1}. ${q}`).join("\n"), contact);
   assertNoPersonalData(questions, contact);
 
-  const client = new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: ANSWERS_MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: betaZodOutputFormat(draftedAnswersSchema) },
-    system: [{ type: "text", text: DRAFT_SYSTEM, cache_control: { type: "ephemeral" } }],
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: `Résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
-          { type: "text", text: `Posting:\n${parts.posting}${evaluation ? `\n\nThe app's evaluation of this posting:\n${evaluation}` : ""}\n\nQuestions:\n${questions}` },
-        ],
-      },
-    ],
-  });
-  if (response.stop_reason === "refusal") throw new Error("Claude declined to draft these answers.");
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new Error("The drafts came back incomplete. Try fewer questions at once.");
-  return response.parsed_output;
+  const output = await claudeStructured(
+    draftedAnswersSchema,
+    {
+      model: ANSWERS_MODEL,
+      effort: "medium",
+      system: [{ type: "text", text: DRAFT_SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
+            { type: "text", text: `Posting:\n${parts.posting}${evaluation ? `\n\nThe app's evaluation of this posting:\n${evaluation}` : ""}\n\nQuestions:\n${questions}` },
+          ],
+        },
+      ],
+    },
+    { refused: "Claude declined to draft these answers.", incomplete: "The drafts came back incomplete. Try fewer questions at once." }
+  );
+  return output;
 }
 
 export async function jobChatWithClaude(ctx: Ctx & { history: JobChatTurn[]; message: string }): Promise<JobChatOutput> {
@@ -144,17 +142,15 @@ export async function jobChatWithClaude(ctx: Ctx & { history: JobChatTurn[]; mes
     messages.push({ role: t.role, content: t.text });
   });
 
-  const client = new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: ANSWERS_MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: betaZodOutputFormat(jobChatOutputSchema) },
-    system: [{ type: "text", text: CHAT_SYSTEM, cache_control: { type: "ephemeral" } }],
-    messages,
-  });
-  if (response.stop_reason === "refusal") throw new Error("Claude declined that request.");
-  if (response.stop_reason === "max_tokens" || !response.parsed_output) throw new Error("The reply came back incomplete. Try again.");
-  return response.parsed_output;
+  const output = await claudeStructured(
+    jobChatOutputSchema,
+    {
+      model: ANSWERS_MODEL,
+      effort: "medium",
+      system: [{ type: "text", text: CHAT_SYSTEM, cache_control: { type: "ephemeral" } }],
+      messages,
+    },
+    { refused: "Claude declined that request.", incomplete: "The reply came back incomplete. Try again." }
+  );
+  return output;
 }
