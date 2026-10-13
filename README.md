@@ -29,6 +29,11 @@ npm run db:seed            # settings, S-corp category chart, compliance calenda
 npm run dev                # http://localhost:3000
 ```
 
+After pulling changes: `npm install` (regenerates the Prisma client) and
+`npx prisma migrate dev` (applies new migrations), then restart `npm run dev`.
+An "Unknown argument" error from Prisma means the client is older than the
+schema; a "column does not exist" error means a migration hasn't run.
+
 Tests: `npm test` (unit) · `npm run test:e2e` (Playwright; boots its own server
 on :3100 against `avani_test` with auth bypassed and email/SMS/Mercury faked).
 
@@ -90,7 +95,9 @@ Accounts, plus the scheduled tick.
    `EMAIL_MODE=resend`, `SMS_MODE=twilio`, `MERCURY_MODE=live`, strong `CRON_SECRET`).
 3. `vercel.json` already schedules the tick cron (`*/15 * * * *`). Optionally add a
    healthchecks.io check and set `HEALTHCHECK_PING_URL`.
-4. Run `npx prisma migrate deploy && npm run db:seed` against the production DB once.
+4. Run `npx prisma migrate deploy && npm run db:seed` against the production DB once,
+   and `npm run db:deploy` (`prisma migrate deploy`) after each deploy that adds a
+   migration. The build regenerates the Prisma client itself (`prisma generate`).
 5. In Clerk: restricted sign-up; in Resend: verify your sending domain.
 
 ## Repo map
