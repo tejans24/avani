@@ -17,9 +17,10 @@ export const RESUME_LAYOUT = {
     contactLine: "#3C424B",
     rule: "#26405E",
   },
-  name: { sizePt: 26, bold: true, letterSpacingPt: -0.5, spaceAfterPt: 1 },
+  /** Smaller than the Word file's 26pt: the header shouldn't crowd the page. */
+  name: { sizePt: 22, bold: true, letterSpacingPt: -0.4, spaceAfterPt: 1 },
   /** Headline + contact items joined by "  |  ", with a 1.5pt rule beneath. */
-  contactLine: { sizePt: 9.5, separator: "  |  ", ruleWidthPt: 1.5, ruleGapPt: 4, spaceAfterPt: 4 },
+  contactLine: { sizePt: 9, separator: "  |  ", ruleWidthPt: 1.5, ruleGapPt: 4, spaceAfterPt: 4 },
   sectionHeading: { sizePt: 9.5, bold: true, uppercase: true, letterSpacingPt: 1.4, spaceBeforePt: 7, spaceAfterPt: 3 },
   /** Skills: bold "Group:" then regular text. */
   skillLine: { spaceAfterPt: 1 },

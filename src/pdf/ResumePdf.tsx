@@ -71,6 +71,9 @@ const s = StyleSheet.create({
   roleHeader: { flexDirection: "row", alignItems: "flex-start", marginTop: L.roleHeader.spaceBeforePt, marginBottom: L.roleHeader.spaceAfterPt },
   roleTitle: { fontSize: L.roleHeader.sizePt, fontWeight: 700, color: L.colors.name, flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10 },
   roleDates: { fontSize: L.roleHeader.datesSizePt, color: L.roleHeader.datesColor, flexShrink: 0, textAlign: "right", paddingTop: 1.5 },
+  earlierLabel: { fontSize: L.roleHeader.datesSizePt, fontWeight: 700, color: L.colors.sectionHeading, marginTop: L.roleHeader.spaceBeforePt, marginBottom: 1 },
+  compactRole: { flexDirection: "row", alignItems: "flex-start", marginBottom: 1.5 },
+  compactTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 10 },
   // Word's list: the dot sits slightly in from the margin, text at the 0.25in tab.
   bulletRow: { flexDirection: "row", marginBottom: L.bullet.spaceAfterPt, paddingLeft: 6 },
   bulletDot: { width: L.bullet.indentIn * IN - 6 },
@@ -91,8 +94,8 @@ export function formatPeriods(periods: { start: string; end?: string | null }[])
 
 /** A headline longer than this (a posting's full title) goes on its own line. */
 const LONG_HEADLINE_CHARS = 45;
-/** About how many characters of the 9.5pt contact line fit across the page (Carlito). */
-const CONTACT_LINE_CHARS = 132;
+/** About how many characters of the 9pt contact line fit across the page (Carlito). */
+const CONTACT_LINE_CHARS = 138;
 
 /**
  * What goes under the name: the headline and the contact items, joined by
@@ -124,7 +127,8 @@ export function contactLines(r: Resume): { headline: string | null; items: Conta
     ...plain(c.location),
     ...plain(c.phone),
     ...(c.email.trim() ? [{ text: c.email.trim(), href: `mailto:${c.email.trim()}` }] : []),
-    ...c.links.filter((l) => l.url.trim()).map((l) => ({ text: shortUrl(l.url), href: /^https?:\/\//i.test(l.url.trim()) ? l.url.trim() : `https://${l.url.trim()}` })),
+    // A link shows its label ("LinkedIn") when it has one, else the short address.
+    ...c.links.filter((l) => l.url.trim()).map((l) => ({ text: l.label.trim() || shortUrl(l.url), href: /^https?:\/\//i.test(l.url.trim()) ? l.url.trim() : `https://${l.url.trim()}` })),
     ...plain(c.citizenship),
   ];
   const headline = r.headline?.trim() || null;
@@ -200,7 +204,20 @@ export function ResumePdf({ resume }: { resume: Resume }) {
         )}
 
         <Text style={s.heading}>Experience</Text>
-        {r.experience.map((e) => (
+        {r.experience.map((e, i) =>
+          e.bullets.length === 0 ? (
+            // A role with no bullets (older roles trimmed to fit the page) reads as one compact line,
+            // grouped under "Earlier experience" rather than looking like a header with nothing under it.
+            <View key={e.id} wrap={false}>
+              {i > 0 && r.experience[i - 1].bullets.length > 0 && r.experience.slice(i).every((x) => x.bullets.length === 0) && (
+                <Text style={s.earlierLabel}>Earlier experience</Text>
+              )}
+              <View style={s.compactRole}>
+                <Text style={s.compactTitle}>{[e.title, e.organization, e.location].filter(Boolean).join(", ")}</Text>
+                <Text style={s.roleDates}>{formatPeriods(e.periods)}</Text>
+              </View>
+            </View>
+          ) : (
           <View key={e.id}>
             {/* Keep the role header with its first line. */}
             <View wrap={false}>
@@ -214,7 +231,8 @@ export function ResumePdf({ resume }: { resume: Resume }) {
               <Bullet key={b.id}>{b.text}</Bullet>
             ))}
           </View>
-        ))}
+          )
+        )}
 
         {r.clearance.length > 0 && (
           <>

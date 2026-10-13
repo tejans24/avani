@@ -39,7 +39,7 @@ describe("résumé header", () => {
         { text: "Baltimore, MD" },
         { text: "(410) 555-0100" },
         { text: "jordan.quill@example.com", href: "mailto:jordan.quill@example.com" },
-        { text: "linkedin.com/in/jordan-quill-architect", href: "https://www.linkedin.com/in/jordan-quill-architect" },
+        { text: "LinkedIn", href: "https://www.linkedin.com/in/jordan-quill-architect" },
       ],
     });
   });
@@ -59,11 +59,27 @@ describe("résumé header", () => {
 });
 
 describe("links under the name", () => {
-  it("read short, and still lead to the full address", () => {
+  it("show their label (\"LinkedIn\"), or the short address when there's no label, and lead to the full address", () => {
     expect(shortUrl("https://www.linkedin.com/in/jordan-quill/")).toBe("linkedin.com/in/jordan-quill");
     expect(shortUrl("http://jordanquill.dev/?utm_source=resume")).toBe("jordanquill.dev");
     expect(shortUrl("github.com/jquill")).toBe("github.com/jquill");
-    const r = resumeSchema.parse({ ...base, contact: { ...base.contact, links: [{ label: "Site", url: "jordanquill.dev" }] } });
+    const r = resumeSchema.parse({ ...base, contact: { ...base.contact, links: [{ label: "", url: "jordanquill.dev" }] } });
     expect(contactLines(r).items.at(-1)).toEqual({ text: "jordanquill.dev", href: "https://jordanquill.dev" });
+  });
+});
+
+describe("roles with no bullets", () => {
+  it("render as compact lines under Earlier experience, and the résumé still fits", async () => {
+    const r = resumeSchema.parse({
+      ...base,
+      experience: [
+        ...base.experience,
+        { id: "b", title: "Engineer", organization: "Old Co", periods: [{ start: "2012-01", end: "2014-06" }], bullets: [{ id: "b1", text: "x", skills: [] }] },
+      ],
+    });
+    // Tailoring left the older role with no bullets.
+    const trimmed = { ...r, experience: [r.experience[0], { ...r.experience[1], bullets: [] }] };
+    const buffer = await renderToBuffer(React.createElement(ResumePdf, { resume: trimmed }) as never);
+    expect(pdfPageCount(buffer)).toBe(1);
   });
 });
