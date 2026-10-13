@@ -1,6 +1,6 @@
 import path from "node:path";
 import React from "react";
-import { Document, Font, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Link, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { RESUME_LAYOUT as L } from "@/lib/jobs/resume-layout";
 import type { Resume } from "@/lib/jobs/resume-schema";
 
@@ -42,6 +42,8 @@ const s = StyleSheet.create({
     paddingHorizontal: L.page.marginSideIn * IN,
   },
   name: { fontSize: L.name.sizePt, fontWeight: 700, color: L.colors.name, letterSpacing: L.name.letterSpacingPt, lineHeight: 1.05, marginBottom: L.name.spaceAfterPt },
+  // Clickable, but styled like the rest of the line (it prints the same).
+  contactLink: { color: L.colors.contactLine, textDecoration: "none" },
   headlineLine: { fontSize: L.contactLine.sizePt, color: L.colors.contactLine, marginBottom: 1 },
   contact: {
     flexDirection: "row",
@@ -89,27 +91,55 @@ export function formatPeriods(periods: { start: string; end?: string | null }[])
 
 /** A headline longer than this (a posting's full title) goes on its own line. */
 const LONG_HEADLINE_CHARS = 45;
+/** About how many characters of the 9.5pt contact line fit across the page (Carlito). */
+const CONTACT_LINE_CHARS = 132;
 
 /**
  * What goes under the name: the headline and the contact items, joined by
- * "  |  " as in the owner's résumé, wrapping only between items. A long
- * headline (it matches the posting's title, which can be long) gets its own
- * line above the contact items instead.
+ * "  |  " as in the owner's résumé, on one line when they fit. Otherwise (or
+ * when the headline is a posting's long title) the headline gets its own line
+ * above the contact items. Lines only ever break between items.
  */
-export function contactLines(r: Resume): { headline: string | null; items: string[] } {
+export type ContactItem = { text: string; href?: string };
+
+/**
+ * A link as it reads on the page: no scheme, no "www.", no trailing slash or
+ * tracking query ("linkedin.com/in/jordan-quill"). Still the real address, so
+ * applicant tracking systems and printed copies can use it; the PDF link
+ * goes to the full URL.
+ */
+export function shortUrl(url: string): string {
+  return url
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "");
+}
+
+export function contactLines(r: Resume): { headline: string | null; items: ContactItem[] } {
   const c = r.contact;
-  const items = [c.location, c.phone, c.email, ...c.links.map((l) => l.url.replace(/^https?:\/\//, "")), c.citizenship]
-    .map((x) => x?.trim())
-    .filter((x): x is string => Boolean(x));
+  const plain = (x?: string): ContactItem[] => (x?.trim() ? [{ text: x.trim() }] : []);
+  const items: ContactItem[] = [
+    ...plain(c.location),
+    ...plain(c.phone),
+    ...(c.email.trim() ? [{ text: c.email.trim(), href: `mailto:${c.email.trim()}` }] : []),
+    ...c.links.filter((l) => l.url.trim()).map((l) => ({ text: shortUrl(l.url), href: /^https?:\/\//i.test(l.url.trim()) ? l.url.trim() : `https://${l.url.trim()}` })),
+    ...plain(c.citizenship),
+  ];
   const headline = r.headline?.trim() || null;
   if (!headline) return { headline: null, items };
-  return headline.length > LONG_HEADLINE_CHARS ? { headline, items } : { headline: null, items: [headline, ...items] };
+  // One line when everything fits; otherwise the headline goes on its own line so the contact details stay on one.
+  const oneLine = [headline, ...items.map((i) => i.text)].join(L.contactLine.separator).length;
+  return headline.length > LONG_HEADLINE_CHARS || oneLine > CONTACT_LINE_CHARS
+    ? { headline, items }
+    : { headline: null, items: [{ text: headline }, ...items] };
 }
 
 /** Everything under the name as one string (tests and plain-text uses). */
 export function contactLine(r: Resume): string {
   const { headline, items } = contactLines(r);
-  return [headline, ...items].filter(Boolean).join(L.contactLine.separator);
+  return [headline, ...items.map((i) => i.text)].filter(Boolean).join(L.contactLine.separator);
 }
 
 function Bullet({ children }: { children: string }) {
@@ -139,7 +169,13 @@ export function ResumePdf({ resume }: { resume: Resume }) {
               <View style={s.contact}>
                 {lines.items.map((item, i) => (
                   <Text key={i}>
-                    {item}
+                    {item.href ? (
+                      <Link src={item.href} style={s.contactLink}>
+                        {item.text}
+                      </Link>
+                    ) : (
+                      item.text
+                    )}
                     {i < lines.items.length - 1 ? L.contactLine.separator : ""}
                   </Text>
                 ))}
