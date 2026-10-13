@@ -84,7 +84,8 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
   expect(p.nextActionNote).toMatch(/follow up/i);
 
   await expect(page.getByTestId("job-steps")).toContainText(/Applied \d{4}-\d{2}-\d{2}/);
-  await expect(page.getByRole("button", { name: "Delete" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Delete", exact: true })).toBeDisabled();
+  await expect(page.getByTestId("job-steps").getByRole("button", { name: /^Delete / })).toHaveCount(0);
   await page.getByRole("button", { name: "Archive" }).click();
   await expect(page.getByRole("button", { name: "Restore" })).toBeVisible();
   await page.goto("/jobs?view=archived");
@@ -94,9 +95,8 @@ test("detail explains the score; marking applied logs it, sets a follow-up, and 
 test("a deleted posting stays deleted when its board refreshes", async ({ page }) => {
   const id = await postingId("Founding Engineer");
   await page.goto(`/jobs/${id}`);
-  await openFold(page, "Tracking and notes");
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Delete" }).click();
+  await page.getByTestId("job-steps").getByRole("button", { name: "Delete Founding Engineer" }).click();
   await page.waitForURL("**/jobs");
 
   await page.goto("/jobs/boards");
@@ -256,4 +256,23 @@ test("the job page walks through the steps: skip sends a job to Not for me, and 
   await page.goto(`/jobs/${id}`);
   await steps.getByRole("button", { name: "Undo" }).click();
   await expect(steps.getByRole("button", { name: "Not for me: skip it" })).toBeVisible();
+});
+
+test("delete from the list: one row, or everything under Not for me", async ({ page }) => {
+  await page.goto("/jobs");
+  const row = page.getByTestId("job-row").filter({ hasText: "Senior Software Engineer, Medicaid Modernization" });
+  page.once("dialog", (d) => d.accept());
+  await row.getByRole("button", { name: /^Delete / }).click();
+  await expect(row).toHaveCount(0);
+  expect(await queryRows(`SELECT id FROM "JobPosting" WHERE title = 'Senior Software Engineer, Medicaid Modernization'`)).toHaveLength(0);
+
+  await page.goto("/jobs?view=notforme");
+  const before = await page.getByTestId("job-row").count();
+  expect(before).toBeGreaterThan(0);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: `Delete all ${before}` }).click();
+  await expect(page.getByText(`Deleted ${before} job`)).toBeVisible();
+  await expect(page.getByTestId("job-row")).toHaveCount(0);
+  const [{ n }] = await queryRows(`SELECT count(*)::int AS n FROM "JobDismissal"`);
+  expect(n).toBeGreaterThanOrEqual(before + 1);
 });

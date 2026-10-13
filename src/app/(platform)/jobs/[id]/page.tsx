@@ -133,6 +133,8 @@ export default async function JobDetailPage({ params }: { params: { id: string }
         <JobSteps
           postingId={posting.id}
           postingUrl={posting.url}
+          title={posting.title}
+          deletable={canDeletePosting(posting)}
           status={posting.status as JobStatus}
           appliedOnIso={posting.appliedAt ? dateToIso(posting.appliedAt) : null}
           verdict={fit?.verdict ?? null}

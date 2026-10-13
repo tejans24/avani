@@ -11,7 +11,7 @@ import { addDetectedQuestions } from "@/actions/answers";
 import { guardedContact } from "@/lib/jobs/ai-payload";
 import { canonicalJobUrl, parseCapture, type CapturePayload } from "@/lib/jobs/capture";
 import { canDeletePosting } from "@/lib/jobs/dedupe";
-import { UNEVALUATED_MATCH } from "@/lib/jobs/views";
+import { UNEVALUATED_MATCH, verdictBucket, viewWhere } from "@/lib/jobs/views";
 import { defaultNextAction, type JobStatus } from "@/lib/jobs/pipeline";
 import { ingestPostings, refreshBoard, rescorePosting } from "@/lib/jobs/refresh";
 import { INTERVIEW_QUESTIONS, type Lane, type WorkMode } from "@/lib/jobs/scoring-config";
@@ -193,26 +193,48 @@ export async function deleteJob(id: string): Promise<ActionResult> {
     if (!canDeletePosting(p)) {
       return { ok: false, error: "You applied to this one, so it keeps its history. Archive it instead." };
     }
-    await db.$transaction([
-      db.jobDismissal.upsert({
-        where: { source_sourceJobId: { source: p.source, sourceJobId: p.sourceJobId } },
-        create: { source: p.source, sourceJobId: p.sourceJobId, dedupeKey: p.dedupeKey, title: p.title, companyName: p.company.name },
-        update: {},
-      }),
-      ...p.aliases.map((a) =>
-        db.jobDismissal.upsert({
-          where: { source_sourceJobId: { source: a.source, sourceJobId: a.sourceJobId } },
-          create: { source: a.source, sourceJobId: a.sourceJobId, dedupeKey: p.dedupeKey, title: p.title, companyName: p.company.name },
-          update: {},
-        })
-      ),
-      db.jobPosting.delete({ where: { id } }),
-    ]);
+    await dismissAndDelete(p);
     revalidateJob();
     return { ok: true };
   } catch (e) {
     return fail(e);
   }
+}
+
+/**
+ * Delete everything under "Not for me" that can be deleted (jobs you applied
+ * to keep their history). Like Delete on one job, refreshes won't bring them back.
+ */
+export async function deleteNotForMe(): Promise<ActionResult> {
+  try {
+    await requireAuth();
+    const rows = await db.jobPosting.findMany({ where: viewWhere("notforme"), include: { company: true, aliases: true } });
+    const gone = rows.filter((p) => verdictBucket(p).bucket === "notforme" && canDeletePosting(p));
+    for (const p of gone) await dismissAndDelete(p);
+    revalidateJob();
+    return { ok: true, note: `Deleted ${gone.length} job${gone.length === 1 ? "" : "s"}.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Delete a posting and leave tombstones (for it and its aliases) so refreshes never re-add it. */
+async function dismissAndDelete(p: {
+  id: string;
+  source: string;
+  sourceJobId: string;
+  dedupeKey: string;
+  title: string;
+  company: { name: string };
+  aliases: { source: string; sourceJobId: string }[];
+}) {
+  const tombstone = (source: string, sourceJobId: string) =>
+    db.jobDismissal.upsert({
+      where: { source_sourceJobId: { source: source as never, sourceJobId } },
+      create: { source: source as never, sourceJobId, dedupeKey: p.dedupeKey, title: p.title, companyName: p.company.name },
+      update: {},
+    });
+  await db.$transaction([tombstone(p.source, p.sourceJobId), ...p.aliases.map((a) => tombstone(a.source, a.sourceJobId)), db.jobPosting.delete({ where: { id: p.id } })]);
 }
 
 // --- Company: verify-on-the-call answers, benefits, staffing flag ------------

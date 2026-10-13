@@ -701,6 +701,7 @@ input[type="file"].file-input::file-selector-button:hover {
   }
   .job-table td.c-pay,
   .job-table td.c-pace,
+  .job-table td.c-actions,
   .job-table td.c-posted,
   .job-table td.c-status {
     display: inline-block;

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge, Button } from "@/components/platform/ds";
+import { DeleteJobButton, DeleteNotForMeButton } from "@/components/platform/jobs/DeleteJobButtons";
 import { EvaluateMatchesButton } from "@/components/platform/jobs/EvaluateMatchesButton";
+import { canDeletePosting } from "@/lib/jobs/dedupe";
 import { LANE_LABEL, WORK_MODE_LABEL, ago, formatComp, postingSiteLabel, scoreTone } from "@/lib/jobs/display";
 import { APPLYING_VERDICTS, FIT_VERDICT_LABEL, PACE_LABEL, paceOf, type FitAnalysis, type Pace } from "@/lib/jobs/fit";
 import { JOB_STATUS_LABEL, type JobStatus } from "@/lib/jobs/pipeline";
@@ -77,6 +79,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {view === "todo" && aiEnabled && hasMaster > 0 && <EvaluateMatchesButton remaining={unevaluated} />}
+          {view === "notforme" && postings.length > 0 && <DeleteNotForMeButton count={postings.filter((p) => canDeletePosting(p)).length} />}
           <Button href="/jobs/capture" variant="primary" size="md">
             Add a job
           </Button>
@@ -161,6 +164,9 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                 <th>Pace</th>
                 <th>Where</th>
                 {view === "applied" ? <th>Status</th> : <th>Posted</th>}
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -217,6 +223,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { view?
                         {ago(p.postedAt ?? p.firstSeenAt)}
                       </td>
                     )}
+                    <td className="c-actions">{canDeletePosting(p) && <DeleteJobButton postingId={p.id} title={p.title} />}</td>
                   </tr>
                 );
               })}

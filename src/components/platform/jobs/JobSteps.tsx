@@ -4,6 +4,7 @@ import { setJobStatus } from "@/actions/jobs";
 import { Badge, Button, Eyebrow } from "@/components/platform/ds";
 import { APPLYING_VERDICTS, FIT_VERDICT_LABEL, type FitVerdict } from "@/lib/jobs/fit";
 import type { JobStatus } from "@/lib/jobs/pipeline";
+import { DeleteJobButton } from "./DeleteJobButtons";
 import { ActionMessage, useAction } from "./useAction";
 
 const small = { fontSize: "var(--text-sm)" } as const;
@@ -34,6 +35,9 @@ function Step({ n, done, title, children }: { n: number; done: boolean; title: s
 export function JobSteps(props: {
   postingId: string;
   postingUrl: string;
+  title: string;
+  /** False once you've applied: the job then keeps its history (archive it instead). */
+  deletable: boolean;
   status: JobStatus;
   appliedOnIso: string | null;
   verdict: FitVerdict | null;
@@ -143,6 +147,8 @@ export function JobSteps(props: {
               Not for me: skip it
             </Button>
           )}
+          <span style={{ flex: 1 }} />
+          {props.deletable && <DeleteJobButton postingId={props.postingId} title={props.title} backToList />}
           <ActionMessage error={error} />
         </div>
       )}
