@@ -43,7 +43,7 @@ Truthfulness is the hard rule:
 
 Selection:
 - For each role, choose the bullets that best fit this posting, most relevant first, by bullet id. Reserve bullets (reserve: true) are true and may be used when the posting asks for that skill.
-- Length is a hard limit (stated with the posting). As a budget: the three most recent roles up to 4 bullets each, the next three up to 2, older roles 0 or 1 (a role with no bullets still shows its title line). Fewer, stronger bullets beat more. The app trims anything over the page limit, cutting from older roles first.
+- Length is a hard limit (stated with the posting). As a budget: the three most recent roles up to 4 bullets each, the next three up to 2, older roles exactly 1: their bullet most relevant to this posting. Every role gets at least one bullet. Fewer, stronger bullets beat more. The app trims anything over the page limit, cutting the bullets least relevant to the posting first and never a role's last one.
 - Order skill groups by relevance to the posting, using the exact group names.
 
 Summary: 2 to 4 sentences, using only master facts, in the posting's vocabulary where it is honest to do so.
@@ -108,7 +108,7 @@ export async function tailorWithClaude(input: {
           content: [
             // Identical for every posting: cached after the first tailoring run.
             { type: "text", text: `Master résumé content:\n${parts.resume}`, cache_control: { type: "ephemeral" } },
-            { type: "text", text: `Length: the finished résumé must fit ${maxResumePages(input.posting.lane)} pages; choose fewer bullets in older roles to get there.\n\n${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
+            { type: "text", text: `Length: the finished résumé must fit ${maxResumePages(input.posting.lane)} pages; choose fewer bullets in older roles to get there, keeping at least one per role.\n\n${federal ? FEDERAL + "\n\n" : ""}${plan ? plan + "\n\n" : ""}Posting and the candidate's notes for it:\n${parts.posting}` },
           ],
         },
       ],

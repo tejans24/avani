@@ -41,9 +41,14 @@ export const PAY = {
  * (e.g. GOV_CONTRACTOR: 3); the preview warns over the limit and tailoring
  * aims for it.
  */
-export const RESUME_PAGES: { default: number; byLane: Partial<Record<Lane, number>> } = {
+export const RESUME_PAGES: { default: number; byLane: Partial<Record<Lane, number>>; hardMax: number } = {
   default: 2,
   byLane: {},
+  /**
+   * When even the trimmed version (every role down to its most relevant
+   * bullet) doesn't fit the limit, it may run this long rather than empty a role.
+   */
+  hardMax: 3,
 };
 export const maxResumePages = (lane?: Lane | null) => (lane && RESUME_PAGES.byLane[lane]) || RESUME_PAGES.default;
 

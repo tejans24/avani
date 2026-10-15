@@ -9,9 +9,9 @@ import { defaultNextAction } from "@/lib/jobs/pipeline";
 import { resumeSchema, type Resume } from "@/lib/jobs/resume-schema";
 import { checkStyle } from "@/lib/jobs/resume-style";
 import type { FitAnalysis } from "@/lib/jobs/fit";
-import { checkDocStyle, checkTruth, hasBlocking, masterDoc, quickTailor, reuseDoc, type TailorEdit, type TailoredDoc } from "@/lib/jobs/tailor";
+import { bulletRelevance, checkDocStyle, checkTruth, ensureOneBullet, hasBlocking, masterDoc, quickTailor, reuseDoc, type TailorEdit, type TailoredDoc } from "@/lib/jobs/tailor";
 import { chatAboutResumeWithClaude, tailorWithClaude, type ChatTurn } from "@/lib/jobs/tailor-ai";
-import { maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
+import { RESUME_PAGES, maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
 import { fitDocToPages } from "@/pdf/resume-render";
 
 export type TailorResult = { ok: true; id?: string; version?: number; note?: string } | { ok: false; error: string };
@@ -61,23 +61,34 @@ async function nextVersion(postingId: string): Promise<number> {
 
 
 /**
- * Hold a generated version to the page limit: trims in code (older roles
- * first; cut bullets marked rejected so they can come back) and says what it
- * did in the version's rationale.
+ * Hold a version to the page limit. Every role keeps at least one bullet;
+ * cuts go least relevant to this posting first (bullets the evaluation cited
+ * are kept longest), and cut bullets are marked rejected so they can come
+ * back. If it can't fit even then, it may run to RESUME_PAGES.hardMax pages.
+ * Says what it did in the version's rationale.
  */
-async function fitToLimit(master: Resume, doc: TailoredDoc, lane: Lane): Promise<TailoredDoc> {
-  const maxPages = maxResumePages(lane);
-  const r = await fitDocToPages(master, doc, maxPages);
-  if (!r.bulletsCut && !r.skillLinesHidden) return doc;
+async function fitToLimit(
+  master: Resume,
+  doc: TailoredDoc,
+  posting: { lane: string; title: string; descriptionText: string; fitAnalysis: unknown }
+): Promise<TailoredDoc> {
+  const maxPages = maxResumePages(posting.lane as Lane);
+  const fit = posting.fitAnalysis as FitAnalysis | null;
+  const ranking = { score: bulletRelevance(posting), protect: new Set(fit?.fitTable.flatMap((r) => r.bulletIds) ?? []) };
+  const full = ensureOneBullet(master, doc, ranking);
+  const r = await fitDocToPages(master, full, { maxPages, hardMaxPages: RESUME_PAGES.hardMax }, ranking);
+  if (!r.bulletsCut && !r.skillLinesHidden) return r.doc;
   const what = [
-    r.bulletsCut ? `${r.bulletsCut} bullet${r.bulletsCut === 1 ? "" : "s"} (marked Rejected; bring any back in the editor)` : "",
+    r.bulletsCut ? `${r.bulletsCut} of the bullets least relevant to this posting (marked Rejected; bring any back in the editor)` : "",
     r.skillLinesHidden ? `${r.skillLinesHidden} least relevant skill line${r.skillLinesHidden === 1 ? "" : "s"}` : "",
   ]
     .filter(Boolean)
     .join(" and ");
-  const note = r.fits
-    ? `Trimmed ${what} to fit ${maxPages} page${maxPages === 1 ? "" : "s"}.`
-    : `Trimmed ${what}, and it's still ${r.pages} pages: leave out an old role or shorten bullets.`;
+  const note = !r.overLimit
+    ? `Trimmed ${what} to fit ${maxPages} page${maxPages === 1 ? "" : "s"}; every role keeps at least one bullet.`
+    : r.fits
+      ? `Trimmed ${what}. With every role keeping at least one bullet it needs ${r.pages} pages, over your ${maxPages}-page limit. To get back to ${maxPages}, leave out an old role or shorten bullets.`
+      : `Trimmed ${what}, and it's still ${r.pages} pages: leave out an old role or shorten bullets.`;
   return { ...r.doc, rationale: [doc.rationale, note].filter(Boolean).join(" ") };
 }
 
@@ -104,7 +115,7 @@ export async function generateTailored(postingId: string, mode: "claude" | "quic
             tailoringNotes: posting.tailoringNotes,
             fitPlan: (posting.fitAnalysis as unknown as FitAnalysis | null)?.tailoring ?? null,
           });
-    const fitted = await fitToLimit(master.data, doc, posting.lane as Lane);
+    const fitted = await fitToLimit(master.data, doc, posting);
     const version = await nextVersion(postingId);
     const created = await db.tailoredResume.create({
       data: { postingId, masterId: master.id, version, data: fitted as unknown as Prisma.InputJsonValue, coverNote: fitted.coverNote || null },
@@ -229,11 +240,11 @@ export async function reuseTailoredVersion(postingId: string, fromId: string): P
       include: { posting: { select: { title: true, company: { select: { name: true } } } } },
     });
     const master = await latestMaster();
-    const target = await db.jobPosting.findUniqueOrThrow({ where: { id: postingId }, select: { lane: true } });
+    const target = await db.jobPosting.findUniqueOrThrow({ where: { id: postingId }, select: { lane: true, title: true, descriptionText: true, fitAnalysis: true } });
     const doc = await fitToLimit(
       master.data,
       reuseDoc(master.data, from.data as unknown as TailoredDoc, `v${from.version} for ${from.posting.title} at ${from.posting.company.name}`),
-      target.lane as Lane
+      target
     );
     const version = await nextVersion(postingId);
     const created = await db.tailoredResume.create({

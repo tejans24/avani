@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { db } from "@/lib/db";
 import { resumeSchema, type Resume } from "@/lib/jobs/resume-schema";
 import { maxResumePages, type Lane } from "@/lib/jobs/scoring-config";
-import { applyTrims, checkDocStyle, checkTruth, hasBlocking, renderResume, trimPlan, type TailoredDoc } from "@/lib/jobs/tailor";
+import { applyTrims, checkDocStyle, checkTruth, hasBlocking, renderResume, trimPlan, type TailoredDoc, type TrimRanking } from "@/lib/jobs/tailor";
 import { ResumePdf } from "./ResumePdf";
 
 /** "Lastname_Firstname_Company_Role.pdf", filesystem-safe. */
@@ -62,11 +62,15 @@ export async function renderDocPdf(master: Resume, doc: TailoredDoc): Promise<{ 
 export async function fitDocToPages(
   master: Resume,
   doc: TailoredDoc,
-  maxPages: number
-): Promise<{ doc: TailoredDoc; pages: number; bulletsCut: number; skillLinesHidden: number; fits: boolean }> {
+  limits: { maxPages: number; hardMaxPages?: number },
+  ranking: TrimRanking = {}
+): Promise<{ doc: TailoredDoc; pages: number; bulletsCut: number; skillLinesHidden: number; fits: boolean; overLimit: boolean }> {
+  const { maxPages } = limits;
+  const hardMax = Math.max(limits.hardMaxPages ?? maxPages, maxPages);
   const start = await renderDocPdf(master, doc);
-  if (start.pages <= maxPages) return { doc, pages: start.pages, bulletsCut: 0, skillLinesHidden: 0, fits: true };
-  const ops = trimPlan(master, doc);
+  if (start.pages <= maxPages) return { doc, pages: start.pages, bulletsCut: 0, skillLinesHidden: 0, fits: true, overLimit: false };
+  const ops = trimPlan(master, doc, ranking);
+  // Fewest cuts that fit the limit (binary search over the cut order).
   let lo = 1;
   let hi = ops.length;
   let best: { k: number; pages: number } | null = null;
@@ -78,6 +82,7 @@ export async function fitDocToPages(
       hi = mid - 1;
     } else lo = mid + 1;
   }
+  // Doesn't fit even with every cut (each role down to its best bullet): use them all and let it run longer.
   const k = best?.k ?? ops.length;
   const used = ops.slice(0, k);
   const trimmed = applyTrims(doc, used);
@@ -88,6 +93,7 @@ export async function fitDocToPages(
     pages,
     bulletsCut: used.filter((o) => o.kind === "bullet").length,
     skillLinesHidden: shownBefore - (trimmed.skillGroupsShown ?? shownBefore),
-    fits: pages <= maxPages,
+    fits: pages <= hardMax,
+    overLimit: pages > maxPages,
   };
 }

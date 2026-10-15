@@ -224,13 +224,24 @@ const STOP = new Set(
   )
 );
 
-export function quickTailor(master: Resume, posting: { title: string; descriptionText: string }): TailoredDoc {
+/**
+ * How relevant a bullet is to one posting: shared words, plus the posting's
+ * stack (scoring-config STACK_RULES) the bullet is tagged with. Used to pick
+ * bullets (quick tailor) and to decide what to cut first to fit the page.
+ */
+export function bulletRelevance(posting: { title: string; descriptionText: string }): (b: { text: string; skills?: string[] }) => number {
   const text = `${posting.title}\n${posting.descriptionText}`;
   const postingWords = new Set((text.toLowerCase().match(WORD) ?? []).filter((w) => !STOP.has(w)));
   const stackHits = new Set(STACK_RULES.filter((r) => r.pattern.test(text)).map((r) => r.id));
-  const score = (b: { text: string; skills: string[] }) =>
-    b.skills.filter((s) => stackHits.has(s)).length * 3 +
+  return (b) =>
+    (b.skills ?? []).filter((s) => stackHits.has(s)).length * 3 +
     [...new Set(b.text.toLowerCase().match(WORD) ?? [])].filter((w) => postingWords.has(w)).length;
+}
+
+export function quickTailor(master: Resume, posting: { title: string; descriptionText: string }): TailoredDoc {
+  const score = bulletRelevance(posting);
+  const text = `${posting.title}\n${posting.descriptionText}`;
+  const postingWords = new Set((text.toLowerCase().match(WORD) ?? []).filter((w) => !STOP.has(w)));
 
   const out: TailorOutput = {
     headline: master.headline,
@@ -538,30 +549,83 @@ export type TrimOp = { kind: "bullet"; roleId: string; bulletId: string } | { ki
 
 const MIN_SKILL_LINES = 8;
 
-/**
- * What to cut, in order, when a version runs over the page limit: older
- * roles' extra bullets (keeping one each), then recent roles' bullets beyond
- * three, then the least relevant skill lines (down to eight), then older
- * roles to their header line. Roles are in master order, newest first; the
- * first three count as recent. Bullets go from the end of each role's list,
- * where the least relevant sit.
- */
-export function trimPlan(master: Resume, doc: TailoredDoc): TrimOp[] {
-  const byRole = new Map(doc.experience.map((r) => [r.id, r]));
-  const kept = (roleId: string) => (byRole.get(roleId)?.omitted ? [] : (byRole.get(roleId)?.bullets ?? []).filter((b) => b.status !== "rejected"));
-  const roles = master.experience.map((e) => e.id);
-  const ops: TrimOp[] = [];
-  const cut = (roleId: string, keep: number) =>
-    kept(roleId)
-      .slice(keep)
-      .reverse()
-      .forEach((b) => ops.push({ kind: "bullet", roleId, bulletId: b.id }));
+/** How the trimming ranks bullets for one posting; with none, the master's own order decides. */
+export type TrimRanking = {
+  /** Relevance to the posting (bulletRelevance). */
+  score?: (b: { text: string; skills?: string[] }) => number;
+  /** Bullets the evaluation cited for what the posting asks: cut last. */
+  protect?: Set<string>;
+};
 
-  for (let i = roles.length - 1; i >= 3; i--) cut(roles[i], 1);
-  for (let i = Math.min(2, roles.length - 1); i >= 0; i--) cut(roles[i], 3);
+/**
+ * What to cut, in order, when a version runs over the page limit. Every role
+ * keeps at least one bullet (its most relevant), and within each step the
+ * bullets least relevant to this posting go first:
+ *
+ * 1. older roles (fourth and on) down to one bullet,
+ * 2. recent roles (the first three) down to three,
+ * 3. the least relevant skill lines, down to eight,
+ * 4. recent roles down to two.
+ *
+ * If it still doesn't fit, the caller allows a longer résumé
+ * (RESUME_PAGES.hardMax) rather than emptying a role.
+ */
+export function trimPlan(master: Resume, doc: TailoredDoc, ranking: TrimRanking = {}): TrimOp[] {
+  const byRole = new Map(doc.experience.map((r) => [r.id, r]));
+  const skillsOf = new Map(master.experience.flatMap((e) => e.bullets.map((b) => [b.id, b.skills] as const)));
+  const roles = master.experience.filter((e) => !byRole.get(e.id)?.omitted).map((e) => e.id);
+  const kept = (roleId: string) => (byRole.get(roleId)?.bullets ?? []).filter((b) => b.status !== "rejected");
+  const value = (b: { id: string; text: string }) =>
+    (ranking.protect?.has(b.id) ? 1000 : 0) + (ranking.score ? ranking.score({ text: b.text, skills: skillsOf.get(b.id) }) : 0);
+
+  const ops: TrimOp[] = [];
+  const cutTo = (roleIds: string[], keep: number) => {
+    const candidates = roleIds.flatMap((roleId) => {
+      // Within a role: most relevant first, then the role's own order.
+      const ranked = kept(roleId)
+        .map((b, position) => ({ roleId, b, v: value(b), position }))
+        .sort((x, y) => y.v - x.v || x.position - y.position);
+      return ranked.slice(keep).map((x) => ({ ...x, age: roles.indexOf(roleId) }));
+    });
+    // Across roles: least relevant first; on a tie, the older role, then the bullet further down.
+    candidates
+      .sort((x, y) => x.v - y.v || y.age - x.age || y.position - x.position)
+      .forEach((c) => {
+        if (!ops.some((o) => o.kind === "bullet" && o.bulletId === c.b.id)) ops.push({ kind: "bullet", roleId: c.roleId, bulletId: c.b.id });
+      });
+  };
+
+  cutTo(roles.slice(3), 1);
+  cutTo(roles.slice(0, 3), 3);
   for (let n = (doc.skillGroupsShown ?? master.skills.length) - 2; n >= MIN_SKILL_LINES; n -= 2) ops.push({ kind: "skills", shown: n });
-  for (let i = roles.length - 1; i >= 3; i--) cut(roles[i], 0);
+  cutTo(roles.slice(0, 3), 2);
   return ops;
+}
+
+/**
+ * Every role in the version gets at least one bullet: a role left empty (by
+ * Claude, by reuse, or by an older trim) gets back its most relevant master
+ * bullet. Roles you chose to leave out stay out.
+ */
+export function ensureOneBullet(master: Resume, doc: TailoredDoc, ranking: TrimRanking = {}): TailoredDoc {
+  const next: TailoredDoc = structuredClone(doc);
+  for (const role of master.experience) {
+    let r = next.experience.find((x) => x.id === role.id);
+    if (r?.omitted) continue;
+    if (r && r.bullets.some((b) => b.status !== "rejected")) continue;
+    const best = [...role.bullets]
+      .map((b, i) => ({ b, v: (ranking.protect?.has(b.id) ? 1000 : 0) + (ranking.score?.(b) ?? 0) - (b.reserve ? 5 : 0) - i * 0.01 }))
+      .sort((x, y) => y.v - x.v)[0]?.b;
+    if (!best) continue;
+    if (!r) {
+      r = { id: role.id, bullets: [] };
+      next.experience.push(r);
+    }
+    const existing = r.bullets.find((b) => b.id === best.id);
+    if (existing) existing.status = "accepted";
+    else r.bullets.push({ id: best.id, text: best.text, status: "accepted" });
+  }
+  return next;
 }
 
 /** The document with the first ops applied: cut bullets become "rejected" (restorable in the editor). */
