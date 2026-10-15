@@ -139,6 +139,7 @@ const docSchema = z.object({
   ),
   skillGroupOrder: z.array(z.string()),
   skillGroupsShown: z.number().int().min(1).max(100).optional(),
+  skillGroupsHidden: z.array(z.string().max(200)).max(100).optional(),
   coverNote: z.string().max(5000),
   rationale: z.string().max(2000),
   generatedBy: z.enum(["claude", "quick", "master", "reuse"]),

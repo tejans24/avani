@@ -25,14 +25,15 @@ const long = resumeSchema.parse({
 });
 
 describe("trimPlan", () => {
-  it("keeps every role's best bullet, cuts older roles first, then recent roles, then skill lines", () => {
+  it("keeps every role's best bullet: older roles first, then skill lines, then recent roles", () => {
     const ops = trimPlan(long, masterDoc(long));
     expect(ops[0]).toMatchObject({ kind: "bullet", roleId: "role11" });
     const firstRecent = ops.findIndex((o) => o.kind === "bullet" && ["role0", "role1", "role2"].includes(o.roleId));
-    const firstSkills = ops.findIndex((o) => o.kind === "skills");
+    const firstSkill = ops.findIndex((o) => o.kind === "skill");
+    const lastSkill = ops.map((o, i) => (o.kind === "skill" ? i : -1)).reduce((m, i) => Math.max(m, i), -1);
     const lastOlder = ops.map((o, i) => (o.kind === "bullet" && !["role0", "role1", "role2"].includes(o.roleId) ? i : -1)).reduce((m, i) => Math.max(m, i), -1);
-    expect(firstRecent).toBeGreaterThan(lastOlder);
-    expect(firstSkills).toBeGreaterThan(firstRecent);
+    expect(firstSkill).toBeGreaterThan(lastOlder);
+    expect(firstRecent).toBeGreaterThan(lastSkill);
     // Everything applied: no role is ever empty; recent roles keep two, older roles one.
     const all = renderResume(long, applyTrims(masterDoc(long), ops));
     expect(all.experience.every((e) => e.bullets.length >= 1)).toBe(true);
@@ -64,6 +65,17 @@ describe("trimPlan", () => {
     const oldCuts = ops.filter((o) => o.kind === "bullet" && o.roleId === "old").map((o) => (o as { bulletId: string }).bulletId);
     expect(oldCuts).not.toContain("old-2"); // the relevant one stays
     expect(oldCuts).toHaveLength(2);
+    // Skill lines: the one about the posting's work stays; unrelated ones go first.
+    const withSkills = resumeSchema.parse({
+      ...resume,
+      skills: [
+        { group: "Healthcare interoperability", text: "FHIR, Medicaid eligibility" },
+        ...Array.from({ length: 9 }, (_, i) => ({ group: `Unrelated ${i}`, text: "Photography, woodworking" })),
+      ],
+    });
+    const skillCuts = trimPlan(withSkills, masterDoc(withSkills), { score }).filter((o) => o.kind === "skill");
+    expect(skillCuts).toHaveLength(2);
+    expect(skillCuts.some((o) => o.kind === "skill" && o.group === "Healthcare interoperability")).toBe(false);
     // A bullet the evaluation cited outranks keyword overlap.
     const cited = trimPlan(resume, masterDoc(resume), { score, protect: new Set(["old-3"]) });
     expect(cited.some((o) => o.kind === "bullet" && o.bulletId === "old-3")).toBe(false);
@@ -96,6 +108,9 @@ describe("fitDocToPages", () => {
     const rejected = r.doc.experience.flatMap((e) => e.bullets).filter((b) => b.status === "rejected").length;
     expect(rejected).toBe(r.bulletsCut);
     expect(renderResume(long, r.doc).experience.every((e) => e.bullets.length >= 1)).toBe(true);
+    // As few cuts as it takes: one fewer would not fit.
+    const used = r.bulletsCut + r.skillLinesHidden;
+    expect((await renderDocPdf(long, applyTrims(doc, trimPlan(long, doc).slice(0, used - 1)))).pages).toBeGreaterThan(2);
   }, 60_000);
 
   it("runs to the longer limit rather than emptying roles when nothing else fits", async () => {

@@ -359,11 +359,13 @@ export function TailorEditor(props: {
               <summary>Master summary</summary>
               {props.master.summary}
             </details>
-            {doc.skillGroupsShown !== undefined && doc.skillGroupsShown < props.master.skills.length && (
+            {((doc.skillGroupsShown !== undefined && doc.skillGroupsShown < props.master.skills.length) || (doc.skillGroupsHidden?.length ?? 0) > 0) && (
               <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                Showing the {doc.skillGroupsShown} most relevant of {props.master.skills.length} skill lines, to fit the page limit.
+                {doc.skillGroupsHidden?.length
+                  ? `Left out the skill lines least relevant to this posting, to fit the page limit: ${doc.skillGroupsHidden.join(", ")}.`
+                  : `Showing the ${doc.skillGroupsShown} most relevant of ${props.master.skills.length} skill lines, to fit the page limit.`}
                 {!isSent && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => update((d) => ({ ...d, skillGroupsShown: undefined }))}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => update((d) => ({ ...d, skillGroupsShown: undefined, skillGroupsHidden: undefined }))}>
                     Show all
                   </Button>
                 )}

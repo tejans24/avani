@@ -99,9 +99,10 @@ const CONTACT_LINE_CHARS = 138;
 
 /**
  * What goes under the name: the headline and the contact items, joined by
- * "  |  " as in the owner's résumé, on one line when they fit. Otherwise (or
- * when the headline is a posting's long title) the headline gets its own line
- * above the contact items. Lines only ever break between items.
+ * "  |  " as in the owner's résumé, on one line. When they don't fit, links
+ * (LinkedIn and the like) are left off first; if it still doesn't fit, or the
+ * headline is a posting's long title, the headline gets its own line above
+ * the contact items. Lines only ever break between items.
  */
 export type ContactItem = { text: string; href?: string };
 
@@ -132,12 +133,17 @@ export function contactLines(r: Resume): { headline: string | null; items: Conta
     ...plain(c.citizenship),
   ];
   const headline = r.headline?.trim() || null;
-  if (!headline) return { headline: null, items };
-  // One line when everything fits; otherwise the headline goes on its own line so the contact details stay on one.
-  const oneLine = [headline, ...items.map((i) => i.text)].join(L.contactLine.separator).length;
-  return headline.length > LONG_HEADLINE_CHARS || oneLine > CONTACT_LINE_CHARS
-    ? { headline, items }
-    : { headline: null, items: [{ text: headline }, ...items] };
+  const fits = (parts: ContactItem[]) => parts.map((i) => i.text).join(L.contactLine.separator).length <= CONTACT_LINE_CHARS;
+  // Links are the first thing to give up: the recruiter has the profile from the application.
+  const noLinks = items.filter((i) => !i.href || i.href.startsWith("mailto:"));
+  if (headline && headline.length <= LONG_HEADLINE_CHARS) {
+    const withHeadline = [{ text: headline }, ...items];
+    if (fits(withHeadline)) return { headline: null, items: withHeadline };
+    const withoutLinks = [{ text: headline }, ...noLinks];
+    if (fits(withoutLinks)) return { headline: null, items: withoutLinks };
+  }
+  // A long headline (or one that won't share the line) gets its own line; the contact details stay on one.
+  return { headline, items: fits(items) ? items : noLinks };
 }
 
 /** Everything under the name as one string (tests and plain-text uses). */

@@ -83,3 +83,21 @@ describe("roles with no bullets", () => {
     expect(pdfPageCount(buffer)).toBe(1);
   });
 });
+
+describe("one line under the name", () => {
+  it("leaves the link off before splitting the line, and keeps it when there's room", () => {
+    const busy = resumeSchema.parse({
+      ...base,
+      headline: "Principal Engineer and Architect",
+      contact: { ...base.contact, email: "jordan.quill.solutions.architect@example.com", citizenship: "U.S. Citizen", links: [{ label: "LinkedIn", url: "https://www.linkedin.com/in/jq" }] },
+    });
+    // Headline, location, phone, a long email and citizenship fit together, but not with the link too.
+    const lines = contactLines(busy);
+    expect(lines.headline).toBeNull();
+    expect(lines.items.map((i) => i.text)).not.toContain("LinkedIn");
+    expect(lines.items.map((i) => i.text)).toContain("jordan.quill.solutions.architect@example.com");
+
+    const roomy = resumeSchema.parse({ ...busy, contact: { ...busy.contact, email: "jq@example.com", citizenship: undefined } });
+    expect(contactLines(roomy).items.map((i) => i.text)).toContain("LinkedIn");
+  });
+});

@@ -87,12 +87,12 @@ export async function fitDocToPages(
   const used = ops.slice(0, k);
   const trimmed = applyTrims(doc, used);
   const pages = best?.pages ?? (await renderDocPdf(master, trimmed)).pages;
-  const shownBefore = doc.skillGroupsShown ?? master.skills.length;
+  const hiddenBefore = doc.skillGroupsHidden?.length ?? 0;
   return {
     doc: trimmed,
     pages,
     bulletsCut: used.filter((o) => o.kind === "bullet").length,
-    skillLinesHidden: shownBefore - (trimmed.skillGroupsShown ?? shownBefore),
+    skillLinesHidden: (trimmed.skillGroupsHidden?.length ?? 0) - hiddenBefore,
     fits: pages <= hardMax,
     overLimit: pages > maxPages,
   };

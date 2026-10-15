@@ -56,8 +56,10 @@ export type TailoredDoc = {
   skillGroupOrder: string[];
   coverNote: string;
   rationale: string;
-  /** Show only this many skill lines (most relevant first); all when unset. Set when trimming to fit the page limit. */
+  /** Older versions: show only this many skill lines (the first in skillGroupOrder). */
   skillGroupsShown?: number;
+  /** Skill lines left off to fit the page limit: the ones least relevant to the posting. */
+  skillGroupsHidden?: string[];
   /** How the version started: Claude, the quick tailor, master as is, or copied from another job. */
   generatedBy: "claude" | "quick" | "master" | "reuse";
 };
@@ -204,7 +206,7 @@ export function renderResume(master: Resume, doc: TailoredDoc): Resume {
     ...master,
     headline: doc.headline,
     summary: doc.summary,
-    skills: doc.skillGroupsShown ? skills.slice(0, doc.skillGroupsShown) : skills,
+    skills: (doc.skillGroupsShown ? skills.slice(0, doc.skillGroupsShown) : skills).filter((s) => !doc.skillGroupsHidden?.includes(s.group)),
     experience: master.experience
       .filter((e) => !byRole.get(e.id)?.omitted)
       .map((e) => {
@@ -545,7 +547,7 @@ export function docForChat(master: Resume, doc: TailoredDoc) {
 
 // --- Fitting the page limit -------------------------------------------------------
 
-export type TrimOp = { kind: "bullet"; roleId: string; bulletId: string } | { kind: "skills"; shown: number };
+export type TrimOp = { kind: "bullet"; roleId: string; bulletId: string } | { kind: "skill"; group: string };
 
 const MIN_SKILL_LINES = 8;
 
@@ -563,8 +565,8 @@ export type TrimRanking = {
  * bullets least relevant to this posting go first:
  *
  * 1. older roles (fourth and on) down to one bullet,
- * 2. recent roles (the first three) down to three,
- * 3. the least relevant skill lines, down to eight,
+ * 2. the skill lines least relevant to the posting, down to eight,
+ * 3. recent roles (the first three) down to three,
  * 4. recent roles down to two.
  *
  * If it still doesn't fit, the caller allows a longer résumé
@@ -596,8 +598,14 @@ export function trimPlan(master: Resume, doc: TailoredDoc, ranking: TrimRanking 
   };
 
   cutTo(roles.slice(3), 1);
+  // Skill lines least relevant to the posting, down to eight; on a tie, the one further down the list.
+  const shown = renderResume(master, doc).skills;
+  shown
+    .map((g, position) => ({ group: g.group, v: ranking.score ? ranking.score({ text: `${g.group} ${g.text}` }) : 0, position }))
+    .sort((x, y) => x.v - y.v || y.position - x.position)
+    .slice(0, Math.max(0, shown.length - MIN_SKILL_LINES))
+    .forEach((g) => ops.push({ kind: "skill", group: g.group }));
   cutTo(roles.slice(0, 3), 3);
-  for (let n = (doc.skillGroupsShown ?? master.skills.length) - 2; n >= MIN_SKILL_LINES; n -= 2) ops.push({ kind: "skills", shown: n });
   cutTo(roles.slice(0, 3), 2);
   return ops;
 }
@@ -632,7 +640,7 @@ export function ensureOneBullet(master: Resume, doc: TailoredDoc, ranking: TrimR
 export function applyTrims(doc: TailoredDoc, ops: TrimOp[]): TailoredDoc {
   const next: TailoredDoc = structuredClone(doc);
   for (const op of ops) {
-    if (op.kind === "skills") next.skillGroupsShown = Math.min(next.skillGroupsShown ?? Infinity, op.shown);
+    if (op.kind === "skill") next.skillGroupsHidden = [...new Set([...(next.skillGroupsHidden ?? []), op.group])];
     else {
       const b = next.experience.find((r) => r.id === op.roleId)?.bullets.find((x) => x.id === op.bulletId);
       if (b) b.status = "rejected";
