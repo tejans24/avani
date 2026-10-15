@@ -1,0 +1,34 @@
+Looking for an opportunity to make an impact?
+
+At Leidos, we deliver innovative solutions through the efforts of our diverse and talented people who are dedicated to our customers’ success.
+
+The Digital Modernization Sector brings together our digital transformation and IT programs, allowing us to better serve our customers through scale and repeatability.
+
+Your Next Great Adventure Awaits!
+
+Leidos is seeking a highly versatile and hands on Solution Architect/Engineer with broad expertise across enterprise networks, infrastructure, cloud platforms, and systems engineering. This role combines high level architectural design with deep technical implementation.
+
+Key Responsibilities:
+
+* Serve as the Enterprise Architecture team lead; assigning and managing team tasks, conducting daily stand ups and status updates, preparing weekly consolidated reports, and delivering updates to the federal lead.
+* Define and develop target infrastructure architectures across hybrid and multi cloud environments, networks, platforms, and enterprise systems.
+* Develop automation and code-based solutions using Python, PowerShell, Bash, or similar languages, and infrastructure as code tools such as Terraform, Ansible, or CloudFormation.
+
+Required Qualifications:
+
+* 12+ years of progressive experience in enterprise architecture, infrastructure engineering, and cloud solutions.
+* U.S. Citizenship required.
+* Ability to obtain and maintain a Public Trust security clearance.
+
+Remote Interview / Identification Notice
+**** Please be advised that during the interview, you will be required to keep your camera on.
+
+Please Note:  The program budget salary for this role could fall anywhere between mid $150,000 to low/mid $170,000 with a slight wiggle room (no guarantees) based on relevant experience and assessment.  Additional factors considered in extending an offer include (but are not limited to) responsibilities of the job, education, experience.
+
+If you're looking for comfort, keep scrolling. At Leidos, we outthink, outbuild, and outpace the status quo — because the mission demands it.
+Original Posting:
+September 11, 2026
+Pay Range:
+Pay Range $131,300.00 - $237,350.00
+The Leidos pay range for this job level is a general guideline only and not a guarantee of compensation or salary.
+#Remote

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { insertClient, insertInvoice, insertLineItem, resetDb } from "./utils/db";
+import { isoDaysFromToday } from "./utils/dates";
 
 const FAKE_EMAILS = join(__dirname, "..", ".fake-emails");
 
@@ -22,8 +23,8 @@ test("sending an invoice lands in the activity feed", async ({ page }) => {
   const id = await insertInvoice(client.id, {
     status: "DRAFT",
     totalCents: 594000,
-    issueDate: "2026-07-16",
-    dueDate: "2026-08-07",
+    issueDate: isoDaysFromToday(-5),
+    dueDate: isoDaysFromToday(20), // future → the badge reads "Sent", not "Overdue"
     number: "INV-0100",
   });
   await insertLineItem(id, {

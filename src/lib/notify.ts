@@ -35,6 +35,10 @@ const DEFAULT_TIER: Record<EventType, NotifyTier> = {
   "sync.failed": "action",
   "client.followup_due": "action",
   "client.going_cold": "action",
+  "jobs.new_matches": "action",
+  "jobs.awards_found": "info",
+  "job.followup_due": "action",
+  "job.application_stale": "info",
 };
 
 export type NotifyInput = {

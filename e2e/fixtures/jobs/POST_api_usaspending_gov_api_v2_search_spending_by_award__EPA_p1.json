@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "Award ID": "68HERC26C0042",
+      "Recipient Name": "PATUXENT EARTH ANALYTICS, INC.",
+      "Award Amount": 48250000,
+      "Description": "AIR QUALITY DATA PLATFORM MODERNIZATION",
+      "Start Date": "2026-08-15",
+      "End Date": "2031-08-14",
+      "Awarding Agency": "Environmental Protection Agency",
+      "Awarding Sub Agency": "Environmental Protection Agency",
+      "NAICS": {
+        "code": "541512"
+      },
+      "Place of Performance State Code": "MD",
+      "generated_internal_id": "CONT_AWD_68HERC26C0042_TEST"
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": false
+  }
+}

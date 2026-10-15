@@ -14,3 +14,10 @@ tsconfig.tsbuildinfo
 
 # Test artifacts
 .fake-sms
+
+# Personal résumé data (master + tailored + exported PDFs) — never committed
+/resume
+
+# Job-finder script output
+job-boards-report.json
+contractors-discovered.json

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { insertClient, insertInvoice, insertLineItem, queryRows, resetDb } from "./utils/db";
+import { isoDaysFromToday } from "./utils/dates";
 
 test.beforeEach(async ({ page }) => {
   await resetDb();
@@ -38,8 +39,8 @@ test("sending an invoice auto-logs an EMAIL interaction on the client's timeline
   const invoiceId = await insertInvoice(client.id, {
     status: "DRAFT",
     totalCents: 90000,
-    issueDate: "2026-07-16",
-    dueDate: "2026-08-07",
+    issueDate: isoDaysFromToday(-5),
+    dueDate: isoDaysFromToday(20), // future → the badge reads "Sent", not "Overdue"
     number: "INV-ACME-0001",
   });
   await insertLineItem(invoiceId, {

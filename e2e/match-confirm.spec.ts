@@ -8,6 +8,9 @@ import {
   getCategoryIdByName,
   queryRows,
 } from "./utils/db";
+import { formatIsoLong, isoDaysFromToday } from "./utils/dates";
+
+const DEPOSIT_POSTED = isoDaysFromToday(-20);
 
 /** Seed a SENT invoice and a same-amount unmatched deposit posted after issue. */
 async function seedMatchPair(number: string) {
@@ -15,13 +18,13 @@ async function seedMatchPair(number: string) {
   const invoiceId = await insertInvoice(client.id, {
     status: "SENT",
     totalCents: 594000,
-    issueDate: "2026-07-01",
-    dueDate: "2026-08-15", // future relative to the real clock → badge stays "Sent"
+    issueDate: isoDaysFromToday(-30),
+    dueDate: isoDaysFromToday(30), // future relative to the real clock → badge stays "Sent"
     number,
   });
   const account = await insertAccount();
   const txnId = await insertTransaction(account.id, {
-    postedAt: "2026-07-10",
+    postedAt: DEPOSIT_POSTED,
     amountCents: 594000,
     description: "ACME ACH",
   });
@@ -59,7 +62,7 @@ test.describe("deposit→invoice matching", () => {
       [invoiceId]
     );
     expect(inv[0].status).toBe("PAID");
-    expect(inv[0].paid).toBe("2026-07-10");
+    expect(inv[0].paid).toBe(DEPOSIT_POSTED);
     const txn = await queryRows(
       `SELECT "matchedInvoiceId", "categoryId", status FROM "Transaction" WHERE id = $1`,
       [txnId]
@@ -85,7 +88,7 @@ test.describe("deposit→invoice matching", () => {
 
     await page.goto(`/invoices/${invoiceId}`);
     await expect(
-      page.getByText(/A \$5,940\.00 deposit on Jul 10, 2026 looks like this payment/)
+      page.getByText(`A $5,940.00 deposit on ${formatIsoLong(DEPOSIT_POSTED)} looks like this payment`)
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Confirm", exact: true }).click();

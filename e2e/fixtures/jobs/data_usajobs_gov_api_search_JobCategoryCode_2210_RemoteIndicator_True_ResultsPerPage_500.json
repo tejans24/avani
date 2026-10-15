@@ -1,0 +1,32 @@
+{
+  "SearchResult": {
+    "SearchResultItems": [
+      {
+        "MatchedObjectId": "900001",
+        "MatchedObjectDescriptor": {
+          "PositionTitle": "IT Specialist (Software Engineer)",
+          "PositionURI": "https://www.usajobs.gov/job/900001",
+          "PositionLocationDisplay": "Anywhere in the U.S. (remote job)",
+          "OrganizationName": "Example Health Agency",
+          "PublicationStartDate": "2026-09-26",
+          "PositionRemuneration": [
+            {
+              "MinimumRange": "163964",
+              "MaximumRange": "191900",
+              "RateIntervalCode": "PA"
+            }
+          ],
+          "UserArea": {
+            "Details": {
+              "JobSummary": "Modernize legacy benefits systems that serve veterans.",
+              "MajorDuties": [
+                "Design and build APIs",
+                "Integrate with external systems"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

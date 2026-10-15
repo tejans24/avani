@@ -113,6 +113,31 @@ export const EVENT_SCHEMAS = {
     stage: z.enum(["LEAD", "PROSPECT", "ACTIVE", "PAST"]),
     daysCold: z.number().int(),
   }),
+  // --- Job finder (internal) ---
+  "jobs.new_matches": z.object({
+    count: z.number().int(),
+    top: z.array(
+      z.object({ postingId: z.string(), title: z.string(), companyName: z.string(), score: z.number().int() })
+    ),
+  }),
+  "job.followup_due": z.object({
+    postingId: z.string(),
+    title: z.string(),
+    companyName: z.string(),
+    status: z.string(),
+    note: z.string(),
+    dueDateIso: z.string(),
+  }),
+  "jobs.awards_found": z.object({
+    count: z.number().int(),
+    top: z.array(z.object({ recipient: z.string(), agency: z.string(), amount: z.string() })),
+  }),
+  "job.application_stale": z.object({
+    postingId: z.string(),
+    title: z.string(),
+    companyName: z.string(),
+    daysQuiet: z.number().int(),
+  }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "Award ID": "75FCMC26C0011",
+      "Recipient Name": "CHESAPEAKE CIVIC DIGITAL LLC",
+      "Award Amount": 31500000,
+      "Description": "MEDICAID ELIGIBILITY SYSTEMS MODERNIZATION",
+      "Start Date": "2026-07-20",
+      "End Date": "2031-07-19",
+      "Awarding Agency": "Department of Health and Human Services",
+      "Awarding Sub Agency": "Centers for Medicare and Medicaid Services",
+      "NAICS": {
+        "code": "541512"
+      },
+      "Place of Performance State Code": "MD",
+      "generated_internal_id": "CONT_AWD_75FCMC26C0011_TEST"
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": false
+  }
+}
