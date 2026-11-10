@@ -25,7 +25,12 @@ export default defineConfig({
       : {}),
   },
   webServer: {
-    command: `npx next dev -p ${PORT}`,
+    // CI serves the production build from the preceding `npm run build` step.
+    // `next dev` compiles every route on first visit, which made the serial
+    // suite slower with each new page. Locally, dev keeps edit-and-rerun fast.
+    command: process.env.CI
+      ? `npx next start -p ${PORT}`
+      : `npx next dev -p ${PORT}`,
     port: PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

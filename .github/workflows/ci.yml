@@ -1,13 +1,22 @@
 name: CI
 
 on:
+  # PR branches are covered by pull_request; also running on their pushes ran
+  # every commit twice.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
+
+# A newer commit on the same branch/PR supersedes the in-flight run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A normal run takes about 7 minutes; a hung step fails here instead of after GitHub's 6-hour limit.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -66,8 +75,10 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browser
+        timeout-minutes: 10
         run: npx playwright install --with-deps chromium
 
+      # Runs against the build above via `next start` (see playwright.config.ts).
       - name: E2E tests
         run: npm run test:e2e
 
