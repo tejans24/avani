@@ -1,6 +1,7 @@
 import React from "react";
 import { Eyebrow } from "@/ds/components/core/Eyebrow";
 import { Button } from "@/ds/components/core/Button";
+import { TerrainBackdrop } from "./TerrainBackdrop";
 
 const audiences = [
   "Public-sector teams",
@@ -11,18 +12,23 @@ const audiences = [
 
 export function Hero() {
   return (
-    <section id="top" style={{ position: "relative", overflow: "hidden" }}>
+    <section id="top" className="hero">
+      <TerrainBackdrop />
       <div
-        className="container"
+        className="container hero__inner"
         style={{
-          paddingTop: "clamp(3.5rem, 2rem + 7vw, 7rem)",
-          paddingBottom: "var(--section-y)",
+          paddingTop: "calc(72px + clamp(3.5rem, 2rem + 7vw, 7rem))",
+          paddingBottom: "clamp(6rem, 4rem + 8vw, 10rem)",
         }}
       >
         <div style={{ maxWidth: 900 }}>
-          <Eyebrow style={{ marginBottom: 26 }}>AI systems consulting</Eyebrow>
+          <Eyebrow className="hero-rise" style={{ marginBottom: 26 }}>
+            AI systems consulting
+          </Eyebrow>
           <h1
+            className="hero-rise"
             style={{
+              ["--d" as string]: "120ms",
               fontSize: "var(--text-display)",
               lineHeight: 1.04,
               letterSpacing: "-0.022em",
@@ -31,12 +37,12 @@ export function Hero() {
             }}
           >
             Thoughtful systems. Real efficiency.{" "}
-            <span style={{ fontStyle: "italic", color: "var(--clay)" }}>
-              Responsible AI.
-            </span>
+            <span className="hero-accent">Responsible AI.</span>
           </h1>
           <p
+            className="hero-rise"
             style={{
+              ["--d" as string]: "260ms",
               fontSize: "var(--text-lead)",
               lineHeight: 1.5,
               color: "var(--text-secondary)",
@@ -48,7 +54,9 @@ export function Hero() {
             build better with AI — done thoughtfully, not hastily.
           </p>
           <div
+            className="hero-rise"
             style={{
+              ["--d" as string]: "400ms",
               display: "flex",
               flexWrap: "wrap",
               gap: 14,
@@ -64,7 +72,9 @@ export function Hero() {
           </div>
         </div>
         <div
+          className="hero-rise"
           style={{
+            ["--d" as string]: "560ms",
             marginTop: "clamp(3rem, 2rem + 4vw, 5rem)",
             display: "flex",
             flexWrap: "wrap",

@@ -102,3 +102,123 @@ body {
     max-width: 320px;
   }
 }
+
+/* ============================================================
+   Hero — "dawn over living terrain"
+   ============================================================ */
+.hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-top: -72px; /* slide under the transparent sticky header */
+  min-height: min(100svh, 980px);
+  display: flex;
+  align-items: center;
+  background:
+    radial-gradient(120% 90% at 85% 100%, #F3DCC6 0%, rgba(243,220,198,0) 55%),
+    linear-gradient(180deg, var(--warm-white) 0%, var(--bone) 70%);
+}
+.hero__inner { position: relative; z-index: 2; }
+
+.terrain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.terrain__map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* fade the map out behind the copy so the type stays crisp */
+  -webkit-mask-image: linear-gradient(100deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.35) 35%, #000 70%);
+          mask-image: linear-gradient(100deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.35) 35%, #000 70%);
+}
+.terrain__glow {
+  position: absolute;
+  right: -8%;
+  bottom: -30%;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(201,120,90,.42), rgba(224,170,110,.18) 45%, rgba(244,239,229,0) 75%);
+  filter: blur(8px);
+}
+.terrain__sun {
+  position: absolute;
+  right: clamp(-6rem, 6vw - 6rem, 6vw);
+  bottom: clamp(3.5rem, 2rem + 4vw, 6rem);
+  width: clamp(300px, 34vw, 560px);
+  height: auto;
+  opacity: .95;
+}
+.terrain__rays { transform-origin: 300px 300px; }
+.terrain__horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(3.5rem, 2rem + 4vw, 6rem);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(40,53,43,0) 0%, rgba(40,53,43,.55) 25%, var(--forest) 70%);
+}
+.terrain__horizon::after { /* soft ground below the horizon */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 2px;
+  height: 40vh;
+  background: linear-gradient(180deg, rgba(237,230,215,.92), var(--cream));
+}
+.terrain__grain {
+  position: absolute;
+  inset: 0;
+  opacity: .32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .13  0 0 0 0 .12  0 0 0 0 .10  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.hero-accent {
+  font-style: italic;
+  color: var(--clay);
+  background: linear-gradient(100deg, var(--clay-600) 0%, var(--clay) 40%, #C98A3E 60%, var(--clay) 80%, var(--clay-600) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .terrain__rays { animation: terrain-spin 140s linear infinite; }
+  .terrain__sun  { animation: terrain-sunrise 2.4s var(--ease-out) both; }
+  .terrain__glow { animation: terrain-breathe 9s var(--ease-in-out) infinite alternate; }
+  .hero-accent   { animation: hero-shimmer 9s var(--ease-in-out) infinite alternate; }
+  .hero-rise {
+    animation: hero-rise .9s var(--ease-out) both;
+    animation-delay: var(--d, 0ms);
+  }
+  @keyframes terrain-spin { to { transform: rotate(360deg); } }
+  @keyframes terrain-sunrise {
+    from { transform: translateY(38%); opacity: 0; }
+    to   { transform: none; opacity: .95; }
+  }
+  @keyframes terrain-breathe {
+    from { transform: scale(.94); opacity: .8; }
+    to   { transform: scale(1.06); opacity: 1; }
+  }
+  @keyframes hero-shimmer {
+    from { background-position: 0% 50%; }
+    to   { background-position: 100% 50%; }
+  }
+  @keyframes hero-rise {
+    from { opacity: 0; transform: translateY(18px); filter: blur(4px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+}
+
+@media (max-width: 860px) {
+  .terrain__sun { width: 220px; right: -60px; bottom: 3.5rem; opacity: .45; }
+  .terrain__map {
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,.25), #000 75%);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,.25), #000 75%);
+  }
+}
